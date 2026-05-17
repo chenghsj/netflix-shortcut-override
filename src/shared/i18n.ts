@@ -23,7 +23,6 @@ type Copy = {
   showHints: string
   showHintsDesc: string
   quickSettings: string
-  savingSettings: string
   settingsSaveError: string
   openOptions: string
   githubRepository: string
@@ -67,6 +66,7 @@ type Copy = {
   recordTitle: string
   recordDesc: string
   pressKey: string
+  restore: string
   cancel: string
   save: string
   conflict: string
@@ -94,7 +94,6 @@ export const COPY: Record<Locale, Copy> = {
     showHints: 'Show media hints',
     showHintsDesc: 'Show a small overlay after shortcut actions.',
     quickSettings: 'General settings',
-    savingSettings: 'Saving settings...',
     settingsSaveError: 'Settings were not saved',
     openOptions: 'Open options',
     githubRepository: 'GitHub',
@@ -139,6 +138,7 @@ export const COPY: Record<Locale, Copy> = {
     recordTitle: 'Record shortcut',
     recordDesc: 'Press the key combination to assign to this action.',
     pressKey: 'Press a key',
+    restore: 'Restore',
     cancel: 'Cancel',
     save: 'Save',
     conflict: 'This shortcut is already used by {action}.',
@@ -175,7 +175,6 @@ export const COPY: Record<Locale, Copy> = {
     showHints: '顯示媒體提示',
     showHintsDesc: '使用快捷鍵後顯示小型畫面提示。',
     quickSettings: '一般設定',
-    savingSettings: '正在儲存設定...',
     settingsSaveError: '設定未儲存',
     openOptions: '開啟設定頁',
     githubRepository: 'GitHub',
@@ -220,6 +219,7 @@ export const COPY: Record<Locale, Copy> = {
     recordTitle: '錄製快捷鍵',
     recordDesc: '按下要指定給這個功能的按鍵組合。',
     pressKey: '按下按鍵',
+    restore: '還原',
     cancel: '取消',
     save: '儲存',
     conflict: '這組快捷鍵已被「{action}」使用。',
@@ -256,7 +256,6 @@ export const COPY: Record<Locale, Copy> = {
     showHints: '显示媒体提示',
     showHintsDesc: '使用快捷键后显示小型画面提示。',
     quickSettings: '常规设置',
-    savingSettings: '正在保存设置...',
     settingsSaveError: '设置未保存',
     openOptions: '打开设置页',
     githubRepository: 'GitHub',
@@ -301,6 +300,7 @@ export const COPY: Record<Locale, Copy> = {
     recordTitle: '录制快捷键',
     recordDesc: '按下要指定给这个功能的按键组合。',
     pressKey: '按下按键',
+    restore: '恢复',
     cancel: '取消',
     save: '保存',
     conflict: '这组快捷键已被“{action}”使用。',
@@ -337,7 +337,6 @@ export const COPY: Record<Locale, Copy> = {
     showHints: 'メディアヒントを表示',
     showHintsDesc: 'ショートカット実行後に小さなヒントを表示します。',
     quickSettings: '一般設定',
-    savingSettings: '設定を保存中...',
     settingsSaveError: '設定は保存されませんでした',
     openOptions: '設定を開く',
     githubRepository: 'GitHub',
@@ -382,6 +381,7 @@ export const COPY: Record<Locale, Copy> = {
     recordTitle: 'ショートカットを記録',
     recordDesc: 'この操作に割り当てるキーの組み合わせを押してください。',
     pressKey: 'キーを押す',
+    restore: '復元',
     cancel: 'キャンセル',
     save: '保存',
     conflict: 'このショートカットは「{action}」で使用されています。',
@@ -418,7 +418,6 @@ export const COPY: Record<Locale, Copy> = {
     showHints: '미디어 힌트 표시',
     showHintsDesc: '단축키 실행 후 작은 화면 힌트를 표시합니다.',
     quickSettings: '일반 설정',
-    savingSettings: '설정 저장 중...',
     settingsSaveError: '설정이 저장되지 않았습니다',
     openOptions: '설정 열기',
     githubRepository: 'GitHub',
@@ -463,6 +462,7 @@ export const COPY: Record<Locale, Copy> = {
     recordTitle: '단축키 기록',
     recordDesc: '이 동작에 지정할 키 조합을 누르세요.',
     pressKey: '키를 누르세요',
+    restore: '복원',
     cancel: '취소',
     save: '저장',
     conflict: '이 단축키는 이미 “{action}”에서 사용 중입니다.',

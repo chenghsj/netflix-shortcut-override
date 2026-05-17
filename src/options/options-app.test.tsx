@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
 import { OptionsApp } from '@/options/options-app'
@@ -232,6 +232,43 @@ describe('OptionsApp', () => {
 
     await waitFor(() => {
       expect(seekInput).toHaveValue(10)
+    })
+  })
+
+  it('restores the recorder draft to the saved shortcut before saving', async () => {
+    await saveSettings({
+      ...DEFAULT_SETTINGS,
+      bindings: {
+        ...DEFAULT_SETTINGS.bindings,
+        playPause: {
+          enabled: true,
+          key: { code: 'KeyP', key: 'p', ctrl: false, alt: false, shift: false, meta: false },
+        },
+      },
+    })
+
+    render(<OptionsApp />)
+
+    expect(await screen.findByTitle('P')).toBeInTheDocument()
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Edit' })[0])
+
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByTitle('P')).toBeInTheDocument()
+
+    fireEvent.keyDown(dialog, { code: 'KeyQ', key: 'q' })
+
+    expect(within(dialog).getByTitle('Q')).toBeInTheDocument()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Restore Play / Pause' }))
+
+    expect(within(dialog).getByTitle('P')).toBeInTheDocument()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(screen.getByTitle('P')).toBeInTheDocument()
     })
   })
 })

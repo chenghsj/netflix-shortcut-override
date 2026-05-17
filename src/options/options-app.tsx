@@ -62,6 +62,7 @@ import {
   SPEED_LIMITS,
   findBindingConflict,
   keyBindingFromEvent,
+  keyBindingsEqual,
   type KeyBinding,
   type ShortcutAction,
 } from '@/shared/shortcuts'
@@ -86,6 +87,7 @@ const ignoredRecordKeys = new Set([
 type RecorderState = {
   action: ShortcutAction
   draft: KeyBinding | null
+  savedKey: KeyBinding
 } | null
 
 const FieldLabelWithTooltip = ({
@@ -126,7 +128,6 @@ export function OptionsApp() {
     speedDraft,
     seekDraft,
     loaded,
-    isSaving,
     saveError,
     updateSettings,
     setSpeedDraft,
@@ -170,6 +171,9 @@ export function OptionsApp() {
   }, [recorder, settings])
 
   const canSaveDraft = Boolean(recorder?.draft && !activeConflict)
+  const canRestoreDraft = Boolean(
+    recorder?.draft && !keyBindingsEqual(recorder.draft, recorder.savedKey)
+  )
 
   const saveDraft = () => {
     if (!recorder?.draft || activeConflict) return
@@ -184,6 +188,14 @@ export function OptionsApp() {
       },
     }))
     setRecorder(null)
+  }
+
+  const restoreSavedDraft = () => {
+    if (!recorder) return
+    setRecorder({
+      ...recorder,
+      draft: recorder.savedKey,
+    })
   }
 
   if (!loaded) return null
@@ -220,9 +232,7 @@ export function OptionsApp() {
                 />
               </div>
               <SettingsSaveStatus
-                isSaving={isSaving}
                 error={saveError}
-                savingLabel={copy.savingSettings}
                 errorLabel={copy.settingsSaveError}
                 className="mt-3"
               />
@@ -339,7 +349,11 @@ export function OptionsApp() {
                                 <Button
                                   variant="outline"
                                   onClick={() =>
-                                    setRecorder({ action, draft: settings.bindings[action].key })
+                                    setRecorder({
+                                      action,
+                                      draft: settings.bindings[action].key,
+                                      savedKey: settings.bindings[action].key,
+                                    })
                                   }
                                 >
                                   {copy.edit}
@@ -556,13 +570,23 @@ export function OptionsApp() {
 
           <Separator />
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRecorder(null)}>
-              {copy.cancel}
+          <DialogFooter className="sm:justify-between">
+            <Button
+              variant="ghost"
+              onClick={restoreSavedDraft}
+              disabled={!canRestoreDraft}
+              aria-label={`${copy.restore} ${copy.actions[recorder?.action ?? 'playPause']}`}
+            >
+              {copy.restore}
             </Button>
-            <Button onClick={saveDraft} disabled={!canSaveDraft}>
-              {copy.save}
-            </Button>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button variant="outline" onClick={() => setRecorder(null)}>
+                {copy.cancel}
+              </Button>
+              <Button onClick={saveDraft} disabled={!canSaveDraft}>
+                {copy.save}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

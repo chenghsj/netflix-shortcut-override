@@ -136,7 +136,6 @@ export function PopupApp() {
     speedDraft,
     seekDraft,
     loaded,
-    isSaving,
     saveError,
     updateSettings,
     setSpeedDraftField,
@@ -430,9 +429,7 @@ export function PopupApp() {
               labelClassName="text-center"
             />
             <SettingsSaveStatus
-              isSaving={isSaving}
               error={saveError}
-              savingLabel={copy.savingSettings}
               errorLabel={copy.settingsSaveError}
               className="col-span-2"
             />

@@ -45,7 +45,7 @@ export const useShortcutSettingsForm = () => {
   )
   const [loaded, setLoaded] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [isSaving, startSavingTransition] = useTransition()
+  const [, startSavingTransition] = useTransition()
   const latestSettingsRef = useRef<ShortcutSettings>(DEFAULT_SETTINGS)
   const saveRequestIdRef = useRef(0)
 
@@ -192,7 +192,6 @@ export const useShortcutSettingsForm = () => {
     speedDraft,
     seekDraft,
     loaded,
-    isSaving,
     saveError,
     updateSettings,
     setSpeedDraft,
