@@ -3,6 +3,12 @@
 [![CI](https://github.com/chenghsj/netflix-shortcut-override/actions/workflows/ci.yml/badge.svg)](https://github.com/chenghsj/netflix-shortcut-override/actions/workflows/ci.yml)
 [![Release](https://github.com/chenghsj/netflix-shortcut-override/actions/workflows/release.yml/badge.svg)](https://github.com/chenghsj/netflix-shortcut-override/actions/workflows/release.yml)
 [![Latest release](https://img.shields.io/github/v/release/chenghsj/netflix-shortcut-override?label=release)](https://github.com/chenghsj/netflix-shortcut-override/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+[![Manifest V3](https://img.shields.io/badge/Manifest-V3-4285F4)](https://developer.chrome.com/docs/extensions/develop/migrate/what-is-mv3)
+[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+
+[![Chrome Web Store](https://img.shields.io/badge/Chrome%20Web%20Store-Install-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/shortcut-override-for-net/jebnhiecgnchnioahfagmnebdknddbom)
 
 Customize Netflix playback shortcuts with a small unofficial Chrome extension.
 
@@ -390,4 +396,4 @@ The zip root should contain `manifest.json`, not a nested `dist` folder.
 
 ## License
 
-No license file is currently included. Add one before public distribution if you intend to publish or accept external contributions.
+This project is licensed under the MIT License. See [LICENSE](LICENSE).
