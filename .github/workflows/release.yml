@@ -1,0 +1,146 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag. Leave empty to use manifest.json version, for example v0.1.0.'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Resolve release tag
+        id: release_ref
+        shell: bash
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+
+          manifest_version="$(node -p "JSON.parse(require('fs').readFileSync('manifest.json', 'utf8')).version")"
+          current_tag="v${manifest_version}"
+
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            tag="${INPUT_TAG}"
+            if [[ -z "${tag}" ]]; then
+              tag="${current_tag}"
+            fi
+          else
+            tag="${GITHUB_REF_NAME}"
+          fi
+
+          if [[ ! "${tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Release tag must look like v1.2.3 or v1.2.3-beta.1: ${tag}" >&2
+            exit 1
+          fi
+
+          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+
+      - name: Require existing tag for manual release
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ steps.release_ref.outputs.tag }}"
+
+          if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+            echo "Tag ${tag} already exists."
+          else
+            echo "Tag ${tag} does not exist. Create and push it before running a manual release." >&2
+            exit 1
+          fi
+
+      - name: Checkout release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout --detach "${{ steps.release_ref.outputs.tag }}"
+
+      - name: Verify release version
+        id: release_version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          manifest_version="$(node -p "JSON.parse(require('fs').readFileSync('manifest.json', 'utf8')).version")"
+          expected_tag="v${manifest_version}"
+          tag="${{ steps.release_ref.outputs.tag }}"
+
+          if [[ "${tag}" != "${expected_tag}" ]]; then
+            echo "Release tag ${tag} does not match manifest.json version ${manifest_version}." >&2
+            echo "Update manifest.json or use ${expected_tag}." >&2
+            exit 1
+          fi
+
+          echo "version=${manifest_version}" >> "${GITHUB_OUTPUT}"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build extension
+        run: npm run build
+
+      - name: Generate changelog
+        run: npm run changelog -- --tag "${{ steps.release_ref.outputs.tag }}" --output release-notes.md
+
+      - name: Package extension
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ steps.release_version.outputs.version }}"
+          asset_name="shortcut-override-for-netflix-${version}.zip"
+
+          mkdir -p release-assets
+          (cd dist && zip -r "../release-assets/${asset_name}" .)
+          sha256sum "release-assets/${asset_name}" > "release-assets/${asset_name}.sha256"
+
+      - name: Publish GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${{ steps.release_ref.outputs.tag }}"
+
+          if gh release view "${tag}" >/dev/null 2>&1; then
+            gh release upload "${tag}" release-assets/* --clobber
+            gh release edit "${tag}" --title "${tag}" --notes-file release-notes.md
+          else
+            gh release create "${tag}" release-assets/* \
+              --title "${tag}" \
+              --notes-file release-notes.md \
+              --verify-tag \
+              --latest
+          fi

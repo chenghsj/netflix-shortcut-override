@@ -1,0 +1,45 @@
+{
+  "manifest_version": 3,
+  "name": "Shortcut Override for Netflix",
+  "short_name": "Shortcut Override",
+  "version": "0.1.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0r95+gQsT9L7uYTsT4D+BZWmGjHg+H5qvVTbO2rvWOUji4JbJGBcd6CQA0tqILRTOsSWh6TV3blST+BDEdHlAygTT2UZuDTL+JO43PHO+xnFUKT5uoyvFy+DNsyjmPjgn0I3tNvfxuRc9c5cvkT0l2eMxKpqZzyGRO2aLtC7i46CexMmaXxYSzgCbzFg5XUgOba8V7hnZIxurKY5pxLZuklY8ti46XJvhyx3h/QILXGmpi8x5rxqzUFyewsQaTT26lh2Dbq6GdTTFuV2OxONfXPLgM2qQ/+9crNr00v404bQY5FacFmIQjw2+5r/6UKlTpBxJ9PyHWQX5/YTUOsAbwIDAQAB",
+  "description": "Customize playback shortcuts on Netflix. Unofficial extension, not affiliated with Netflix.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "Shortcut Override",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "background": {
+    "service_worker": "src/background/index.ts",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.netflix.com/*"],
+      "js": ["src/content/netflix-api-bridge.ts"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["*://*.netflix.com/*"],
+      "js": ["src/content/index.ts"],
+      "run_at": "document_start"
+    }
+  ],
+  "permissions": ["storage", "scripting", "activeTab"],
+  "host_permissions": ["*://*.netflix.com/*"]
+}
