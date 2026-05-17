@@ -1,5 +1,9 @@
 # Shortcut Override for Netflix
 
+[![CI](https://github.com/chenghsj/netflix-shortcut-override/actions/workflows/ci.yml/badge.svg)](https://github.com/chenghsj/netflix-shortcut-override/actions/workflows/ci.yml)
+[![Release](https://github.com/chenghsj/netflix-shortcut-override/actions/workflows/release.yml/badge.svg)](https://github.com/chenghsj/netflix-shortcut-override/actions/workflows/release.yml)
+[![Latest release](https://img.shields.io/github/v/release/chenghsj/netflix-shortcut-override?label=release)](https://github.com/chenghsj/netflix-shortcut-override/releases/latest)
+
 Customize Netflix playback shortcuts with a small unofficial Chrome extension.
 
 This extension intercepts configured keyboard shortcuts on Netflix watch pages and routes playback operations through Netflix's player API where needed. It is designed for users who want predictable shortcuts without relying on Netflix's default key handling or visible UI focus state.
@@ -80,7 +84,29 @@ The options UI currently includes:
 - npm
 - Google Chrome or a Chromium-based browser that supports Manifest V3 extensions.
 
-## Install For Local Use
+## Install From Release
+
+Use this path if you just want to install the extension without building it from source.
+
+1. Download the latest release zip from the [GitHub Releases page](https://github.com/chenghsj/netflix-shortcut-override/releases/latest).
+
+2. Extract the zip file.
+
+3. Open Chrome Extension Manager:
+
+   ```text
+   chrome://extensions
+   ```
+
+4. Enable Developer mode.
+
+5. Click "Load unpacked".
+
+6. Select the extracted folder that contains `manifest.json`.
+
+7. Open the extension options page and configure shortcuts.
+
+## Install From Source
 
 1. Install dependencies:
 
@@ -198,7 +224,14 @@ The extension requests:
 | `activeTab` | Read the active tab URL after the toolbar popup is opened so the popup can show page status. |
 | `*://*.netflix.com/*` | Run the extension only on Netflix pages. |
 
-No remote analytics, tracking, or external API calls are used by this project.
+## Privacy
+
+- No remote analytics or tracking code is included.
+- No external API calls are made by the extension.
+- Shortcut, language, hint, and playback speed settings are stored with `chrome.storage`.
+- Content scripts only run on pages matching `*://*.netflix.com/*`.
+- The toolbar popup reads the active tab URL only after the popup is opened, and only to show page status.
+- See the full privacy policy in [PRIVACY.md](PRIVACY.md).
 
 ## Testing
 
@@ -255,6 +288,24 @@ npm run changelog -- --tag v0.1.0 --output release-notes.md
 ```
 
 Commit messages that follow Conventional Commits are grouped into sections such as Features, Fixes, Build and CI, and Maintenance. Other commit messages are placed under Changes.
+
+## Known Limitations
+
+- Shortcuts only run on Netflix watch pages or pages with a visible Netflix player.
+- Shortcut handling is skipped while typing in inputs, textareas, or editable content.
+- Skip intro only works when Netflix renders a visible skip intro button.
+- Seeking uses Netflix's internal player API. If Netflix changes that API, rewind and fast-forward may need an extension update.
+- Browser extension pages and content scripts may need a manual reload after manifest, service worker, or content script changes.
+
+## Bug Reports
+
+When reporting an issue, include:
+
+- Browser name and version.
+- Extension version.
+- The Netflix page type where the issue happened.
+- The shortcut or action that failed.
+- Any console errors from the Netflix tab or extension service worker.
 
 ## Troubleshooting
 
