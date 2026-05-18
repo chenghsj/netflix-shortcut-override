@@ -204,39 +204,42 @@ export function OptionsApp() {
     <TooltipProvider>
       <main className="min-h-svh bg-background text-foreground">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
-          <header className="rounded-lg border bg-card p-5 shadow-xs">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex min-w-0 items-start gap-4">
-                <img src="/icons/icon48.png" alt="" className="size-12 shrink-0" />
-                <h1 className="self-center text-2xl font-semibold leading-tight">
-                  {copy.appTitle}
-                </h1>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Button variant="outline" size="sm" asChild>
-                  <a
-                    href={EXTERNAL_LINKS.githubRepository}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label={copy.githubRepositoryAriaLabel}
-                  >
-                    <GitHubIcon data-icon="inline-start" />
-                    {copy.githubRepository}
-                  </a>
-                </Button>
-                <OtherProjectsSelect
-                  label={copy.otherProjects}
-                  ariaLabel={copy.otherProjectsAriaLabel}
-                  streamDanmakuLabel={copy.streamDanmakuStore}
-                  streamDanmakuTitle={copy.streamDanmakuStoreAriaLabel}
+          <header>
+            <Card>
+              <CardHeader>
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <CardTitle className="flex min-w-0 items-center gap-4">
+                    <img src="/icons/icon48.png" alt="" className="size-12 shrink-0" />
+                    <h1 className="truncate text-2xl font-semibold leading-tight">
+                      {copy.appTitle}
+                    </h1>
+                  </CardTitle>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button variant="outline" size="sm" asChild>
+                      <a
+                        href={EXTERNAL_LINKS.githubRepository}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label={copy.githubRepositoryAriaLabel}
+                      >
+                        <GitHubIcon data-icon="inline-start" />
+                        {copy.githubRepository}
+                      </a>
+                    </Button>
+                    <OtherProjectsSelect
+                      label={copy.otherProjects}
+                      ariaLabel={copy.otherProjectsAriaLabel}
+                      streamDanmakuLabel={copy.streamDanmakuStore}
+                      streamDanmakuTitle={copy.streamDanmakuStoreAriaLabel}
+                    />
+                  </div>
+                </div>
+                <SettingsSaveStatus
+                  error={saveError}
+                  errorLabel={copy.settingsSaveError}
                 />
-              </div>
-              <SettingsSaveStatus
-                error={saveError}
-                errorLabel={copy.settingsSaveError}
-                className="mt-3"
-              />
-            </div>
+              </CardHeader>
+            </Card>
           </header>
 
           <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">

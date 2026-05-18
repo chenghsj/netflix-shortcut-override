@@ -238,29 +238,68 @@ export const findBindingConflict = (
 
 const CODE_LABELS: Record<string, string> = {
   Space: 'Space',
-  ArrowLeft: 'Left',
-  ArrowRight: 'Right',
-  ArrowUp: 'Up',
-  ArrowDown: 'Down',
+  Escape: 'Esc',
+  Enter: 'Enter',
+  NumpadEnter: 'Enter',
+  Tab: 'Tab',
+  Backspace: 'Backspace',
+  Delete: 'Del',
+  Insert: 'Ins',
+  Home: 'Home',
+  End: 'End',
+  PageUp: 'PgUp',
+  PageDown: 'PgDn',
+  CapsLock: 'Caps',
+  ArrowLeft: '←',
+  ArrowRight: '→',
+  ArrowUp: '↑',
+  ArrowDown: '↓',
   Period: '.',
   Comma: ',',
   Slash: '/',
 }
 
-export const getKeyBindingLabels = (binding: KeyBinding): string[] => {
+type KeyBindingLabelOptions = {
+  platform?: string
+}
+
+type NavigatorWithUserAgentData = Navigator & {
+  userAgentData?: {
+    platform?: string
+  }
+}
+
+const getRuntimePlatform = (): string => {
+  if (typeof navigator === 'undefined') return ''
+  const userAgentDataPlatform = (navigator as NavigatorWithUserAgentData).userAgentData?.platform
+  return userAgentDataPlatform ?? navigator.platform
+}
+
+export const getMetaKeyLabel = (platform: string = getRuntimePlatform()): string => {
+  if (/Mac|iPhone|iPad|iPod/i.test(platform)) return '⌘'
+  if (/Win/i.test(platform)) return 'Win'
+  return 'Meta'
+}
+
+export const getKeyBindingLabels = (
+  binding: KeyBinding,
+  options: KeyBindingLabelOptions = {}
+): string[] => {
   const labels = [
     binding.ctrl ? 'Ctrl' : null,
     binding.alt ? 'Alt' : null,
     binding.shift ? 'Shift' : null,
-    binding.meta ? 'Meta' : null,
+    binding.meta ? getMetaKeyLabel(options.platform) : null,
     CODE_LABELS[binding.code] ?? binding.key.toUpperCase(),
   ]
 
   return labels.filter((label): label is string => Boolean(label))
 }
 
-export const formatKeyBinding = (binding: KeyBinding): string =>
-  getKeyBindingLabels(binding).join(' + ')
+export const formatKeyBinding = (
+  binding: KeyBinding,
+  options: KeyBindingLabelOptions = {}
+): string => getKeyBindingLabels(binding, options).join(' + ')
 
 const BASE_PLAYBACK_RATE = 1
 

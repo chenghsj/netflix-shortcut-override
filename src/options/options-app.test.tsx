@@ -15,7 +15,7 @@ describe('OptionsApp', () => {
       'href',
       EXTERNAL_LINKS.githubRepository
     )
-    expect(screen.getByRole('combobox', { name: 'Other projects' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Other products' })).toBeInTheDocument()
     expect(screen.getByText('General settings')).toBeInTheDocument()
     const localeCombobox = screen.getByRole('combobox', { name: 'Language' })
     const enabledSwitch = screen.getByRole('switch', { name: 'Enable shortcut override' })

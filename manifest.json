@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Shortcut Override for Netflix",
   "short_name": "Shortcut Override",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0r95+gQsT9L7uYTsT4D+BZWmGjHg+H5qvVTbO2rvWOUji4JbJGBcd6CQA0tqILRTOsSWh6TV3blST+BDEdHlAygTT2UZuDTL+JO43PHO+xnFUKT5uoyvFy+DNsyjmPjgn0I3tNvfxuRc9c5cvkT0l2eMxKpqZzyGRO2aLtC7i46CexMmaXxYSzgCbzFg5XUgOba8V7hnZIxurKY5pxLZuklY8ti46XJvhyx3h/QILXGmpi8x5rxqzUFyewsQaTT26lh2Dbq6GdTTFuV2OxONfXPLgM2qQ/+9crNr00v404bQY5FacFmIQjw2+5r/6UKlTpBxJ9PyHWQX5/YTUOsAbwIDAQAB",
   "description": "Customize playback shortcuts on Netflix. Unofficial extension, not affiliated with Netflix.",
   "icons": {

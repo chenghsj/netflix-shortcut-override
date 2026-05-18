@@ -13,7 +13,7 @@ describe('PopupApp', () => {
       'href',
       EXTERNAL_LINKS.githubRepository
     )
-    expect(screen.getByRole('combobox', { name: 'Other projects' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Other products' })).toBeInTheDocument()
     expect(screen.getByText('General settings')).toBeInTheDocument()
     expect(screen.queryByText('Open a Netflix title to use shortcuts.')).not.toBeInTheDocument()
     expect(screen.queryByText('Shortcuts only run on Netflix watch pages.')).not.toBeInTheDocument()

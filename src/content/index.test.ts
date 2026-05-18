@@ -198,6 +198,46 @@ describe('content media shortcuts', () => {
     expect(hint?.innerHTML).not.toContain('M18 13c0 3.31')
   })
 
+  it.each([
+    '略過介紹',
+    '略過前情提要',
+    '前回までのあらすじをスキップ',
+    '줄거리 건너뛰기',
+    'Skip Recap',
+  ])(
+    'recognizes localized Netflix skip copy: %s',
+    label => {
+      const button = document.createElement('button')
+      button.textContent = label
+      button.getBoundingClientRect = () =>
+        ({
+          width: 120,
+          height: 32,
+          top: 0,
+          right: 120,
+          bottom: 32,
+          left: 0,
+          x: 0,
+          y: 0,
+          toJSON: () => ({}),
+        }) as DOMRect
+      const click = vi.fn()
+      button.addEventListener('click', click)
+      document.body.append(button)
+
+      const event = new KeyboardEvent('keydown', {
+        code: 'KeyS',
+        key: 's',
+        bubbles: true,
+        cancelable: true,
+      })
+      window.dispatchEvent(event)
+
+      expect(event.defaultPrevented).toBe(true)
+      expect(click).toHaveBeenCalledTimes(1)
+    }
+  )
+
   it('adjusts playback speed through the configured binding and shows the Netflix Danmaku-style hint', () => {
     const video = document.createElement('video')
     video.playbackRate = 1

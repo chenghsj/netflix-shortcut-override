@@ -6,6 +6,24 @@ import { defineConfig } from 'vite'
 
 import manifest from './manifest.json'
 
+const devSuffix = '-dev'
+
+const extensionManifest: ManifestV3Export = ({ command }) => {
+  const isDev = command === 'serve'
+
+  if (!isDev) return manifest
+
+  return {
+    ...manifest,
+    name: `${manifest.name}${devSuffix}`,
+    short_name: `${manifest.short_name}${devSuffix}`,
+    action: {
+      ...manifest.action,
+      default_title: `${manifest.action.default_title}${devSuffix}`,
+    },
+  }
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   resolve: {
@@ -13,7 +31,7 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
-  plugins: [react(), tailwindcss(), crx({ manifest: manifest as ManifestV3Export })],
+  plugins: [react(), tailwindcss(), crx({ manifest: extensionManifest })],
   build: {
     rollupOptions: {
       input: {

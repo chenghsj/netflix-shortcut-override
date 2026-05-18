@@ -5,6 +5,8 @@ import {
   SEEK_LIMITS,
   SPEED_LIMITS,
   findBindingConflict,
+  formatKeyBinding,
+  getKeyBindingLabels,
   normalizeSeekSettings,
   normalizeSpeedSettings,
   resolveNextPlaybackRate,
@@ -96,5 +98,52 @@ describe('shortcut settings', () => {
     )
 
     expect(conflict).toBe('playPause')
+  })
+
+  it('uses platform-native labels for the Meta modifier', () => {
+    const binding = {
+      code: 'KeyZ',
+      key: 'z',
+      ctrl: false,
+      alt: false,
+      shift: false,
+      meta: true,
+    }
+
+    expect(getKeyBindingLabels(binding, { platform: 'macOS' })).toEqual(['⌘', 'Z'])
+    expect(formatKeyBinding(binding, { platform: 'MacIntel' })).toBe('⌘ + Z')
+    expect(getKeyBindingLabels(binding, { platform: 'Win32' })).toEqual(['Win', 'Z'])
+    expect(getKeyBindingLabels(binding, { platform: 'Linux x86_64' })).toEqual(['Meta', 'Z'])
+  })
+
+  it('uses compact arrow glyphs for arrow key labels', () => {
+    expect(getKeyBindingLabels(DEFAULT_SETTINGS.bindings.seekBackward.key)).toEqual(['←'])
+    expect(getKeyBindingLabels(DEFAULT_SETTINGS.bindings.seekForward.key)).toEqual(['→'])
+    expect(getKeyBindingLabels(DEFAULT_SETTINGS.bindings.volumeUp.key)).toEqual(['↑'])
+    expect(getKeyBindingLabels(DEFAULT_SETTINGS.bindings.volumeDown.key)).toEqual(['↓'])
+  })
+
+  it('uses readable labels for common special keys', () => {
+    const specialKey = (code: string, key: string) => ({
+      code,
+      key,
+      ctrl: false,
+      alt: false,
+      shift: false,
+      meta: false,
+    })
+
+    expect(getKeyBindingLabels(specialKey('PageUp', 'PageUp'))).toEqual(['PgUp'])
+    expect(getKeyBindingLabels(specialKey('PageDown', 'PageDown'))).toEqual(['PgDn'])
+    expect(getKeyBindingLabels(specialKey('Escape', 'Escape'))).toEqual(['Esc'])
+    expect(getKeyBindingLabels(specialKey('Delete', 'Delete'))).toEqual(['Del'])
+    expect(getKeyBindingLabels(specialKey('Insert', 'Insert'))).toEqual(['Ins'])
+    expect(getKeyBindingLabels(specialKey('CapsLock', 'CapsLock'))).toEqual(['Caps'])
+    expect(getKeyBindingLabels(specialKey('Backspace', 'Backspace'))).toEqual(['Backspace'])
+    expect(getKeyBindingLabels(specialKey('Enter', 'Enter'))).toEqual(['Enter'])
+    expect(getKeyBindingLabels(specialKey('NumpadEnter', 'Enter'))).toEqual(['Enter'])
+    expect(getKeyBindingLabels(specialKey('Home', 'Home'))).toEqual(['Home'])
+    expect(getKeyBindingLabels(specialKey('End', 'End'))).toEqual(['End'])
+    expect(getKeyBindingLabels(specialKey('Tab', 'Tab'))).toEqual(['Tab'])
   })
 })
