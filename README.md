@@ -8,9 +8,10 @@
 [![Manifest V3](https://img.shields.io/badge/Manifest-V3-4285F4)](https://developer.chrome.com/docs/extensions/develop/migrate/what-is-mv3)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 
-[![Chrome Web Store](https://img.shields.io/badge/Chrome%20Web%20Store-Install-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/shortcut-override-for-net/jebnhiecgnchnioahfagmnebdknddbom)
+[![Chrome Web Store](https://img.shields.io/badge/Chrome-Install-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/shortcut-override-for-net/jebnhiecgnchnioahfagmnebdknddbom)
+[![Microsoft Edge Add-ons](https://img.shields.io/badge/Edge-Install-0078D7?logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyByb2xlPSJpbWciIHZpZXdCb3g9IjAgMCAyNCAyNCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48dGl0bGU%2BTWljcm9zb2Z0IEVkZ2U8L3RpdGxlPjxwYXRoIGZpbGw9IndoaXRlIiBkPSJNMjEuODYgMTcuODZxLjE0IDAgLjI1LjEyLjEuMTMuMS4yNXQtLjExLjMzbC0uMzIuNDYtLjQzLjUzLS40NC41cS0uMjEuMjUtLjM4LjQybC0uMjIuMjNxLS41OC41My0xLjM0IDEuMDQtLjc2LjUxLTEuNi45MS0uODYuNC0xLjc0LjY0dC0xLjY3LjI0cS0uOSAwLTEuNjktLjI4LS44LS4yOC0xLjQ4LS43OC0uNjgtLjUtMS4yMi0xLjE3LS41My0uNjYtLjkyLTEuNDQtLjM4LS43Ny0uNTgtMS42LS4yLS44My0uMi0xLjY3IDAtMSAuMzItMS45Ni4zMy0uOTcuODctMS44LjE0Ljk1LjU1IDEuNzcuNDEuODIgMS4wMiAxLjUuNi42OCAxLjM4IDEuMjEuNzguNTQgMS42NC45Ljg2LjM2IDEuNzcuNTYuOTIuMiAxLjguMiAxLjEyIDAgMi4xOC0uMjQgMS4wNi0uMjMgMi4wNi0uNzJsLjItLjEuMi0uMDV6bS0xNS41LTEuMjdxMCAxLjEuMjcgMi4xNS4yNyAxLjA2Ljc4IDIuMDMuNTEuOTYgMS4yNCAxLjc3Ljc0LjgyIDEuNjYgMS40LTEuNDctLjItMi44LS43NC0xLjMzLS41NS0yLjQ4LTEuMzctMS4xNS0uODMtMi4wOC0xLjktLjkyLTEuMDctMS41OC0yLjMzVC4zNiAxNC45NFEwIDEzLjU0IDAgMTIuMDZxMC0uODEuMzItMS40OS4zMS0uNjguODMtMS4yMy41My0uNTUgMS4yLS45Ni42Ni0uNCAxLjM1LS42Ni43NC0uMjcgMS41LS4zOS43OC0uMTIgMS41NS0uMTIuNyAwIDEuNDIuMS43Mi4xMiAxLjQuMzUuNjguMjMgMS4zMi41Ny42My4zNSAxLjE2LjgzLS4zNSAwLS43LjA3LS4zMy4wNy0uNjUuMjN2LS4wMnEtLjYzLjI4LTEuMi43NC0uNTcuNDYtMS4wNSAxLjA0LS40OC41OC0uODcgMS4yNi0uMzguNjctLjY1IDEuMzktLjI3LjcxLS40MiAxLjQ0LS4xNS43Mi0uMTUgMS4zOHpNMTEuOTYuMDZxMS43IDAgMy4zMy4zOSAxLjYzLjM4IDMuMDcgMS4xNSAxLjQzLjc3IDIuNjIgMS45MyAxLjE4IDEuMTYgMS45OCAyLjcuNDkuOTQuNzYgMS45Ni4yOCAxIC4yOCAyLjA4IDAgLjg5LS4yMyAxLjctLjI0LjgtLjY5IDEuNDgtLjQ1LjY4LTEuMSAxLjIyLS42NC41My0xLjQ1Ljg4LS41NC4yNC0xLjExLjM2LS41OC4xMy0xLjE2LjEzLS40MiAwLS45Ny0uMDMtLjU0LS4wMy0xLjEtLjEyLS41NS0uMS0xLjA1LS4yOC0uNS0uMTktLjg0LS41LS4xMi0uMDktLjIzLS4yNC0uMS0uMTYtLjEtLjMzIDAtLjE1LjE2LS4zNS4xNi0uMi4zNS0uNS4yLS4yOC4zNi0uNjguMTYtLjQuMTYtLjk1IDAtMS4wNi0uNC0xLjk2LS40LS45MS0xLjA2LTEuNjQtLjY2LS43NC0xLjUyLTEuMjgtLjg2LS41NS0xLjc5LS44OS0uODQtLjMtMS43Mi0uNDQtLjg3LS4xNC0xLjc2LS4xNC0xLjU1IDAtMy4wNi40NVQuOTQgNy41NXEuNzEtMS43NCAxLjgxLTMuMTMgMS4xLTEuMzggMi41Mi0yLjM1UTYuNjggMS4xIDguMzcuNThxMS43LS41MiAzLjU4LS41MloiLz48L3N2Zz4%3D)](https://microsoftedge.microsoft.com/addons/detail/shortcut-override-for-net/ddfnieehcebicbmnejlafjphppdjmdhi)
 
-Customize Netflix playback shortcuts with a small unofficial Chrome extension.
+Customize Netflix playback shortcuts with a small unofficial browser extension.
 
 This extension intercepts configured keyboard shortcuts on Netflix watch pages and routes playback operations through Netflix's player API where needed. It is designed for users who want predictable shortcuts without relying on Netflix's default key handling or visible UI focus state.
 
@@ -30,7 +31,7 @@ This project is not affiliated with, endorsed by, or sponsored by Netflix.
 - Control play/pause, volume, mute, fullscreen, skip intro, and playback speed.
 - Hold Space to temporarily switch to a configurable playback speed, then restore on release.
 - Persist settings with `chrome.storage`.
-- Build as a Manifest V3 Chrome extension.
+- Build as a Manifest V3 browser extension.
 
 ## Default Shortcuts
 
