@@ -12,6 +12,7 @@
     "changelog": "node scripts/generate-release-notes.mjs",
     "icons": "node scripts/generate-icons.mjs",
     "build": "tsc -b && vite build && node scripts/fix-extension-build.mjs",
+    "build:edge": "npm run build && node scripts/build-edge-package.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "typecheck": "tsc -b",

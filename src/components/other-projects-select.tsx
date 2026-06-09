@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
-import { EXTERNAL_LINKS } from '@/shared/external-links'
+import { getStreamDanmakuStoreUrl } from '@/shared/external-links'
 
 const STREAM_DANMAKU_VALUE = 'stream-danmaku'
 
@@ -78,7 +78,7 @@ export function OtherProjectsSelect({
                 className="[&>svg:last-child]:hidden"
                 onSelect={() => {
                   setOpen(false)
-                  openExternalProject(EXTERNAL_LINKS.streamDanmakuChromeWebStore)
+                  openExternalProject(getStreamDanmakuStoreUrl())
                 }}
               >
                 <img

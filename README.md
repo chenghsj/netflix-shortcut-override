@@ -277,12 +277,15 @@ The release workflow will:
 4. Build the extension.
 5. Generate release notes.
 6. Package `dist` as a zip file.
-7. Publish or update the GitHub Release.
+7. Package the Microsoft Edge-specific zip file.
+8. Publish or update the GitHub Release.
 
 The generated release assets are:
 
 - `shortcut-override-for-netflix-<version>.zip`
 - `shortcut-override-for-netflix-<version>.zip.sha256`
+- `shortcut-override-for-netflix-edge-<version>.zip`
+- `shortcut-override-for-netflix-edge-<version>.zip.sha256`
 
 ## Changelog
 
@@ -394,6 +397,16 @@ Create a zip from the contents of `dist`:
 ```
 
 The zip root should contain `manifest.json`, not a nested `dist` folder.
+
+For Microsoft Edge Partner Center, build the Edge-specific package:
+
+```sh
+npm run build:edge
+```
+
+That package is written to `release-assets/shortcut-override-for-netflix-edge-<version>.zip`.
+It is generated from `dist`, but removes the Chrome extension `key` field and shortens
+`short_name` to satisfy Edge validation.
 
 ## License
 

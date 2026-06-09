@@ -102,7 +102,7 @@ export const COPY: Record<Locale, Copy> = {
     otherProjectsAriaLabel: 'Other products',
     streamDanmakuStore: 'Stream Danmaku',
     streamDanmakuStoreAriaLabel:
-      'Open Stream Danmaku, another product by the same maker, in the Chrome Web Store',
+      'Open Stream Danmaku, another product by the same maker, in the extension store',
     popupNetflixPage: 'Open a Netflix title to use shortcuts.',
     popupNetflixOnly: 'Shortcuts only run on Netflix watch pages.',
     locale: 'Language',
@@ -183,7 +183,7 @@ export const COPY: Record<Locale, Copy> = {
     otherProjectsAriaLabel: '其他產品',
     streamDanmakuStore: 'Stream Danmaku',
     streamDanmakuStoreAriaLabel:
-      '在 Chrome Web Store 開啟同作者的其他產品 Stream Danmaku',
+      '在擴充功能商店開啟同作者的其他產品 Stream Danmaku',
     popupNetflixPage: '開啟 Netflix 影片後即可使用快捷鍵。',
     popupNetflixOnly: '快捷鍵只會在 Netflix 觀看頁生效。',
     locale: '語言',
@@ -264,7 +264,7 @@ export const COPY: Record<Locale, Copy> = {
     otherProjectsAriaLabel: '其他产品',
     streamDanmakuStore: 'Stream Danmaku',
     streamDanmakuStoreAriaLabel:
-      '在 Chrome Web Store 打开同作者的其他产品 Stream Danmaku',
+      '在扩展商店打开同作者的其他产品 Stream Danmaku',
     popupNetflixPage: '打开 Netflix 视频后即可使用快捷键。',
     popupNetflixOnly: '快捷键只会在 Netflix 观看页生效。',
     locale: '语言',
@@ -345,7 +345,7 @@ export const COPY: Record<Locale, Copy> = {
     otherProjectsAriaLabel: '他の製品',
     streamDanmakuStore: 'Stream Danmaku',
     streamDanmakuStoreAriaLabel:
-      '同じ作者の別製品 Stream Danmaku を Chrome ウェブストアで開く',
+      '同じ作者の別製品 Stream Danmaku を拡張機能ストアで開く',
     popupNetflixPage: 'Netflix の作品を開くとショートカットを使えます。',
     popupNetflixOnly: 'ショートカットは Netflix の視聴ページでのみ動作します。',
     locale: '言語',
@@ -426,7 +426,7 @@ export const COPY: Record<Locale, Copy> = {
     otherProjectsAriaLabel: '다른 제품',
     streamDanmakuStore: 'Stream Danmaku',
     streamDanmakuStoreAriaLabel:
-      '같은 제작자의 다른 제품 Stream Danmaku를 Chrome 웹 스토어에서 열기',
+      '같은 제작자의 다른 제품 Stream Danmaku를 확장 프로그램 스토어에서 열기',
     popupNetflixPage: 'Netflix 콘텐츠를 열면 단축키를 사용할 수 있습니다.',
     popupNetflixOnly: '단축키는 Netflix 시청 페이지에서만 동작합니다.',
     locale: '언어',

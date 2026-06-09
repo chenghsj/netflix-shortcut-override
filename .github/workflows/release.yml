@@ -126,6 +126,9 @@ jobs:
           (cd dist && zip -r "../release-assets/${asset_name}" .)
           sha256sum "release-assets/${asset_name}" > "release-assets/${asset_name}.sha256"
 
+      - name: Package Edge extension
+        run: node scripts/build-edge-package.mjs
+
       - name: Publish GitHub Release
         shell: bash
         env:
