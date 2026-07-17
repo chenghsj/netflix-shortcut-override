@@ -40,11 +40,12 @@ describe('OptionsApp', () => {
     expect(screen.queryByText('Record keys, disable individual actions, or reset defaults.')).not.toBeInTheDocument()
     expect(screen.queryByText('Set the range and step size for speed up/down shortcuts.')).not.toBeInTheDocument()
     expect(screen.queryByText('Set how far the rewind and forward shortcuts move playback.')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Reset speed and seek settings' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reset speed settings' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reset seek settings' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Reset Space hold speed' })).toBeInTheDocument()
-    const stepInput = screen.getByLabelText('Each change')
+    const stepInput = screen.getByLabelText('Speed change')
     const holdInput = screen.getByLabelText('Hold speed')
-    const seekInput = screen.getByLabelText('Seek interval (seconds)')
+    const seekInput = screen.getByLabelText('Seconds per seek')
     expect(stepInput).toHaveAttribute('type', 'number')
     expect(stepInput).toHaveAttribute('step', '0.05')
     expect(stepInput).toHaveValue(0.25)
@@ -61,16 +62,18 @@ describe('OptionsApp', () => {
     expect(seekInput).toHaveValue(10)
     const speedCard = screen.getByText('Speed shortcuts').closest('[data-slot="card"]')
     expect(speedCard).not.toBeNull()
-    expect(within(speedCard as HTMLElement).getByLabelText('Seek interval (seconds)')).toBe(
+    expect(within(speedCard as HTMLElement).queryByLabelText('Seconds per seek')).not.toBeInTheDocument()
+    const seekCard = screen.getByText('Seek shortcuts').closest('[data-slot="card"]')
+    expect(seekCard).not.toBeNull()
+    expect(within(seekCard as HTMLElement).getByLabelText('Seconds per seek')).toBe(
       seekInput
     )
-    expect(screen.queryByText('Seek shortcuts')).not.toBeInTheDocument()
   })
 
   it('persists step changes using 0.05 increments', async () => {
     render(<OptionsApp />)
 
-    const stepInput = await screen.findByLabelText('Each change')
+    const stepInput = await screen.findByLabelText('Speed change')
     fireEvent.change(stepInput, { target: { value: '0.35' } })
     fireEvent.blur(stepInput)
 
@@ -90,7 +93,7 @@ describe('OptionsApp', () => {
   it('persists seek interval changes', async () => {
     render(<OptionsApp />)
 
-    const seekInput = await screen.findByLabelText('Seek interval (seconds)')
+    const seekInput = await screen.findByLabelText('Seconds per seek')
     fireEvent.change(seekInput, { target: { value: '15' } })
     fireEvent.blur(seekInput)
 
@@ -135,8 +138,8 @@ describe('OptionsApp', () => {
         'aria-checked',
         'false'
       )
-      expect(screen.getByLabelText('每次增減')).toHaveValue(0.5)
-      expect(screen.getByLabelText('快轉 / 倒轉秒數')).toHaveValue(20)
+      expect(screen.getByLabelText('每次調整倍速')).toHaveValue(0.5)
+      expect(screen.getByLabelText('每次跳轉秒數')).toHaveValue(20)
     })
   })
 
@@ -178,9 +181,9 @@ describe('OptionsApp', () => {
     const playPauseSwitch = screen.getByRole('switch', {
       name: 'Play / Pause Enabled',
     })
-    const stepInput = screen.getByLabelText('Each change')
+    const stepInput = screen.getByLabelText('Speed change')
     const holdInput = screen.getByLabelText('Hold speed')
-    const seekInput = screen.getByLabelText('Seek interval (seconds)')
+    const seekInput = screen.getByLabelText('Seconds per seek')
 
     fireEvent.click(globalSwitch)
     fireEvent.click(playPauseSwitch)
@@ -210,14 +213,14 @@ describe('OptionsApp', () => {
     })
   })
 
-  it('resets speed and seek settings together, with Space hold reset independently', async () => {
+  it('resets speed, seek, and Space hold settings independently', async () => {
     render(<OptionsApp />)
 
     const minInput = await screen.findByLabelText('Lowest speed')
     const maxInput = screen.getByLabelText('Highest speed')
-    const stepInput = screen.getByLabelText('Each change')
+    const stepInput = screen.getByLabelText('Speed change')
     const holdInput = screen.getByLabelText('Hold speed')
-    const seekInput = screen.getByLabelText('Seek interval (seconds)')
+    const seekInput = screen.getByLabelText('Seconds per seek')
 
     fireEvent.change(minInput, { target: { value: '0.5' } })
     fireEvent.blur(minInput)
@@ -238,13 +241,19 @@ describe('OptionsApp', () => {
       expect(seekInput).toHaveValue(20)
     })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Reset speed and seek settings' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Reset speed settings' }))
 
     await waitFor(() => {
       expect(minInput).toHaveValue(0.25)
       expect(maxInput).toHaveValue(3)
       expect(stepInput).toHaveValue(0.25)
       expect(holdInput).toHaveValue(3)
+      expect(seekInput).toHaveValue(20)
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset seek settings' }))
+
+    await waitFor(() => {
       expect(seekInput).toHaveValue(10)
     })
 

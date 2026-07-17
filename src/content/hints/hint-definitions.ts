@@ -23,7 +23,7 @@ export const mediaHintIcons = {
   pause:
     '<svg viewBox="0 0 24 24" width="36" height="36" fill="white"><rect x="6" y="5" width="4" height="14" rx="2"/><rect x="14" y="5" width="4" height="14" rx="2"/></svg>',
   playbackPlay:
-    '<svg data-hint-icon="playback-play" viewBox="0 0 24 24" width="56" height="56" fill="white"><path d="M5.2 2.4C4.55 2.03 3.75 2.5 3.75 3.25v17.5c0 .75.8 1.22 1.45.85l15.5-8.75c.67-.38.67-1.34 0-1.72L5.2 2.4z"/></svg>',
+    '<svg data-hint-icon="playback-play" viewBox="0 0 24 24" width="56" height="56" fill="white"><path transform="translate(1.25 0)" d="M5.2 2.4C4.55 2.03 3.75 2.5 3.75 3.25v17.5c0 .75.8 1.22 1.45.85l15.5-8.75c.67-.38.67-1.34 0-1.72L5.2 2.4z"/></svg>',
   playbackPause:
     '<svg data-hint-icon="playback-pause" viewBox="0 0 24 24" width="56" height="56" fill="white"><rect x="5" y="3" width="5" height="18" rx="1.25"/><rect x="14" y="3" width="5" height="18" rx="1.25"/></svg>',
   rewind: (seconds: number) => createSeekIcon(rewindPath, seconds),

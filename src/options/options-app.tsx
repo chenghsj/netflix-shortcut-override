@@ -1,4 +1,5 @@
 import {
+  ChevronsLeftRightIcon,
   CircleHelpIcon,
   GaugeIcon,
   KeyboardIcon,
@@ -127,10 +128,16 @@ export function OptionsApp() {
 
   const resetSpeedSettings = () => {
     setSpeedDraft(speedDraftFromSettings(DEFAULT_SETTINGS.speed))
-    setSeekDraft(seekDraftFromSettings(DEFAULT_SETTINGS.seek))
     updateSettings(current => ({
       ...current,
       speed: DEFAULT_SETTINGS.speed,
+    }))
+  }
+
+  const resetSeekSettings = () => {
+    setSeekDraft(seekDraftFromSettings(DEFAULT_SETTINGS.seek))
+    updateSettings(current => ({
+      ...current,
       seek: DEFAULT_SETTINGS.seek,
     }))
   }
@@ -438,17 +445,40 @@ export function OptionsApp() {
                         onBlur={() => commitSpeedField('step')}
                         onKeyDown={handleSpeedKeyDown}
                     />
+                  </FieldGroup>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="items-center">
+                  <CardTitle className="flex items-center gap-2">
+                    <ChevronsLeftRightIcon data-icon="inline-start" />
+                    {copy.seek}
+                  </CardTitle>
+                  <CardAction className="row-span-1 self-center">
+                    <Button
+                      variant="outline"
+                      onClick={resetSeekSettings}
+                      aria-label={copy.resetSeekSettings}
+                    >
+                      <RotateCcwIcon data-icon="inline-start" />
+                      {copy.reset}
+                    </Button>
+                  </CardAction>
+                </CardHeader>
+                <CardContent>
+                  <FieldGroup>
                     <NumericSettingField
-                        id="seek-seconds"
-                        label={copy.seekSeconds}
-                        tooltip={copy.seekSecondsTooltip}
-                        min={SEEK_LIMITS.seconds.min}
-                        max={SEEK_LIMITS.seconds.max}
-                        step={SEEK_LIMITS.seconds.inputStep}
-                        value={seekDraft.seconds}
-                        onValueChange={setSeekDraftSeconds}
-                        onBlur={commitSeekSeconds}
-                        onKeyDown={handleSeekKeyDown}
+                      id="seek-seconds"
+                      label={copy.seekSeconds}
+                      tooltip={copy.seekSecondsTooltip}
+                      min={SEEK_LIMITS.seconds.min}
+                      max={SEEK_LIMITS.seconds.max}
+                      step={SEEK_LIMITS.seconds.inputStep}
+                      value={seekDraft.seconds}
+                      onValueChange={setSeekDraftSeconds}
+                      onBlur={commitSeekSeconds}
+                      onKeyDown={handleSeekKeyDown}
                     />
                   </FieldGroup>
                 </CardContent>

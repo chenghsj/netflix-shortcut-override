@@ -1,4 +1,5 @@
 import {
+  ChevronsLeftRightIcon,
   AlertCircleIcon,
   ExternalLinkIcon,
   GaugeIcon,
@@ -296,21 +297,30 @@ export function PopupApp() {
                   onBlur={() => commitSpeedField('step')}
                   onKeyDown={handleSpeedKeyDown}
               />
+            </div>
+          </section>
+
+          <section className="rounded-lg border bg-card p-3 shadow-xs">
+            <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+              <ChevronsLeftRightIcon className="size-3.5" />
+              {copy.seek}
+            </h2>
+            <div className="flex flex-col gap-2">
               <NumericSettingField
-                  id="popup-seek-seconds"
-                  label={copy.seekSeconds}
-                  tooltip={copy.seekSecondsTooltip}
-                  orientation="horizontal"
-                  fieldClassName="items-center justify-between gap-3"
-                  labelClassName="min-w-0 truncate text-xs"
-                  min={SEEK_LIMITS.seconds.min}
-                  max={SEEK_LIMITS.seconds.max}
-                  step={SEEK_LIMITS.seconds.inputStep}
-                  value={seekDraft.seconds}
-                  inputClassName={popupSpeedInputClassName}
-                  onValueChange={setSeekDraftSeconds}
-                  onBlur={commitSeekSeconds}
-                  onKeyDown={handleSeekKeyDown}
+                id="popup-seek-seconds"
+                label={copy.seekSeconds}
+                tooltip={copy.seekSecondsTooltip}
+                orientation="horizontal"
+                fieldClassName="items-center justify-between gap-3"
+                labelClassName="min-w-0 truncate text-xs"
+                min={SEEK_LIMITS.seconds.min}
+                max={SEEK_LIMITS.seconds.max}
+                step={SEEK_LIMITS.seconds.inputStep}
+                value={seekDraft.seconds}
+                inputClassName={popupSpeedInputClassName}
+                onValueChange={setSeekDraftSeconds}
+                onBlur={commitSeekSeconds}
+                onKeyDown={handleSeekKeyDown}
               />
             </div>
           </section>

@@ -62,6 +62,10 @@ describe('ShortcutCommandController', () => {
     controller.execute('speedReset', document)
 
     expect(document.querySelector('[data-hint-icon="playback-play"]')).toBeInTheDocument()
+    expect(document.querySelector('[data-hint-icon="playback-play"] path')).toHaveAttribute(
+      'transform',
+      'translate(1.25 0)'
+    )
     expect(document.querySelector('[data-hint-icon="speed-up"]')).toBeNull()
     expect(document.querySelector('[data-hint-icon="speed-down"]')).toBeNull()
   })

@@ -26,28 +26,30 @@ describe('PopupApp', () => {
     )
     expect(screen.getByLabelText('Lowest speed')).toHaveValue(0.25)
     expect(screen.getByLabelText('Highest speed')).toHaveValue(3)
-    expect(screen.getByLabelText('Each change')).toHaveValue(0.25)
+    expect(screen.getByLabelText('Speed change')).toHaveValue(0.25)
     expect(screen.getByLabelText('Hold speed')).toHaveValue(2)
     expect(screen.getByRole('switch', { name: 'Space hold speed: Enabled' })).toHaveAttribute(
       'aria-checked',
       'true'
     )
     expect(screen.queryByRole('button', { name: 'Enabled info' })).not.toBeInTheDocument()
-    const seekInput = screen.getByLabelText('Seek interval (seconds)')
+    const seekInput = screen.getByLabelText('Seconds per seek')
     expect(seekInput).toHaveValue(10)
     expect(seekInput).toHaveAttribute('max', '60')
     const speedSection = screen.getByText('Speed shortcuts').closest('section')
     expect(speedSection).not.toBeNull()
-    expect(within(speedSection as HTMLElement).getByLabelText('Seek interval (seconds)')).toBe(
+    expect(within(speedSection as HTMLElement).queryByLabelText('Seconds per seek')).not.toBeInTheDocument()
+    const seekSection = screen.getByText('Seek shortcuts').closest('section')
+    expect(seekSection).not.toBeNull()
+    expect(within(seekSection as HTMLElement).getByLabelText('Seconds per seek')).toBe(
       seekInput
     )
-    expect(screen.queryByText('Seek shortcuts')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Enable shortcut override info' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Lowest speed info' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Highest speed info' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Each change info' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Speed change info' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Hold speed info' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Seek interval (seconds) info' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Seconds per seek info' })).toBeInTheDocument()
     expect(localeCombobox).toHaveTextContent('EN')
   })
 
@@ -79,7 +81,7 @@ describe('PopupApp', () => {
   it('persists popup speed changes', async () => {
     render(<PopupApp />)
 
-    const stepInput = await screen.findByLabelText('Each change')
+    const stepInput = await screen.findByLabelText('Speed change')
     fireEvent.change(stepInput, { target: { value: '0.35' } })
     fireEvent.blur(stepInput)
 
@@ -89,7 +91,7 @@ describe('PopupApp', () => {
   it('persists popup seek second changes', async () => {
     render(<PopupApp />)
 
-    const seekInput = await screen.findByLabelText('Seek interval (seconds)')
+    const seekInput = await screen.findByLabelText('Seconds per seek')
     fireEvent.change(seekInput, { target: { value: '20' } })
     fireEvent.blur(seekInput)
 

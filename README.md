@@ -67,7 +67,7 @@ The options page exposes these playback speed settings:
 | --- | ---: | --- |
 | Lowest speed | `0.25x` | `0.25x` to `1.0x` |
 | Highest speed | `3x` | `1.0x` to `4.0x` |
-| Each change | `0.25x` | `0.05x` to `4.0x` |
+| Speed change | `0.25x` | `0.05x` to `4.0x` |
 | Space hold speed | `2x` | `0.25x` to `4.0x`; while enabled, the extension handles both Space tap and hold |
 
 Values are normalized to `0.05x` increments.
@@ -78,7 +78,7 @@ The options page and popup expose the configurable seek interval:
 
 | Setting | Default | Range |
 | --- | ---: | --- |
-| Seek interval (seconds) | `10s` | `1s` to `60s` |
+| Seconds per seek | `10s` | `1s` to `60s` |
 
 ## Supported Languages
 
