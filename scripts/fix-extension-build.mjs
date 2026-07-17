@@ -1,4 +1,4 @@
-import { readdir, readFile, writeFile } from 'node:fs/promises'
+import { readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
 const rootDir = process.cwd()
@@ -27,6 +27,23 @@ const collectFiles = async directory => {
 
   return files
 }
+
+const removeMacMetadata = async directory => {
+  const entries = await readdir(directory, { withFileTypes: true })
+
+  for (const entry of entries) {
+    const fullPath = path.join(directory, entry.name)
+
+    if (entry.name === '.DS_Store') {
+      await rm(fullPath, { force: true })
+      continue
+    }
+
+    if (entry.isDirectory()) await removeMacMetadata(fullPath)
+  }
+}
+
+await removeMacMetadata(distDir)
 
 const devBuildMarkers = [
   ['CRXJS dev page', 'CRXJS DEV MODE'],

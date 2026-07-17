@@ -13,12 +13,15 @@ export const isTypingTarget = (targetDoc: Document): boolean => {
 
 export const getTargetDocument = (event: KeyboardEvent): Document => event.view?.document ?? document
 
+export const isVideoElement = (element: Element | null): element is HTMLVideoElement =>
+  element?.tagName.toLowerCase() === 'video'
+
 export const findVideo = (targetDoc: Document): HTMLVideoElement | null => {
   const localVideo = targetDoc.querySelector('video')
-  if (localVideo instanceof HTMLVideoElement) return localVideo
+  if (isVideoElement(localVideo)) return localVideo
 
   const rootVideo = document.querySelector('video')
-  return rootVideo instanceof HTMLVideoElement ? rootVideo : null
+  return isVideoElement(rootVideo) ? rootVideo : null
 }
 
 const skipIntroSelector = [

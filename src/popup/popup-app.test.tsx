@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { PopupApp } from '@/popup/popup-app'
@@ -21,27 +21,33 @@ describe('PopupApp', () => {
     expect(screen.getByText('Space').closest('[data-slot="kbd"]')).toBeInTheDocument()
     const localeCombobox = screen.getByRole('combobox', { name: 'Language' })
     const enabledSwitch = screen.getByRole('switch', { name: 'Enable shortcut override' })
-    const hintsSwitch = screen.getByRole('switch', { name: 'Show media hints' })
     expect(localeCombobox.compareDocumentPosition(enabledSwitch)).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING
-    )
-    expect(enabledSwitch.compareDocumentPosition(hintsSwitch)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
     )
     expect(screen.getByLabelText('Lowest speed')).toHaveValue(0.25)
     expect(screen.getByLabelText('Highest speed')).toHaveValue(3)
     expect(screen.getByLabelText('Each change')).toHaveValue(0.25)
-    expect(screen.getByLabelText('Space hold speed')).toHaveValue(2)
-    const seekInput = screen.getByLabelText('Left / Right seconds')
+    expect(screen.getByLabelText('Hold speed')).toHaveValue(2)
+    expect(screen.getByRole('switch', { name: 'Space hold speed: Enabled' })).toHaveAttribute(
+      'aria-checked',
+      'true'
+    )
+    expect(screen.queryByRole('button', { name: 'Enabled info' })).not.toBeInTheDocument()
+    const seekInput = screen.getByLabelText('Seek interval (seconds)')
     expect(seekInput).toHaveValue(10)
     expect(seekInput).toHaveAttribute('max', '60')
+    const speedSection = screen.getByText('Speed shortcuts').closest('section')
+    expect(speedSection).not.toBeNull()
+    expect(within(speedSection as HTMLElement).getByLabelText('Seek interval (seconds)')).toBe(
+      seekInput
+    )
+    expect(screen.queryByText('Seek shortcuts')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Enable shortcut override info' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Show media hints info' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Lowest speed info' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Highest speed info' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Each change info' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Space hold speed info' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Left / Right seconds info' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Hold speed info' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Seek interval (seconds) info' })).toBeInTheDocument()
     expect(localeCombobox).toHaveTextContent('EN')
   })
 
@@ -51,14 +57,10 @@ describe('PopupApp', () => {
     const enabledSwitch = await screen.findByRole('switch', {
       name: 'Enable shortcut override',
     })
-    const hintsSwitch = screen.getByRole('switch', { name: 'Show media hints' })
-
     fireEvent.click(enabledSwitch)
-    fireEvent.click(hintsSwitch)
 
     await waitFor(() => {
       expect(enabledSwitch).toHaveAttribute('aria-checked', 'false')
-      expect(hintsSwitch).toHaveAttribute('aria-checked', 'false')
     })
   })
 
@@ -87,7 +89,7 @@ describe('PopupApp', () => {
   it('persists popup seek second changes', async () => {
     render(<PopupApp />)
 
-    const seekInput = await screen.findByLabelText('Left / Right seconds')
+    const seekInput = await screen.findByLabelText('Seek interval (seconds)')
     fireEvent.change(seekInput, { target: { value: '20' } })
     fireEvent.blur(seekInput)
 

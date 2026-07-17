@@ -1,38 +1,26 @@
 import { findSkipIntroButton, findVideo, toggleFullscreen } from '@/content/dom-utils'
-import { mediaHintIcons as icons, showMediaHint } from '@/content/media-hint'
+import {
+  createHintIcon,
+  getHintManager,
+  mediaHintIcons as icons,
+  type HintIcon,
+  type HintRequest,
+} from '@/content/hints/hint-manager'
 import { getSeekFailureLabel, sendNetflixApi } from '@/content/netflix-api-client'
-import { getCopy } from '@/shared/i18n'
+import {
+  createSpaceInteractionController,
+  type SpaceInteractionController,
+} from './space-interaction-controller'
+import type { CommandContext, ShortcutCommand } from './shortcut-command-types'
 import {
   resolveNextPlaybackRate,
   type ShortcutAction,
   type ShortcutSettings,
 } from '@/shared/shortcuts'
 
-type CommandContext = {
-  settings: ShortcutSettings
-  targetDoc: Document
-}
-
-type ShortcutCommand = (context: CommandContext) => boolean
-
-type SpaceHoldState = {
-  targetDoc: Document
-  video: HTMLVideoElement
-  restoreRate: number
-  wasPaused: boolean
-  timer: number | null
-  active: boolean
-}
-
-export type ShortcutCommandController = {
-  clearSpaceHoldState(): void
-  completeSpaceHold(): void
+export type ShortcutCommandController = SpaceInteractionController & {
   execute(action: ShortcutAction, targetDoc: Document): boolean
-  hasSpaceHoldState(): boolean
-  startSpaceHold(targetDoc: Document, video: HTMLVideoElement): void
 }
-
-const SPACE_HOLD_DELAY_MS = 250
 
 const clampVolume = (volume: number): number => {
   const clamped = Math.min(1, Math.max(0, Number.isFinite(volume) ? volume : 0.1))
@@ -65,33 +53,49 @@ const mirrorAudioState = (video: HTMLVideoElement, state: { muted?: boolean; vol
   if (state.muted === true) video.muted = true
 }
 
-const getRestorablePlaybackRate = (video: HTMLVideoElement): number =>
-  Number.isFinite(video.playbackRate) && video.playbackRate > 0 ? video.playbackRate : 1
-
 const formatPlaybackRate = (rate: number): string =>
   `${rate.toFixed(2).replace(/\.00$/, '').replace(/0$/, '')}x`
 
-const formatSeekHint = (seconds: number, direction: -1 | 1): string =>
-  `${direction > 0 ? '+' : '-'}${seconds}s`
-
-const showHint = (context: CommandContext, iconHtml: string, label: string) => {
-  showMediaHint(iconHtml, label, context.targetDoc, context.settings.showHints)
+const showHintRequest = (context: CommandContext, request: HintRequest): void => {
+  getHintManager(context.targetDoc).show(request)
 }
 
-const setPlaybackRate = (video: HTMLVideoElement, rate: number, context: CommandContext) => {
+const showHint = (context: CommandContext, icon: HintIcon | string, label: string): void => {
+  showHintRequest(context, {
+    type: 'media',
+    icon: typeof icon === 'string' ? createHintIcon(icon) : icon,
+    label,
+  })
+}
+
+const showVolume = (context: CommandContext, icon: HintIcon | string, label: string): void =>
+  showHintRequest(context, {
+    type: 'volume',
+    icon: typeof icon === 'string' ? createHintIcon(icon) : icon,
+    label,
+  })
+
+const setPlaybackRate = (
+  video: HTMLVideoElement,
+  rate: number,
+  context: CommandContext,
+  displayHint = true,
+  icon: HintIcon = createHintIcon(icons.speed)
+) => {
   video.playbackRate = rate
   sendNetflixApi('setPlaybackRate', rate)
-  showHint(context, icons.speed, formatPlaybackRate(rate))
+  if (displayHint) {
+    showHintRequest(context, { type: 'speed', icon, label: formatPlaybackRate(rate) })
+  }
 }
 
 const adjustVolume = (video: HTMLVideoElement, delta: number, context: CommandContext) => {
-  const copy = getCopy(context.settings.locale)
   const currentVolume = clampVolume(video.volume)
   const isSilent = video.muted || currentVolume === 0
 
   if (isSilent && delta < 0) {
     if (currentVolume > 0) rememberVolumeForRestore(video, currentVolume)
-    showHint(context, icons.mute, copy.hints.mute)
+    showVolume(context, icons.mute, '0%')
     return
   }
 
@@ -112,57 +116,66 @@ const adjustVolume = (video: HTMLVideoElement, delta: number, context: CommandCo
     rememberVolumeForRestore(video, baseVolume)
   }
 
-  const label = nextVolume === 0 ? copy.hints.mute : `${Math.round(nextVolume * 100)}%`
-  showHint(context, nextVolume === 0 ? icons.mute : icons.volume, label)
+  const icon = nextVolume === 0 ? icons.mute : delta > 0 ? icons.volume : icons.volumeDown
+  showVolume(context, icon, `${Math.round(nextVolume * 100)}%`)
 }
 
 const toggleMute = (video: HTMLVideoElement, context: CommandContext) => {
-  const copy = getCopy(context.settings.locale)
   if (video.muted || video.volume === 0) {
     const restored = getLastAudibleVolume(video)
     sendNetflixApi('unmuteWithVolume', restored)
     mirrorAudioState(video, { volume: restored, muted: false })
     rememberVolumeForRestore(video, restored)
-    showHint(context, icons.volume, copy.hints.unmute)
+    showVolume(context, icons.volume, `${Math.round(restored * 100)}%`)
     return
   }
 
   rememberVolumeForRestore(video, video.volume)
   sendNetflixApi('setMuted', 1)
   mirrorAudioState(video, { muted: true })
-  showHint(context, icons.mute, copy.hints.mute)
+  showVolume(context, icons.mute, '0%')
 }
 
 const seekCommand =
   (direction: -1 | 1): ShortcutCommand =>
   context => {
-    const icon =
+    const failureIcon =
       direction === -1
         ? icons.rewind(context.settings.seek.seconds)
         : icons.forward(context.settings.seek.seconds)
-    showHint(context, icon, formatSeekHint(context.settings.seek.seconds, direction))
+    showHintRequest(context, {
+      type: 'seek',
+      direction,
+      seconds: context.settings.seek.seconds,
+    })
     void sendNetflixApi('seek', direction * context.settings.seek.seconds * 1000).then(response => {
+      if (!context.isCurrentAction()) return
+
       const failureLabel = getSeekFailureLabel(response)
-      if (failureLabel) showHint(context, icon, failureLabel)
+      if (failureLabel) showHint(context, failureIcon, failureLabel)
     })
     return true
   }
+
+const togglePlayback = (video: HTMLVideoElement, context: CommandContext): void => {
+  if (video.paused) {
+    void video.play().catch(() => undefined)
+    sendNetflixApi('play')
+    showHintRequest(context, { type: 'playback', icon: createHintIcon(icons.playbackPlay) })
+    return
+  }
+
+  video.pause()
+  sendNetflixApi('pause')
+  showHintRequest(context, { type: 'playback', icon: createHintIcon(icons.playbackPause) })
+}
 
 const createCommandMap = (): Record<ShortcutAction, ShortcutCommand> => ({
   playPause: context => {
     const video = findVideo(context.targetDoc)
     if (!video) return false
 
-    const copy = getCopy(context.settings.locale)
-    if (video.paused) {
-      void video.play().catch(() => undefined)
-      sendNetflixApi('play')
-      showHint(context, icons.play, copy.hints.play)
-    } else {
-      video.pause()
-      sendNetflixApi('pause')
-      showHint(context, icons.pause, copy.hints.pause)
-    }
+    togglePlayback(video, context)
     return true
   },
   seekBackward: seekCommand(-1),
@@ -189,13 +202,12 @@ const createCommandMap = (): Record<ShortcutAction, ShortcutCommand> => ({
     toggleFullscreen(context.targetDoc)
     return true
   },
+  pictureInPicture: () => false,
   skipIntro: context => {
     const button = findSkipIntroButton(context.targetDoc)
     if (!button) return false
 
-    const copy = getCopy(context.settings.locale)
     button.click()
-    showHint(context, icons.skipIntro, copy.hints.skipIntro)
     return true
   },
   speedUp: context => {
@@ -204,7 +216,9 @@ const createCommandMap = (): Record<ShortcutAction, ShortcutCommand> => ({
     setPlaybackRate(
       video,
       resolveNextPlaybackRate(video.playbackRate, 1, context.settings.speed),
-      context
+      context,
+      true,
+      createHintIcon(icons.speedUp)
     )
     return true
   },
@@ -214,14 +228,16 @@ const createCommandMap = (): Record<ShortcutAction, ShortcutCommand> => ({
     setPlaybackRate(
       video,
       resolveNextPlaybackRate(video.playbackRate, -1, context.settings.speed),
-      context
+      context,
+      true,
+      createHintIcon(icons.speedDown)
     )
     return true
   },
   speedReset: context => {
     const video = findVideo(context.targetDoc)
     if (!video) return false
-    setPlaybackRate(video, 1, context)
+    setPlaybackRate(video, 1, context, true, createHintIcon(icons.playbackPlay))
     return true
   },
 })
@@ -229,80 +245,38 @@ const createCommandMap = (): Record<ShortcutAction, ShortcutCommand> => ({
 export const createShortcutCommandController = (
   getSettings: () => ShortcutSettings
 ): ShortcutCommandController => {
+  let currentActionToken = 0
   const commands = createCommandMap()
-  let spaceHoldState: SpaceHoldState | null = null
 
-  const createContext = (targetDoc: Document): CommandContext => ({
+  const createContext = (targetDoc: Document, actionToken = currentActionToken): CommandContext => ({
     settings: getSettings(),
     targetDoc,
+    isCurrentAction: () => actionToken === currentActionToken,
   })
 
-  const execute = (action: ShortcutAction, targetDoc: Document): boolean =>
-    commands[action](createContext(targetDoc))
-
-  const clearSpaceHoldState = (): void => {
-    if (spaceHoldState?.timer != null) window.clearTimeout(spaceHoldState.timer)
-    spaceHoldState = null
+  const startAction = (): number => {
+    currentActionToken += 1
+    return currentActionToken
   }
 
-  const startSpaceHold = (targetDoc: Document, video: HTMLVideoElement): void => {
-    if (spaceHoldState) return
-
-    const state: SpaceHoldState = {
-      targetDoc,
-      video,
-      restoreRate: getRestorablePlaybackRate(video),
-      wasPaused: video.paused,
-      timer: null,
-      active: false,
-    }
-
-    state.timer = window.setTimeout(() => {
-      if (spaceHoldState !== state) return
-
-      state.timer = null
-      state.active = true
-
-      if (state.wasPaused) {
-        void state.video.play().catch(() => undefined)
-        sendNetflixApi('play')
-      }
-
-      const context = createContext(state.targetDoc)
-      setPlaybackRate(state.video, context.settings.speed.hold, context)
-    }, SPACE_HOLD_DELAY_MS)
-
-    spaceHoldState = state
+  const execute = (action: ShortcutAction, targetDoc: Document): boolean => {
+    const actionToken = startAction()
+    return commands[action](createContext(targetDoc, actionToken))
   }
 
-  const completeSpaceHold = (): void => {
-    const state = spaceHoldState
-    if (!state) return
-
-    spaceHoldState = null
-
-    if (state.timer !== null) {
-      window.clearTimeout(state.timer)
-      execute('playPause', state.targetDoc)
-      return
-    }
-
-    if (!state.active) return
-
-    const context = createContext(state.targetDoc)
-    setPlaybackRate(state.video, state.restoreRate, context)
-
-    if (state.wasPaused) {
-      state.video.pause()
-      sendNetflixApi('pause')
-    }
-  }
+  const spaceInteraction = createSpaceInteractionController({
+    createContext,
+    startAction,
+    executeShortPress: targetDoc => execute('playPause', targetDoc),
+    hideHints: targetDoc => getHintManager(targetDoc).hide(),
+    setPlaybackRate,
+    showSpaceHoldHint: (context, label) => {
+      showHintRequest(context, { type: 'spaceHold', label })
+    },
+  })
 
   return {
-    clearSpaceHoldState,
-    completeSpaceHold,
+    ...spaceInteraction,
     execute,
-    hasSpaceHoldState: () => spaceHoldState !== null,
-    startSpaceHold,
   }
 }

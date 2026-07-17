@@ -6,6 +6,7 @@ export const SHORTCUT_ACTIONS = [
   'volumeDown',
   'mute',
   'fullscreen',
+  'pictureInPicture',
   'skipIntro',
   'speedUp',
   'speedDown',
@@ -35,7 +36,11 @@ export type SpeedSettings = {
   min: number
   max: number
   step: number
-  hold: number
+}
+
+export type SpaceHoldSettings = {
+  enabled: boolean
+  speed: number
 }
 
 export type SeekSettings = {
@@ -43,10 +48,11 @@ export type SeekSettings = {
 }
 
 export type ShortcutSettings = {
+  version: number
   enabled: boolean
-  showHints: boolean
   locale: Locale
   speed: SpeedSettings
+  spaceHold: SpaceHoldSettings
   seek: SeekSettings
   bindings: Record<ShortcutAction, ShortcutBinding>
 }
@@ -55,7 +61,10 @@ export const SPEED_LIMITS = {
   min: { min: 0.25, max: 1 },
   max: { min: 1, max: 4 },
   step: { min: 0.05, max: 4, inputStep: 0.05 },
-  hold: { min: 0.25, max: 4, inputStep: 0.05 },
+} as const
+
+export const SPACE_HOLD_LIMITS = {
+  speed: { min: 0.25, max: 4, inputStep: 0.05 },
 } as const
 
 export const SEEK_LIMITS = {
@@ -66,11 +75,26 @@ export const DEFAULT_SPEED_SETTINGS: SpeedSettings = {
   min: 0.25,
   max: 3,
   step: 0.25,
-  hold: 2,
+}
+
+export const DEFAULT_SPACE_HOLD_SETTINGS: SpaceHoldSettings = {
+  enabled: true,
+  speed: 2,
 }
 
 export const DEFAULT_SEEK_SETTINGS: SeekSettings = {
   seconds: 10,
+}
+
+export const SHORTCUT_SETTINGS_VERSION = 3
+
+const LEGACY_PICTURE_IN_PICTURE_BINDING: KeyBinding = {
+  code: 'KeyW',
+  key: 'W',
+  ctrl: false,
+  alt: false,
+  shift: true,
+  meta: false,
 }
 
 export const DEFAULT_KEY_BINDINGS: Record<ShortcutAction, KeyBinding> = {
@@ -81,17 +105,54 @@ export const DEFAULT_KEY_BINDINGS: Record<ShortcutAction, KeyBinding> = {
   volumeDown: { code: 'ArrowDown', key: 'ArrowDown', ctrl: false, alt: false, shift: false, meta: false },
   mute: { code: 'KeyM', key: 'm', ctrl: false, alt: false, shift: false, meta: false },
   fullscreen: { code: 'KeyF', key: 'f', ctrl: false, alt: false, shift: false, meta: false },
+  pictureInPicture: {
+    code: 'KeyP',
+    key: 'P',
+    ctrl: false,
+    alt: false,
+    shift: true,
+    meta: false,
+  },
   skipIntro: { code: 'KeyS', key: 's', ctrl: false, alt: false, shift: false, meta: false },
   speedUp: { code: 'Period', key: '>', ctrl: false, alt: false, shift: true, meta: false },
   speedDown: { code: 'Comma', key: '<', ctrl: false, alt: false, shift: true, meta: false },
   speedReset: { code: 'Slash', key: '?', ctrl: false, alt: false, shift: true, meta: false },
 }
 
+const NETFLIX_NATIVE_SHORTCUT_ACTIONS = [
+  'playPause',
+  'seekBackward',
+  'seekForward',
+  'volumeUp',
+  'volumeDown',
+  'mute',
+  'fullscreen',
+  'skipIntro',
+] as const satisfies readonly ShortcutAction[]
+
+const NETFLIX_NATIVE_KEY_BINDINGS: Record<
+  (typeof NETFLIX_NATIVE_SHORTCUT_ACTIONS)[number],
+  readonly KeyBinding[]
+> = {
+  playPause: [
+    DEFAULT_KEY_BINDINGS.playPause,
+    { code: 'Enter', key: 'Enter', ctrl: false, alt: false, shift: false, meta: false },
+  ],
+  seekBackward: [DEFAULT_KEY_BINDINGS.seekBackward],
+  seekForward: [DEFAULT_KEY_BINDINGS.seekForward],
+  volumeUp: [DEFAULT_KEY_BINDINGS.volumeUp],
+  volumeDown: [DEFAULT_KEY_BINDINGS.volumeDown],
+  mute: [DEFAULT_KEY_BINDINGS.mute],
+  fullscreen: [DEFAULT_KEY_BINDINGS.fullscreen],
+  skipIntro: [DEFAULT_KEY_BINDINGS.skipIntro],
+}
+
 export const DEFAULT_SETTINGS: ShortcutSettings = {
+  version: SHORTCUT_SETTINGS_VERSION,
   enabled: true,
-  showHints: true,
   locale: 'en',
   speed: DEFAULT_SPEED_SETTINGS,
+  spaceHold: DEFAULT_SPACE_HOLD_SETTINGS,
   seek: DEFAULT_SEEK_SETTINGS,
   bindings: Object.fromEntries(
     SHORTCUT_ACTIONS.map(action => [
@@ -119,18 +180,30 @@ export const normalizeSpeedSettings = (raw: Partial<SpeedSettings> | undefined):
   const candidateMin = normalizeToStep(Number(raw?.min ?? DEFAULT_SPEED_SETTINGS.min))
   const candidateMax = normalizeToStep(Number(raw?.max ?? DEFAULT_SPEED_SETTINGS.max))
   const candidateStep = normalizeToStep(Number(raw?.step ?? DEFAULT_SPEED_SETTINGS.step))
-  const candidateHold = normalizeToStep(Number(raw?.hold ?? DEFAULT_SPEED_SETTINGS.hold))
 
   const min = clamp(candidateMin, SPEED_LIMITS.min.min, SPEED_LIMITS.min.max)
   const max = clamp(candidateMax, Math.max(SPEED_LIMITS.max.min, min), SPEED_LIMITS.max.max)
   const step = clamp(candidateStep, SPEED_LIMITS.step.min, SPEED_LIMITS.step.max)
-  const hold = clamp(candidateHold, SPEED_LIMITS.hold.min, SPEED_LIMITS.hold.max)
 
   return {
     min,
     max,
     step,
-    hold,
+  }
+}
+
+export const normalizeSpaceHoldSettings = (
+  raw: Partial<SpaceHoldSettings> | undefined,
+  legacySpeed?: unknown
+): SpaceHoldSettings => {
+  const candidateSpeed = normalizeToStep(
+    Number(raw?.speed ?? legacySpeed ?? DEFAULT_SPACE_HOLD_SETTINGS.speed)
+  )
+
+  return {
+    enabled:
+      typeof raw?.enabled === 'boolean' ? raw.enabled : DEFAULT_SPACE_HOLD_SETTINGS.enabled,
+    speed: clamp(candidateSpeed, SPACE_HOLD_LIMITS.speed.min, SPACE_HOLD_LIMITS.speed.max),
   }
 }
 
@@ -160,15 +233,30 @@ export const isKeyBinding = (value: unknown): value is KeyBinding => {
 
 export const normalizeSettings = (raw: unknown): ShortcutSettings => {
   const source = raw && typeof raw === 'object' ? (raw as Partial<ShortcutSettings>) : {}
+  const sourceVersion = typeof source.version === 'number' ? source.version : 1
+  const shouldMigrateLegacyPictureInPicture = sourceVersion < 2
   const rawBindings =
     source.bindings && typeof source.bindings === 'object'
       ? (source.bindings as Partial<Record<ShortcutAction, Partial<ShortcutBinding>>>)
       : {}
+  const legacySpeed = source.speed as Partial<SpeedSettings & { hold?: unknown }> | undefined
 
   const bindings = Object.fromEntries(
     SHORTCUT_ACTIONS.map(action => {
       const rawBinding = rawBindings[action]
-      const key = isKeyBinding(rawBinding?.key) ? rawBinding.key : DEFAULT_KEY_BINDINGS[action]
+      const key =
+        action === 'pictureInPicture' &&
+        shouldMigrateLegacyPictureInPicture &&
+        isKeyBinding(rawBinding?.key) &&
+        rawBinding.key.code === LEGACY_PICTURE_IN_PICTURE_BINDING.code &&
+        rawBinding.key.ctrl === LEGACY_PICTURE_IN_PICTURE_BINDING.ctrl &&
+        rawBinding.key.alt === LEGACY_PICTURE_IN_PICTURE_BINDING.alt &&
+        rawBinding.key.shift === LEGACY_PICTURE_IN_PICTURE_BINDING.shift &&
+        rawBinding.key.meta === LEGACY_PICTURE_IN_PICTURE_BINDING.meta
+          ? DEFAULT_KEY_BINDINGS[action]
+          : isKeyBinding(rawBinding?.key)
+            ? rawBinding.key
+            : DEFAULT_KEY_BINDINGS[action]
       return [
         action,
         {
@@ -183,11 +271,11 @@ export const normalizeSettings = (raw: unknown): ShortcutSettings => {
   ) as Record<ShortcutAction, ShortcutBinding>
 
   return {
+    version: SHORTCUT_SETTINGS_VERSION,
     enabled: typeof source.enabled === 'boolean' ? source.enabled : DEFAULT_SETTINGS.enabled,
-    showHints:
-      typeof source.showHints === 'boolean' ? source.showHints : DEFAULT_SETTINGS.showHints,
     locale: typeof source.locale === 'string' && isLocale(source.locale) ? source.locale : 'en',
     speed: normalizeSpeedSettings(source.speed),
+    spaceHold: normalizeSpaceHoldSettings(source.spaceHold, legacySpeed?.hold),
     seek: normalizeSeekSettings(source.seek),
     bindings,
   }
@@ -220,6 +308,25 @@ export const findActionForKey = (
   })
 
   return match ?? null
+}
+
+export const findRemappedNetflixNativeActionForKey = (
+  settings: ShortcutSettings,
+  event: KeyboardEvent
+): ShortcutAction | null => {
+  const pressed = keyBindingFromEvent(event)
+  const action = NETFLIX_NATIVE_SHORTCUT_ACTIONS.find(candidate => {
+    const binding = settings.bindings[candidate]
+    return (
+      binding.enabled &&
+      !keyBindingsEqual(binding.key, DEFAULT_KEY_BINDINGS[candidate]) &&
+      NETFLIX_NATIVE_KEY_BINDINGS[candidate].some(nativeBinding =>
+        keyBindingsEqual(nativeBinding, pressed)
+      )
+    )
+  })
+
+  return action ?? null
 }
 
 export const findBindingConflict = (

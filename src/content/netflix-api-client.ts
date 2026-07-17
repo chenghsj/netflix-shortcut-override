@@ -70,6 +70,11 @@ export const sendNetflixApi = async (
   const pageResponse = await sendNetflixPageApi(action, value)
   if (pageResponse.success) return pageResponse
 
+  // A seek changes the current playback position, so replaying it after a
+  // page-bridge timeout could apply the same seek twice if the page handled
+  // the request but its response arrived late.
+  if (action === 'seek') return pageResponse
+
   const backgroundResponse = await sendNetflixBackgroundApi(action, value)
   return backgroundResponse.success ? backgroundResponse : pageResponse
 }

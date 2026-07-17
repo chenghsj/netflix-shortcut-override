@@ -27,8 +27,12 @@ This project is not affiliated with, endorsed by, or sponsored by Netflix.
 - Show compact media hints for shortcut actions.
 - Choose the options UI language.
 - Rewind and fast-forward by a configurable interval.
-- Configure the Left / Right rewind and fast-forward interval.
+- Configure the rewind and fast-forward interval.
 - Control play/pause, volume, mute, fullscreen, skip intro, and playback speed.
+- Toggle a Document Picture-in-Picture player with Netflix subtitle mirroring.
+- Use the same configurable shortcut to enter or exit Picture-in-Picture.
+- The first click focuses the Picture-in-Picture window; later clicks play or pause the video.
+- In subtitle-mirrored Picture-in-Picture, Space is handled by the extension because Netflix cannot receive the focused window's native key event.
 - Hold Space to temporarily switch to a configurable playback speed, then restore on release.
 - Persist settings with `chrome.storage`.
 - Build as a Manifest V3 browser extension.
@@ -44,6 +48,7 @@ This project is not affiliated with, endorsed by, or sponsored by Netflix.
 | Volume down | `Down` |
 | Mute | `M` |
 | Fullscreen | `F` |
+| Picture-in-Picture | `Shift + P` |
 | Skip intro | `S` |
 | Increase playback speed | `Shift + .` |
 | Decrease playback speed | `Shift + ,` |
@@ -63,17 +68,17 @@ The options page exposes these playback speed settings:
 | Lowest speed | `0.25x` | `0.25x` to `1.0x` |
 | Highest speed | `3x` | `1.0x` to `4.0x` |
 | Each change | `0.25x` | `0.05x` to `4.0x` |
-| Space hold speed | `2x` | `0.25x` to `4.0x` |
+| Space hold speed | `2x` | `0.25x` to `4.0x`; while enabled, the extension handles both Space tap and hold |
 
 Values are normalized to `0.05x` increments.
 
 ## Seek Settings
 
-The options page and popup expose the Left / Right seek interval:
+The options page and popup expose the configurable seek interval:
 
 | Setting | Default | Range |
 | --- | ---: | --- |
-| Left / Right seconds | `10s` | `1s` to `60s` |
+| Seek interval (seconds) | `10s` | `1s` to `60s` |
 
 ## Supported Languages
 
@@ -90,6 +95,7 @@ The options UI currently includes:
 - Node.js 22 or newer. CI uses Node.js 24.
 - npm
 - Google Chrome or a Chromium-based browser that supports Manifest V3 extensions.
+- Chrome or Edge Chromium is required for the subtitle-preserving Document Picture-in-Picture feature.
 
 ## Install From Release
 
@@ -202,7 +208,10 @@ Reload the extension in `chrome://extensions` after changes that affect the mani
 
 Key areas:
 
-- `src/content/index.ts`: keyboard interception, media actions, hint overlay, and Space hold behavior.
+- `src/content/index.ts`: keyboard interception and routing between the shortcut, PiP, and hint domains.
+- `src/content/shortcuts/`: media command handling and Space hold interaction state.
+- `src/content/hints/`: hint overlay rendering, layout, icons, and timing.
+- `src/content/pip/`: Document Picture-in-Picture lifecycle, subtitle mirroring, and PiP keyboard routing.
 - `src/content/netflix-api-bridge.ts`: page-world bridge for Netflix player API access.
 - `src/background/index.ts`: background-side Netflix API execution fallback.
 - `src/popup/popup-app.tsx`: toolbar popup for quick status, toggles, shortcut summary, and options entry.
@@ -226,7 +235,7 @@ The extension requests:
 
 | Permission | Why it is needed |
 | --- | --- |
-| `storage` | Save shortcut, language, hint, and playback speed settings. |
+| `storage` | Save shortcut, language, playback speed, seek, and Space-hold settings. |
 | `scripting` | Execute Netflix player API operations from the extension context. |
 | `activeTab` | Read the active tab URL after the toolbar popup is opened so the popup can show page status. |
 | `*://*.netflix.com/*` | Run the extension only on Netflix pages. |
@@ -235,7 +244,7 @@ The extension requests:
 
 - No remote analytics or tracking code is included.
 - No external API calls are made by the extension.
-- Shortcut, language, hint, and playback speed settings are stored with `chrome.storage`.
+- Shortcut, language, playback speed, seek, and Space-hold settings are stored with `chrome.storage`.
 - Content scripts only run on pages matching `*://*.netflix.com/*`.
 - The toolbar popup reads the active tab URL only after the popup is opened, and only to show page status.
 - See the full privacy policy in [PRIVACY.md](PRIVACY.md).

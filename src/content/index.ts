@@ -6,10 +6,12 @@ import {
   isPlainSpaceEvent,
   isTypingTarget,
 } from '@/content/dom-utils'
-import { createShortcutCommandController } from '@/content/shortcut-command-controller'
+import { PipManager } from '@/content/pip/pip-manager'
+import { createShortcutCommandController } from '@/content/shortcuts/shortcut-command-controller'
 import {
   DEFAULT_SETTINGS,
   findActionForKey,
+  findRemappedNetflixNativeActionForKey,
   normalizeSettings,
   type ShortcutSettings,
 } from '@/shared/shortcuts'
@@ -19,34 +21,81 @@ let settings: ShortcutSettings = DEFAULT_SETTINGS
 let settingsLoaded = false
 
 const commandController = createShortcutCommandController(() => settings)
+let pipManager: PipManager | null = null
+
+const clearSpaceHoldOnWindowBlur = () => {
+  commandController.clearSpaceInteraction()
+}
 
 const stopContentListeners = () => {
   window.removeEventListener('keydown', handleKeydown, true)
   window.removeEventListener('keyup', handleKeyup, true)
-  commandController.clearSpaceHoldState()
+  window.removeEventListener('blur', clearSpaceHoldOnWindowBlur)
+  commandController.clearSpaceInteraction()
+  pipManager?.destroy()
 }
 
-const handleKeydown = (event: KeyboardEvent) => {
+const handleKeydown = (event: KeyboardEvent, explicitTargetDoc?: Document) => {
   if (!chrome.runtime?.id) {
     stopContentListeners()
     return
   }
   if (!settingsLoaded) return
+
+  const targetDoc = explicitTargetDoc ?? getTargetDocument(event)
+  if (isTypingTarget(targetDoc)) return
   if (!settings.enabled) return
 
-  const targetDoc = getTargetDocument(event)
-  if (isTypingTarget(targetDoc)) return
-
   const action = findActionForKey(settings, event)
-  if (!action) return
+  const remappedNetflixNativeAction = findRemappedNetflixNativeActionForKey(settings, event)
+
+  if (action === 'pictureInPicture') {
+    if (event.repeat) return
+    const canTogglePip =
+      pipManager?.isActive === true ||
+      (canHandlePlaybackShortcut(targetDoc) &&
+        PipManager.isSupported(targetDoc.defaultView ?? window) &&
+        findVideo(targetDoc) !== null)
+    if (!canTogglePip) return
+
+    interceptShortcutEvent(event)
+    void pipManager?.toggle().catch(() => undefined)
+    return
+  }
+
   if (!canHandlePlaybackShortcut(targetDoc)) return
 
-  if (action === 'playPause' && isPlainSpaceEvent(event)) {
+  const isSpaceInteraction = isPlainSpaceEvent(event) && (action === null || action === 'playPause')
+  if (isSpaceInteraction) {
     const video = findVideo(targetDoc)
     if (!video) return
 
+    if (event.repeat) {
+      if (commandController.shouldInterceptSpaceRepeat()) interceptShortcutEvent(event)
+      return
+    }
+
+    const isPipSpace = pipManager?.isPipDocument(targetDoc) === true
+    const shouldTrackSpace = action === 'playPause' || isPipSpace || settings.spaceHold.enabled
+    if (!shouldTrackSpace) return
+    const handleShortPress = action === 'playPause' || isPipSpace
+    commandController.beginSpaceInteraction(
+      targetDoc,
+      video,
+      settings.spaceHold.enabled,
+      handleShortPress
+    )
+    if (handleShortPress) interceptShortcutEvent(event)
+    return
+  }
+
+  if (!action) {
+    if (remappedNetflixNativeAction) interceptShortcutEvent(event)
+    return
+  }
+
+  if (action === 'fullscreen' && pipManager?.isPipDocument(targetDoc)) {
     interceptShortcutEvent(event)
-    if (!event.repeat) commandController.startSpaceHold(targetDoc, video)
     return
   }
 
@@ -56,7 +105,9 @@ const handleKeydown = (event: KeyboardEvent) => {
     return
   }
 
-  if (commandController.execute(action, targetDoc)) interceptShortcutEvent(event)
+  if (commandController.execute(action, targetDoc)) {
+    interceptShortcutEvent(event)
+  }
 }
 
 const handleKeyup = (event: KeyboardEvent) => {
@@ -65,25 +116,46 @@ const handleKeyup = (event: KeyboardEvent) => {
     return
   }
 
-  if (!isPlainSpaceEvent(event) || !commandController.hasSpaceHoldState()) return
+  if (!settingsLoaded || !settings.enabled) {
+    commandController.clearSpaceInteraction()
+    return
+  }
 
-  interceptShortcutEvent(event)
-  commandController.completeSpaceHold()
+  if (!isPlainSpaceEvent(event)) return
+
+  if (commandController.completeSpaceInteraction()) interceptShortcutEvent(event)
+}
+
+pipManager = new PipManager({
+  sourceDocument: document,
+  onKeydown: (event, targetDoc) => handleKeydown(event, targetDoc),
+  onKeyup: event => handleKeyup(event),
+  onBlur: () => commandController.clearSpaceInteraction(),
+  onClick: (event, targetDoc) => {
+    if (!settingsLoaded || !settings.enabled) return
+    event.preventDefault()
+    event.stopPropagation()
+    event.stopImmediatePropagation()
+    commandController.execute('playPause', targetDoc)
+  },
+})
+
+const applySettings = (nextSettings: ShortcutSettings) => {
+  settings = nextSettings
+  settingsLoaded = true
 }
 
 void getSettings()
   .then(nextSettings => {
-    settings = nextSettings
-    settingsLoaded = true
+    applySettings(nextSettings)
   })
   .catch(() => {
-    settings = DEFAULT_SETTINGS
-    settingsLoaded = true
+    applySettings(DEFAULT_SETTINGS)
   })
 subscribeSettings(nextSettings => {
-  settings = normalizeSettings(nextSettings)
-  settingsLoaded = true
+  applySettings(normalizeSettings(nextSettings))
 })
 
 window.addEventListener('keydown', handleKeydown, true)
 window.addEventListener('keyup', handleKeyup, true)
+window.addEventListener('blur', clearSpaceHoldOnWindowBlur)

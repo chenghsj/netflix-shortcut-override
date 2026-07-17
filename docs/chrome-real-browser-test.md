@@ -96,6 +96,7 @@ Run these against the real Netflix watch page:
 - `ArrowDown`: volume down.
 - `M`: mute/unmute.
 - `F`: fullscreen.
+- `Shift+P`: enter Picture-in-Picture; press it again to exit.
 - `S`: Skip Intro when the Netflix button is visible.
 - `Shift+.`: speed up.
 - `Shift+,`: speed down.
@@ -104,8 +105,10 @@ Run these against the real Netflix watch page:
 Expected:
 
 - Netflix playback responds to each shortcut.
-- Media hints appear near the video center when Show media hints is enabled.
-- Media hints stop appearing when Show media hints is disabled.
+- Media hints appear near the video center after handled shortcut actions.
+- PiP keeps Netflix subtitles visible and updates them when the subtitle line or language changes.
+- Pressing `Shift+P` inside the PiP window exits PiP without returning to the Netflix tab first.
+- Resizing the PiP window keeps the subtitle overlay aligned with the video.
 
 ## 6. Agent-Assisted Chrome Workflow
 

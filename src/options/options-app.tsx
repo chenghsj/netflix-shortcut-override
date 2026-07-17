@@ -5,14 +5,16 @@ import {
   PlayIcon,
   RotateCcwIcon,
   SettingsIcon,
-  TimerIcon,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
 import { GitHubIcon } from '@/components/github-icon'
+import { HoldSpeedIcon } from '@/components/hold-speed-icon'
 import { KeyBindingKbd } from '@/components/key-binding-kbd'
 import { LanguageCombobox } from '@/components/language-combobox'
+import { NumericSettingField } from '@/components/numeric-setting-field'
 import { OtherProjectsSelect } from '@/components/other-projects-select'
+import { SettingLabelWithTooltip } from '@/components/setting-label-with-tooltip'
 import { SettingsSaveStatus } from '@/components/settings-save-status'
 import { Alert, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -36,7 +38,6 @@ import {
   FieldGroup,
   FieldLabel,
 } from '@/components/ui/field'
-import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 import {
@@ -59,6 +60,7 @@ import {
   DEFAULT_SETTINGS,
   SEEK_LIMITS,
   SHORTCUT_ACTIONS,
+  SPACE_HOLD_LIMITS,
   SPEED_LIMITS,
   findBindingConflict,
   keyBindingFromEvent,
@@ -68,6 +70,7 @@ import {
 } from '@/shared/shortcuts'
 import {
   seekDraftFromSettings,
+  spaceHoldDraftFromSettings,
   speedDraftFromSettings,
   useShortcutSettingsForm,
 } from '@/shared/use-shortcut-settings-form'
@@ -90,43 +93,12 @@ type RecorderState = {
   savedKey: KeyBinding
 } | null
 
-const FieldLabelWithTooltip = ({
-  htmlFor,
-  label,
-  tooltip,
-}: {
-  htmlFor: string
-  label: string
-  tooltip: string
-}) => (
-  <div className="flex w-fit items-center gap-1.5">
-    <FieldLabel htmlFor={htmlFor}>{label}</FieldLabel>
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          className="inline-flex size-4 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-          aria-label={`${label} info`}
-        >
-          <CircleHelpIcon className="size-3.5" />
-        </button>
-      </TooltipTrigger>
-      <TooltipContent
-        side="top"
-        sideOffset={6}
-        className="max-w-56 whitespace-pre-line leading-relaxed"
-      >
-        {tooltip}
-      </TooltipContent>
-    </Tooltip>
-  </div>
-)
-
 export function OptionsApp() {
   const {
     settings,
     speedDraft,
     seekDraft,
+    spaceHoldDraft,
     loaded,
     saveError,
     updateSettings,
@@ -134,10 +106,14 @@ export function OptionsApp() {
     setSpeedDraftField,
     setSeekDraft,
     setSeekDraftSeconds,
+    setSpaceHoldDraft,
+    setSpaceHoldDraftSpeed,
     commitSpeedField,
     commitSeekSeconds,
+    commitSpaceHoldSpeed,
     handleSpeedKeyDown,
     handleSeekKeyDown,
+    handleSpaceHoldKeyDown,
   } = useShortcutSettingsForm()
   const [recorder, setRecorder] = useState<RecorderState>(null)
   const copy = getCopy(settings.locale)
@@ -151,17 +127,19 @@ export function OptionsApp() {
 
   const resetSpeedSettings = () => {
     setSpeedDraft(speedDraftFromSettings(DEFAULT_SETTINGS.speed))
-    updateSettings(current => ({
-      ...current,
-      speed: DEFAULT_SETTINGS.speed,
-    }))
-  }
-
-  const resetSeekSettings = () => {
     setSeekDraft(seekDraftFromSettings(DEFAULT_SETTINGS.seek))
     updateSettings(current => ({
       ...current,
+      speed: DEFAULT_SETTINGS.speed,
       seek: DEFAULT_SETTINGS.seek,
+    }))
+  }
+
+  const resetSpaceHoldSettings = () => {
+    setSpaceHoldDraft(spaceHoldDraftFromSettings(DEFAULT_SETTINGS.spaceHold))
+    updateSettings(current => ({
+      ...current,
+      spaceHold: DEFAULT_SETTINGS.spaceHold,
     }))
   }
 
@@ -267,7 +245,7 @@ export function OptionsApp() {
                     </Field>
 
                     <Field orientation="horizontal" className="items-center justify-between">
-                      <FieldLabelWithTooltip
+                      <SettingLabelWithTooltip
                         htmlFor="enable-shortcut-override"
                         label={copy.enabled}
                         tooltip={copy.enabledDesc}
@@ -282,20 +260,6 @@ export function OptionsApp() {
                       />
                     </Field>
 
-                    <Field orientation="horizontal" className="items-center justify-between">
-                      <FieldLabelWithTooltip
-                        htmlFor="show-hints"
-                        label={copy.showHints}
-                        tooltip={copy.showHintsDesc}
-                      />
-                      <Switch
-                        id="show-hints"
-                        checked={settings.showHints}
-                        onCheckedChange={showHints =>
-                          updateSettings(current => ({ ...current, showHints }))
-                        }
-                      />
-                    </Field>
                   </FieldGroup>
                 </CardContent>
               </Card>
@@ -328,7 +292,31 @@ export function OptionsApp() {
                         const binding = settings.bindings[action]
                         return (
                           <TableRow key={action}>
-                            <TableCell className="font-medium">{copy.actions[action]}</TableCell>
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-1.5">
+                                <span>{copy.actions[action]}</span>
+                                {action === 'pictureInPicture' && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        type="button"
+                                        className="inline-flex size-4 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                        aria-label={`${copy.actions[action]} info`}
+                                      >
+                                        <CircleHelpIcon className="size-3.5" />
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent
+                                      side="top"
+                                      sideOffset={6}
+                                      className="max-w-80 whitespace-pre-line"
+                                    >
+                                      {copy.pictureInPictureTooltip}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                )}
+                              </div>
+                            </TableCell>
                             <TableCell>
                               <KeyBindingKbd binding={binding.key} />
                             </TableCell>
@@ -411,82 +399,57 @@ export function OptionsApp() {
                 </CardHeader>
                 <CardContent>
                   <FieldGroup>
-                    <Field>
-                      <FieldLabelWithTooltip
-                        htmlFor="min-speed"
+                    <NumericSettingField
+                        id="min-speed"
                         label={copy.minSpeed}
                         tooltip={copy.minSpeedTooltip}
-                      />
-                      <Input
-                        id="min-speed"
-                        type="number"
                         min={SPEED_LIMITS.min.min}
                         max={SPEED_LIMITS.min.max}
                         step={SPEED_LIMITS.step.inputStep}
                         value={speedDraft.min}
                         data-speed-field="min"
-                        onChange={event => setSpeedDraftField('min', event.target.value)}
+                        onValueChange={value => setSpeedDraftField('min', value)}
                         onBlur={() => commitSpeedField('min')}
                         onKeyDown={handleSpeedKeyDown}
-                      />
-                    </Field>
-                    <Field>
-                      <FieldLabelWithTooltip
-                        htmlFor="max-speed"
+                    />
+                    <NumericSettingField
+                        id="max-speed"
                         label={copy.maxSpeed}
                         tooltip={copy.maxSpeedTooltip}
-                      />
-                      <Input
-                        id="max-speed"
-                        type="number"
                         min={SPEED_LIMITS.max.min}
                         max={SPEED_LIMITS.max.max}
                         step={SPEED_LIMITS.step.inputStep}
                         value={speedDraft.max}
                         data-speed-field="max"
-                        onChange={event => setSpeedDraftField('max', event.target.value)}
+                        onValueChange={value => setSpeedDraftField('max', value)}
                         onBlur={() => commitSpeedField('max')}
                         onKeyDown={handleSpeedKeyDown}
-                      />
-                    </Field>
-                    <Field>
-                      <FieldLabelWithTooltip
-                        htmlFor="speed-step"
+                    />
+                    <NumericSettingField
+                        id="speed-step"
                         label={copy.step}
                         tooltip={copy.stepTooltip}
-                      />
-                      <Input
-                        id="speed-step"
-                        type="number"
                         min={SPEED_LIMITS.step.min}
                         max={SPEED_LIMITS.step.max}
                         step={SPEED_LIMITS.step.inputStep}
                         value={speedDraft.step}
                         data-speed-field="step"
-                        onChange={event => setSpeedDraftField('step', event.target.value)}
+                        onValueChange={value => setSpeedDraftField('step', value)}
                         onBlur={() => commitSpeedField('step')}
                         onKeyDown={handleSpeedKeyDown}
-                      />
-                    </Field>
-                    <Field>
-                      <FieldLabelWithTooltip
-                        htmlFor="hold-speed"
-                        label={copy.holdSpeed}
-                        tooltip={copy.holdSpeedTooltip}
-                      />
-                      <Input
-                        id="hold-speed"
-                        type="number"
-                        min={SPEED_LIMITS.hold.min}
-                        max={SPEED_LIMITS.hold.max}
-                        step={SPEED_LIMITS.hold.inputStep}
-                        value={speedDraft.hold}
-                        data-speed-field="hold"
-                        onChange={event => setSpeedDraftField('hold', event.target.value)}
-                        onBlur={() => commitSpeedField('hold')}
-                        onKeyDown={handleSpeedKeyDown}
-                      />
-                    </Field>
+                    />
+                    <NumericSettingField
+                        id="seek-seconds"
+                        label={copy.seekSeconds}
+                        tooltip={copy.seekSecondsTooltip}
+                        min={SEEK_LIMITS.seconds.min}
+                        max={SEEK_LIMITS.seconds.max}
+                        step={SEEK_LIMITS.seconds.inputStep}
+                        value={seekDraft.seconds}
+                        onValueChange={setSeekDraftSeconds}
+                        onBlur={commitSeekSeconds}
+                        onKeyDown={handleSeekKeyDown}
+                    />
                   </FieldGroup>
                 </CardContent>
               </Card>
@@ -494,14 +457,14 @@ export function OptionsApp() {
               <Card>
                 <CardHeader className="items-center">
                   <CardTitle className="flex items-center gap-2">
-                    <TimerIcon data-icon="inline-start" />
-                    {copy.seek}
+                    <HoldSpeedIcon data-icon="inline-start" />
+                    {copy.holdSpeed}
                   </CardTitle>
                   <CardAction className="row-span-1 self-center">
                     <Button
                       variant="outline"
-                      onClick={resetSeekSettings}
-                      aria-label={copy.resetSeekSettings}
+                      onClick={resetSpaceHoldSettings}
+                      aria-label={`${copy.reset} ${copy.holdSpeed}`}
                     >
                       <RotateCcwIcon data-icon="inline-start" />
                       {copy.reset}
@@ -510,27 +473,37 @@ export function OptionsApp() {
                 </CardHeader>
                 <CardContent>
                   <FieldGroup>
-                    <Field>
-                      <FieldLabelWithTooltip
-                        htmlFor="seek-seconds"
-                        label={copy.seekSeconds}
-                        tooltip={copy.seekSecondsTooltip}
+                    <div className="flex items-center justify-between gap-3">
+                      <FieldLabel htmlFor="enable-space-hold">{copy.holdSpeedEnabled}</FieldLabel>
+                      <Switch
+                        id="enable-space-hold"
+                        checked={settings.spaceHold.enabled}
+                        onCheckedChange={enabled =>
+                          updateSettings(current => ({
+                            ...current,
+                            spaceHold: { ...current.spaceHold, enabled },
+                          }))
+                        }
+                        aria-label={`${copy.holdSpeed}: ${copy.holdSpeedEnabled}`}
                       />
-                      <Input
-                        id="seek-seconds"
-                        type="number"
-                        min={SEEK_LIMITS.seconds.min}
-                        max={SEEK_LIMITS.seconds.max}
-                        step={SEEK_LIMITS.seconds.inputStep}
-                        value={seekDraft.seconds}
-                        onChange={event => setSeekDraftSeconds(event.target.value)}
-                        onBlur={commitSeekSeconds}
-                        onKeyDown={handleSeekKeyDown}
-                      />
-                    </Field>
+                    </div>
+                    <NumericSettingField
+                        id="hold-speed"
+                        label={copy.holdSpeedRate}
+                        tooltip={copy.holdSpeedTooltip}
+                        min={SPACE_HOLD_LIMITS.speed.min}
+                        max={SPACE_HOLD_LIMITS.speed.max}
+                        step={SPACE_HOLD_LIMITS.speed.inputStep}
+                        value={spaceHoldDraft.speed}
+                        disabled={!settings.spaceHold.enabled}
+                        onValueChange={setSpaceHoldDraftSpeed}
+                        onBlur={commitSpaceHoldSpeed}
+                        onKeyDown={handleSpaceHoldKeyDown}
+                    />
                   </FieldGroup>
                 </CardContent>
               </Card>
+
             </aside>
           </section>
         </div>

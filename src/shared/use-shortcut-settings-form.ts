@@ -11,6 +11,7 @@ import {
   DEFAULT_SETTINGS,
   normalizeSeekSettings,
   normalizeSettings,
+  normalizeSpaceHoldSettings,
   normalizeSpeedSettings,
   type ShortcutSettings,
 } from '@/shared/shortcuts'
@@ -20,6 +21,7 @@ export type SpeedField = keyof ShortcutSettings['speed']
 export type SeekField = keyof ShortcutSettings['seek']
 export type SpeedDraft = Record<SpeedField, string>
 export type SeekDraft = Record<SeekField, string>
+export type SpaceHoldDraft = { speed: string }
 
 const formatSpeedValue = (value: number): string => value.toString()
 const formatSeekValue = (value: number): string => value.toString()
@@ -28,8 +30,11 @@ export const speedDraftFromSettings = (speed: ShortcutSettings['speed']): SpeedD
   min: formatSpeedValue(speed.min),
   max: formatSpeedValue(speed.max),
   step: formatSpeedValue(speed.step),
-  hold: formatSpeedValue(speed.hold),
 })
+
+export const spaceHoldDraftFromSettings = (
+  spaceHold: ShortcutSettings['spaceHold']
+): SpaceHoldDraft => ({ speed: formatSpeedValue(spaceHold.speed) })
 
 export const seekDraftFromSettings = (seek: ShortcutSettings['seek']): SeekDraft => ({
   seconds: formatSeekValue(seek.seconds),
@@ -43,17 +48,22 @@ export const useShortcutSettingsForm = () => {
   const [seekDraft, setSeekDraft] = useState<SeekDraft>(() =>
     seekDraftFromSettings(DEFAULT_SETTINGS.seek)
   )
+  const [spaceHoldDraft, setSpaceHoldDraft] = useState<SpaceHoldDraft>(() =>
+    spaceHoldDraftFromSettings(DEFAULT_SETTINGS.spaceHold)
+  )
   const [loaded, setLoaded] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [, startSavingTransition] = useTransition()
   const latestSettingsRef = useRef<ShortcutSettings>(DEFAULT_SETTINGS)
   const saveRequestIdRef = useRef(0)
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve())
 
   const syncDrafts = useCallback((nextSettings: ShortcutSettings) => {
     latestSettingsRef.current = nextSettings
     setSettings(nextSettings)
     setSpeedDraft(speedDraftFromSettings(nextSettings.speed))
     setSeekDraft(seekDraftFromSettings(nextSettings.seek))
+    setSpaceHoldDraft(spaceHoldDraftFromSettings(nextSettings.spaceHold))
   }, [])
 
   useEffect(() => {
@@ -93,14 +103,22 @@ export const useShortcutSettingsForm = () => {
     setSaveError(null)
 
     const saveRequestId = (saveRequestIdRef.current += 1)
-    startSavingTransition(async () => {
-      try {
-        await saveSettings(normalized)
-        if (saveRequestIdRef.current === saveRequestId) setSaveError(null)
-      } catch (error) {
-        if (saveRequestIdRef.current !== saveRequestId) return
-        setSaveError(error instanceof Error ? error.message : 'Unable to save settings.')
-      }
+    const savePromise = saveQueueRef.current.then(() => saveSettings(normalized))
+    saveQueueRef.current = savePromise.then(
+      () => undefined,
+      () => undefined
+    )
+
+    startSavingTransition(() => {
+      void savePromise.then(
+        () => {
+          if (saveRequestIdRef.current === saveRequestId) setSaveError(null)
+        },
+        error => {
+          if (saveRequestIdRef.current !== saveRequestId) return
+          setSaveError(error instanceof Error ? error.message : 'Unable to save settings.')
+        }
+      )
     })
   }
 
@@ -113,6 +131,10 @@ export const useShortcutSettingsForm = () => {
 
   const setSeekDraftSeconds = (value: string) => {
     setSeekDraft({ seconds: value })
+  }
+
+  const setSpaceHoldDraftSpeed = (value: string) => {
+    setSpaceHoldDraft({ speed: value })
   }
 
   const commitSpeedField = (field: SpeedField) => {
@@ -161,6 +183,29 @@ export const useShortcutSettingsForm = () => {
     }))
   }
 
+  const commitSpaceHoldSpeed = () => {
+    const draftValue = spaceHoldDraft.speed.trim()
+    const parsed = Number.parseFloat(draftValue)
+
+    if (!draftValue || !Number.isFinite(parsed)) {
+      setSpaceHoldDraftSpeed(formatSpeedValue(settings.spaceHold.speed))
+      return
+    }
+
+    const nextSpaceHold = normalizeSpaceHoldSettings({
+      ...settings.spaceHold,
+      speed: parsed,
+    })
+    setSpaceHoldDraft(spaceHoldDraftFromSettings(nextSpaceHold))
+    updateSettings(current => ({
+      ...current,
+      spaceHold: normalizeSpaceHoldSettings({
+        ...current.spaceHold,
+        speed: parsed,
+      }),
+    }))
+  }
+
   const handleSpeedKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') {
       event.currentTarget.blur()
@@ -187,10 +232,23 @@ export const useShortcutSettingsForm = () => {
     }
   }
 
+  const handleSpaceHoldKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.currentTarget.blur()
+      return
+    }
+
+    if (event.key === 'Escape') {
+      setSpaceHoldDraftSpeed(formatSpeedValue(settings.spaceHold.speed))
+      event.currentTarget.blur()
+    }
+  }
+
   return {
     settings,
     speedDraft,
     seekDraft,
+    spaceHoldDraft,
     loaded,
     saveError,
     updateSettings,
@@ -198,9 +256,13 @@ export const useShortcutSettingsForm = () => {
     setSpeedDraftField,
     setSeekDraft,
     setSeekDraftSeconds,
+    setSpaceHoldDraft,
+    setSpaceHoldDraftSpeed,
     commitSpeedField,
     commitSeekSeconds,
+    commitSpaceHoldSpeed,
     handleSpeedKeyDown,
     handleSeekKeyDown,
+    handleSpaceHoldKeyDown,
   }
 }

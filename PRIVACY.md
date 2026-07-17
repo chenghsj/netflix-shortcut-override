@@ -2,7 +2,7 @@
 
 Shortcut Override for Netflix does not collect, sell, share, or transfer user data.
 
-The extension only stores user preferences needed for its single purpose: customizing playback keyboard shortcuts on Netflix watch pages. These preferences may include shortcut settings, enabled or disabled state, language preference, media hint preference, seek interval, and playback speed settings.
+The extension only stores user preferences needed for its single purpose: customizing playback keyboard shortcuts on Netflix watch pages. These preferences may include shortcut settings, enabled or disabled state, language preference, seek interval, Space-hold settings, and playback speed settings.
 
 These settings are stored using Chrome storage and are used only by the extension to provide its shortcut customization features.
 
