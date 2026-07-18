@@ -82,6 +82,9 @@ jobs:
           set -euo pipefail
           git checkout --detach "${{ steps.release_ref.outputs.tag }}"
 
+      - name: Verify version consistency
+        run: npm run version:check
+
       - name: Verify release version
         id: release_version
         shell: bash
@@ -106,8 +109,8 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Test
-        run: npm test
+      - name: Test with coverage
+        run: npm run test:coverage
 
       - name: Build extension
         run: npm run build

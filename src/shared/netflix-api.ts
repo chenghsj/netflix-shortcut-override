@@ -1,6 +1,7 @@
 export const NETFLIX_API_MESSAGE_TYPE = 'EXECUTE_NETFLIX_API'
 
 export const NETFLIX_API_ACTIONS = [
+  'diagnose',
   'play',
   'pause',
   'seek',

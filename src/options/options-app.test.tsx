@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { OptionsApp } from '@/options/options-app'
 import { EXTERNAL_LINKS } from '@/shared/external-links'
@@ -110,6 +110,13 @@ describe('OptionsApp', () => {
     await waitFor(() => {
       expect(screen.getByRole('combobox', { name: '語言' })).toHaveTextContent('繁中')
     })
+  })
+
+  it('uses the detected browser language when no settings exist yet', async () => {
+    vi.mocked(chrome.i18n.getUILanguage).mockReturnValue('zh-TW')
+    render(<OptionsApp />)
+
+    expect(await screen.findByRole('combobox', { name: '語言' })).toHaveTextContent('繁中')
   })
 
   it('syncs external settings changes while open', async () => {

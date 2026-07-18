@@ -21,11 +21,14 @@ This project is not affiliated with, endorsed by, or sponsored by Netflix.
 
 - Override Netflix playback shortcuts on watch pages.
 - Use the toolbar popup to check page status, toggle shortcut handling, review keys, and open options.
+- Diagnose content-script, video, Netflix player API, page bridge, and Picture-in-Picture compatibility from a discreet toolbar-popup dialog.
+- Retry compatibility diagnostics automatically while unresolved, then stop after reaching a stable result.
+- Copy a privacy-safe compatibility report that excludes the active Netflix URL.
 - Edit every shortcut from the options page.
 - Enable or disable each shortcut independently.
 - Reset shortcut bindings without resetting global or speed settings.
 - Show compact media hints for shortcut actions.
-- Choose the options UI language.
+- Use the browser UI language as the initial default when supported, then choose the options UI language manually.
 - Rewind and fast-forward by a configurable interval.
 - Configure the rewind and fast-forward interval.
 - Control play/pause, volume, mute, fullscreen, skip intro, and playback speed.
@@ -254,18 +257,22 @@ The extension requests:
 Run all local checks:
 
 ```sh
+npm run version:check
 npm run lint
-npm test
+npm run test:coverage
 npm run build
 ```
 
-The test suite covers shortcut normalization, options behavior, content shortcut handling, Netflix API bridge behavior, and background execution behavior.
+The coverage check enforces minimum global thresholds of 80% statements, 65% branches,
+80% functions, and 85% lines. The test suite covers shortcut normalization, options behavior,
+content shortcut handling, Netflix API bridge behavior, and background execution behavior.
 
 ## Release
 
 Releases are driven by `.github/workflows/release.yml`.
 
-The release version comes from `manifest.json`, not from `package.json`. For example, if the manifest version is `0.1.0`, the release tag must be:
+The version in `package.json`, `package-lock.json`, and `manifest.json` must match. For
+example, if the files use version `0.1.0`, the release tag must be:
 
 ```text
 v0.1.0
@@ -280,14 +287,15 @@ git push origin v0.1.0
 
 The release workflow will:
 
-1. Install dependencies.
-2. Validate that the tag matches `manifest.json`.
-3. Run lint and tests.
-4. Build the extension.
-5. Generate release notes.
-6. Package `dist` as a zip file.
-7. Package the Microsoft Edge-specific zip file.
-8. Publish or update the GitHub Release.
+1. Validate version consistency.
+2. Install dependencies.
+3. Validate that the tag matches `manifest.json`.
+4. Run lint and tests with coverage thresholds.
+5. Build the extension.
+6. Generate release notes.
+7. Package `dist` as a zip file.
+8. Package the Microsoft Edge-specific zip file.
+9. Publish or update the GitHub Release.
 
 The generated release assets are:
 
@@ -318,12 +326,13 @@ Commit messages that follow Conventional Commits are grouped into sections such 
 
 ## Bug Reports
 
-When reporting an issue, include:
+GitHub's bug-report form asks for:
 
 - Browser name and version.
 - Extension version.
 - The Netflix page type where the issue happened.
 - The shortcut or action that failed.
+- Compatibility diagnostics copied from the toolbar popup.
 - Any console errors from the Netflix tab or extension service worker.
 
 ## Troubleshooting

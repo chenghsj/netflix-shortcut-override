@@ -102,4 +102,19 @@ describe('main-world Netflix API bridge', () => {
     expect(response?.result?.playerFound).toBe(false)
     expect(response?.result?.seekCalled).toBe(false)
   })
+
+  it('diagnoses Netflix API availability without changing playback', () => {
+    const video = document.createElement('video')
+    video.currentTime = 30
+    video.volume = 0.5
+    document.body.append(video)
+
+    const response = callBridge('diagnose')
+
+    expect(response?.success).toBe(true)
+    expect(response?.result?.playerApiFound).toBe(false)
+    expect(video.currentTime).toBe(30)
+    expect(video.volume).toBe(0.5)
+    expect(video.paused).toBe(true)
+  })
 })

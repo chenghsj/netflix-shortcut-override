@@ -86,6 +86,15 @@ Do not use Chrome DevTools as the verification path for this real-browser check.
 
 ## 5. Verify Keyboard Shortcuts
 
+Before testing shortcuts, open the extension toolbar popup on the watch page, select the shield-shaped diagnostics button in the title bar, and verify:
+
+- Compatibility reports that Netflix playback features are ready.
+- Extension, video, page bridge, Netflix player API, and Picture-in-Picture rows show their expected available states.
+- Copy diagnostics produces a report without the active Netflix URL.
+- Missing playback state is retried within roughly two seconds while the diagnostics dialog stays open.
+- Automatic checks stop after playback is ready or a stable unsupported capability is identified.
+- Closing the diagnostics dialog stops automatic checks and returns to the uncluttered popup.
+
 Run these against the real Netflix watch page:
 
 - `Space`: play/pause.

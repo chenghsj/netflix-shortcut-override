@@ -16,6 +16,12 @@ import {
   type ShortcutSettings,
 } from '@/shared/shortcuts'
 import { getSettings, subscribeSettings } from '@/shared/storage'
+import {
+  isCompatibilityDiagnosticsRequest,
+  type CompatibilityDiagnostics,
+} from '@/shared/diagnostics'
+import { NETFLIX_API_BRIDGE_READY_ATTR } from '@/shared/netflix-api-events'
+import { sendNetflixApi } from '@/content/netflix-api-client'
 
 let settings: ShortcutSettings = DEFAULT_SETTINGS
 let settingsLoaded = false
@@ -154,6 +160,50 @@ void getSettings()
   })
 subscribeSettings(nextSettings => {
   applySettings(normalizeSettings(nextSettings))
+})
+
+chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
+  if (!isCompatibilityDiagnosticsRequest(message)) return false
+
+  const bridgeReady =
+    document.documentElement?.getAttribute(NETFLIX_API_BRIDGE_READY_ATTR) === 'ready'
+
+  void sendNetflixApi('diagnose')
+    .then(response => {
+      const diagnostics: CompatibilityDiagnostics = {
+        contentScriptReady: true,
+        settingsLoaded,
+        enabled: settings.enabled,
+        videoFound: findVideo(document) !== null,
+        bridgeReady,
+        playerApiFound: response.result?.playerApiFound === true,
+        playerFound: response.result?.playerFound === true,
+        pipSupported: PipManager.isSupported(window),
+        pipActive: pipManager?.isActive === true,
+        ...(response.success
+          ? response.result?.error
+            ? { error: response.result.error }
+            : {}
+          : { error: response.error ?? 'Unable to inspect Netflix compatibility.' }),
+      }
+      sendResponse(diagnostics)
+    })
+    .catch(error => {
+      sendResponse({
+        contentScriptReady: true,
+        settingsLoaded,
+        enabled: settings.enabled,
+        videoFound: findVideo(document) !== null,
+        bridgeReady,
+        playerApiFound: false,
+        playerFound: false,
+        pipSupported: PipManager.isSupported(window),
+        pipActive: pipManager?.isActive === true,
+        error: error instanceof Error ? error.message : 'Unable to inspect Netflix compatibility.',
+      } satisfies CompatibilityDiagnostics)
+    })
+
+  return true
 })
 
 window.addEventListener('keydown', handleKeydown, true)

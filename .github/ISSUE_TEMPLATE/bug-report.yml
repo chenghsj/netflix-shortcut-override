@@ -1,0 +1,96 @@
+name: Bug report
+description: Report a reproducible problem with Shortcut Override for Netflix.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem. Please remove private Netflix account or title information before submitting.
+
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Browser
+      options:
+        - Google Chrome
+        - Microsoft Edge
+        - Other Chromium-based browser
+    validations:
+      required: true
+
+  - type: input
+    id: browser-version
+    attributes:
+      label: Browser version
+      placeholder: "For example: 138.0.7204.158"
+    validations:
+      required: true
+
+  - type: input
+    id: extension-version
+    attributes:
+      label: Extension version
+      placeholder: "For example: 0.3.1"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: netflix-page
+    attributes:
+      label: Netflix page
+      options:
+        - Watch page
+        - Browse or title page
+        - Picture-in-Picture window
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Describe the shortest sequence that consistently reproduces the problem.
+      placeholder: |
+        1. Open…
+        2. Press…
+        3. Observe…
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Compatibility diagnostics
+      description: Open the extension popup on a Netflix watch page, open Compatibility, and choose Copy diagnostics.
+      render: text
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Add screenshots or other details. Do not include account, payment, or viewing-history information.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I reloaded the Netflix tab and confirmed the problem still occurs.
+          required: true
+        - label: I removed private account and title information from this report.
+          required: true

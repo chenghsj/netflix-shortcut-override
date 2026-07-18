@@ -87,7 +87,9 @@ export const executeNetflixPageApi = (
     result.playerFound = Boolean(player)
 
     if (player) {
-      if (action === 'play') {
+      if (action === 'diagnose') {
+        // Diagnostics only inspect API availability and must not alter playback.
+      } else if (action === 'play') {
         player.play()
         handledByNetflixPlaybackApi = true
       } else if (action === 'pause') {

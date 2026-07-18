@@ -38,6 +38,9 @@ const syncArea: ChromeStorageArea = {
 }
 
 const chromeMock = {
+  i18n: {
+    getUILanguage: vi.fn(() => 'en-US'),
+  },
   action: {
     onClicked: {
       addListener: vi.fn(),
@@ -45,6 +48,7 @@ const chromeMock = {
   },
   runtime: {
     id: 'test-extension-id',
+    getManifest: vi.fn(() => ({ version: '0.3.1' })),
     openOptionsPage: vi.fn(),
     sendMessage: vi.fn(),
     onMessage: {
@@ -55,6 +59,25 @@ const chromeMock = {
     query: vi.fn((_query: chrome.tabs.QueryInfo, callback: (tabs: chrome.tabs.Tab[]) => void) => {
       callback([{ id: 1, url: 'https://www.netflix.com/watch/123' } as chrome.tabs.Tab])
     }),
+    sendMessage: vi.fn(
+      (
+        _tabId: number,
+        _message: unknown,
+        callback: (response: Record<string, unknown>) => void
+      ) => {
+        callback({
+          contentScriptReady: true,
+          settingsLoaded: true,
+          enabled: true,
+          videoFound: true,
+          bridgeReady: true,
+          playerApiFound: true,
+          playerFound: true,
+          pipSupported: true,
+          pipActive: false,
+        })
+      }
+    ),
   },
   scripting: {
     executeScript: vi.fn().mockResolvedValue([]),
@@ -83,9 +106,17 @@ Object.assign(globalThis, {
   ResizeObserver: ResizeObserverMock,
 })
 
+Object.defineProperty(navigator, 'clipboard', {
+  configurable: true,
+  value: {
+    writeText: vi.fn().mockResolvedValue(undefined),
+  },
+})
+
 Element.prototype.scrollIntoView = vi.fn()
 
 beforeEach(() => {
   for (const key of Object.keys(storageState)) delete storageState[key]
   vi.clearAllMocks()
+  chromeMock.i18n.getUILanguage.mockReturnValue('en-US')
 })

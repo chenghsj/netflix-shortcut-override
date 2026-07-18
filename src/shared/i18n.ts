@@ -31,6 +31,28 @@ type Copy = {
   streamDanmakuStoreAriaLabel: string
   popupNetflixPage: string
   popupNetflixOnly: string
+  diagnosticsTitle: string
+  diagnosticsReady: string
+  diagnosticsWarning: string
+  diagnosticsPending: string
+  diagnosticsChecking: string
+  diagnosticsRetrying: string
+  diagnosticsContentScript: string
+  diagnosticsSettings: string
+  diagnosticsVideo: string
+  diagnosticsBridge: string
+  diagnosticsNetflixApi: string
+  diagnosticsPictureInPicture: string
+  diagnosticsReadyValue: string
+  diagnosticsEnabledValue: string
+  diagnosticsDisabledValue: string
+  diagnosticsFoundValue: string
+  diagnosticsMissingValue: string
+  diagnosticsSupportedValue: string
+  diagnosticsUnsupportedValue: string
+  diagnosticsCopy: string
+  diagnosticsCopied: string
+  diagnosticsCopyFailed: string
   locale: string
   speed: string
   speedDesc: string
@@ -92,6 +114,29 @@ export const COPY: Record<Locale, Copy> = {
       'Open Stream Danmaku, another product by the same maker, in the extension store',
     popupNetflixPage: 'Open a Netflix title to use shortcuts.',
     popupNetflixOnly: 'Shortcuts only run on Netflix watch pages.',
+    diagnosticsTitle: 'Compatibility',
+    diagnosticsReady: 'Netflix playback features are ready.',
+    diagnosticsWarning: 'Some playback features may be unavailable.',
+    diagnosticsPending: 'The Netflix player is not ready yet. Retrying automatically…',
+    diagnosticsChecking: 'Checking compatibility…',
+    diagnosticsRetrying:
+      'Unable to reach the extension on this tab. Reload Netflix if needed; retrying automatically…',
+    diagnosticsContentScript: 'Extension',
+    diagnosticsSettings: 'Shortcut handling',
+    diagnosticsVideo: 'Video',
+    diagnosticsBridge: 'Page bridge',
+    diagnosticsNetflixApi: 'Netflix player API',
+    diagnosticsPictureInPicture: 'Picture-in-Picture',
+    diagnosticsReadyValue: 'Ready',
+    diagnosticsEnabledValue: 'Enabled',
+    diagnosticsDisabledValue: 'Disabled',
+    diagnosticsFoundValue: 'Found',
+    diagnosticsMissingValue: 'Missing',
+    diagnosticsSupportedValue: 'Supported',
+    diagnosticsUnsupportedValue: 'Unsupported',
+    diagnosticsCopy: 'Copy diagnostics',
+    diagnosticsCopied: 'Copied',
+    diagnosticsCopyFailed: 'Copy failed',
     locale: 'Language',
     speed: 'Speed shortcuts',
     speedDesc: 'Set the range and step size for speed up/down shortcuts.',
@@ -166,6 +211,28 @@ export const COPY: Record<Locale, Copy> = {
       '在擴充功能商店開啟同作者的其他產品 Stream Danmaku',
     popupNetflixPage: '開啟 Netflix 影片後即可使用快捷鍵。',
     popupNetflixOnly: '快捷鍵只會在 Netflix 觀看頁生效。',
+    diagnosticsTitle: '相容性診斷',
+    diagnosticsReady: 'Netflix 播放功能已就緒。',
+    diagnosticsWarning: '部分播放功能可能無法使用。',
+    diagnosticsPending: 'Netflix 播放器尚未就緒，正在自動重試…',
+    diagnosticsChecking: '正在檢查相容性…',
+    diagnosticsRetrying: '無法連線到此分頁的擴充功能。如有需要請重新載入 Netflix；正在自動重試…',
+    diagnosticsContentScript: '擴充功能',
+    diagnosticsSettings: '快捷鍵處理',
+    diagnosticsVideo: '播放器影片',
+    diagnosticsBridge: '頁面橋接',
+    diagnosticsNetflixApi: 'Netflix 播放器 API',
+    diagnosticsPictureInPicture: '子母畫面',
+    diagnosticsReadyValue: '已就緒',
+    diagnosticsEnabledValue: '已啟用',
+    diagnosticsDisabledValue: '已停用',
+    diagnosticsFoundValue: '已找到',
+    diagnosticsMissingValue: '未找到',
+    diagnosticsSupportedValue: '支援',
+    diagnosticsUnsupportedValue: '不支援',
+    diagnosticsCopy: '複製診斷資訊',
+    diagnosticsCopied: '已複製',
+    diagnosticsCopyFailed: '複製失敗',
     locale: '語言',
     speed: '播放速度快捷鍵',
     speedDesc: '設定「加快 / 降低播放速度」快捷鍵的可用範圍與每次增減。',
@@ -239,6 +306,28 @@ export const COPY: Record<Locale, Copy> = {
       '在扩展商店打开同作者的其他产品 Stream Danmaku',
     popupNetflixPage: '打开 Netflix 视频后即可使用快捷键。',
     popupNetflixOnly: '快捷键只会在 Netflix 观看页生效。',
+    diagnosticsTitle: '兼容性诊断',
+    diagnosticsReady: 'Netflix 播放功能已就绪。',
+    diagnosticsWarning: '部分播放功能可能无法使用。',
+    diagnosticsPending: 'Netflix 播放器尚未就绪，正在自动重试…',
+    diagnosticsChecking: '正在检查兼容性…',
+    diagnosticsRetrying: '无法连接到此标签页的扩展程序。如有需要请重新加载 Netflix；正在自动重试…',
+    diagnosticsContentScript: '扩展程序',
+    diagnosticsSettings: '快捷键处理',
+    diagnosticsVideo: '播放器视频',
+    diagnosticsBridge: '页面桥接',
+    diagnosticsNetflixApi: 'Netflix 播放器 API',
+    diagnosticsPictureInPicture: '画中画',
+    diagnosticsReadyValue: '已就绪',
+    diagnosticsEnabledValue: '已启用',
+    diagnosticsDisabledValue: '已停用',
+    diagnosticsFoundValue: '已找到',
+    diagnosticsMissingValue: '未找到',
+    diagnosticsSupportedValue: '支持',
+    diagnosticsUnsupportedValue: '不支持',
+    diagnosticsCopy: '复制诊断信息',
+    diagnosticsCopied: '已复制',
+    diagnosticsCopyFailed: '复制失败',
     locale: '语言',
     speed: '播放速度快捷键',
     speedDesc: '设置“加快 / 降低播放速度”快捷键的可用范围与每次增减。',
@@ -312,6 +401,29 @@ export const COPY: Record<Locale, Copy> = {
       '同じ作者の別製品 Stream Danmaku を拡張機能ストアで開く',
     popupNetflixPage: 'Netflix の作品を開くとショートカットを使えます。',
     popupNetflixOnly: 'ショートカットは Netflix の視聴ページでのみ動作します。',
+    diagnosticsTitle: '互換性診断',
+    diagnosticsReady: 'Netflix の再生機能を使用できます。',
+    diagnosticsWarning: '一部の再生機能を使用できない可能性があります。',
+    diagnosticsPending: 'Netflix プレーヤーの準備ができていません。自動的に再試行しています…',
+    diagnosticsChecking: '互換性を確認しています…',
+    diagnosticsRetrying:
+      'このタブの拡張機能に接続できません。必要に応じて Netflix を再読み込みしてください。自動的に再試行しています…',
+    diagnosticsContentScript: '拡張機能',
+    diagnosticsSettings: 'ショートカット処理',
+    diagnosticsVideo: '動画',
+    diagnosticsBridge: 'ページブリッジ',
+    diagnosticsNetflixApi: 'Netflix プレーヤー API',
+    diagnosticsPictureInPicture: 'ピクチャー イン ピクチャー',
+    diagnosticsReadyValue: '準備完了',
+    diagnosticsEnabledValue: '有効',
+    diagnosticsDisabledValue: '無効',
+    diagnosticsFoundValue: '検出済み',
+    diagnosticsMissingValue: '未検出',
+    diagnosticsSupportedValue: '対応',
+    diagnosticsUnsupportedValue: '非対応',
+    diagnosticsCopy: '診断情報をコピー',
+    diagnosticsCopied: 'コピーしました',
+    diagnosticsCopyFailed: 'コピー失敗',
     locale: '言語',
     speed: '速度ショートカット',
     speedDesc: '速度を上げる/下げるショートカットの範囲と増減幅を設定します。',
@@ -386,6 +498,29 @@ export const COPY: Record<Locale, Copy> = {
       '같은 제작자의 다른 제품 Stream Danmaku를 확장 프로그램 스토어에서 열기',
     popupNetflixPage: 'Netflix 콘텐츠를 열면 단축키를 사용할 수 있습니다.',
     popupNetflixOnly: '단축키는 Netflix 시청 페이지에서만 동작합니다.',
+    diagnosticsTitle: '호환성 진단',
+    diagnosticsReady: 'Netflix 재생 기능을 사용할 수 있습니다.',
+    diagnosticsWarning: '일부 재생 기능을 사용하지 못할 수 있습니다.',
+    diagnosticsPending: 'Netflix 플레이어가 아직 준비되지 않았습니다. 자동으로 다시 시도하는 중…',
+    diagnosticsChecking: '호환성을 확인하는 중…',
+    diagnosticsRetrying:
+      '이 탭의 확장 프로그램에 연결할 수 없습니다. 필요한 경우 Netflix를 새로고침하세요. 자동으로 다시 시도하는 중…',
+    diagnosticsContentScript: '확장 프로그램',
+    diagnosticsSettings: '단축키 처리',
+    diagnosticsVideo: '동영상',
+    diagnosticsBridge: '페이지 브리지',
+    diagnosticsNetflixApi: 'Netflix 플레이어 API',
+    diagnosticsPictureInPicture: '화면 속 화면',
+    diagnosticsReadyValue: '준비됨',
+    diagnosticsEnabledValue: '사용',
+    diagnosticsDisabledValue: '꺼짐',
+    diagnosticsFoundValue: '찾음',
+    diagnosticsMissingValue: '찾지 못함',
+    diagnosticsSupportedValue: '지원',
+    diagnosticsUnsupportedValue: '미지원',
+    diagnosticsCopy: '진단 정보 복사',
+    diagnosticsCopied: '복사됨',
+    diagnosticsCopyFailed: '복사 실패',
     locale: '언어',
     speed: '속도 단축키',
     speedDesc: '속도 올리기/내리기 단축키의 범위와 한 번에 바뀌는 값을 설정합니다.',

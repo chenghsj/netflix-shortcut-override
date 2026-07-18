@@ -94,6 +94,22 @@ body {
   margin: 0;
 }
 
+body.popup-page[data-scroll-locked] {
+  margin-right: 0 !important;
+}
+
+html.popup-page-root,
+html.popup-page-root body,
+html.popup-page-root #root {
+  width: 22rem;
+  min-width: 22rem;
+  max-width: 22rem;
+}
+
+html.popup-page-root {
+  overflow-x: hidden;
+}
+
 @theme inline {
   --font-heading:
     var(--font-sans);
@@ -270,6 +286,7 @@ body {
     border-radius: 4px;
     background: color-mix(in oklch, var(--muted-foreground) 58%, transparent);
   }
+
 }
 
 @layer components {

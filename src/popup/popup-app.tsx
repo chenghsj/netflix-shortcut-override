@@ -11,6 +11,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { GitHubIcon } from '@/components/github-icon'
 import { HoldSpeedIcon } from '@/components/hold-speed-icon'
 import { KeyBindingKbd } from '@/components/key-binding-kbd'
+import type { CompatibilityDiagnosticsState } from '@/components/compatibility-diagnostics-card'
+import { CompatibilityDiagnosticsDialog } from '@/components/compatibility-diagnostics-dialog'
 import { LanguageCombobox } from '@/components/language-combobox'
 import { NumericSettingField } from '@/components/numeric-setting-field'
 import { OtherProjectsSelect } from '@/components/other-projects-select'
@@ -22,6 +24,11 @@ import { Switch } from '@/components/ui/switch'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { EXTERNAL_LINKS } from '@/shared/external-links'
+import {
+  COMPATIBILITY_DIAGNOSTICS_MESSAGE_TYPE,
+  isCompatibilityCoreReady,
+  type CompatibilityDiagnostics,
+} from '@/shared/diagnostics'
 import { getCopy } from '@/shared/i18n'
 import {
   SEEK_LIMITS,
@@ -32,6 +39,10 @@ import {
 import { useShortcutSettingsForm } from '@/shared/use-shortcut-settings-form'
 
 type PageStatus = 'watch' | 'netflix' | 'external' | 'unknown'
+type ActivePageContext = {
+  status: PageStatus
+  tabId?: number
+}
 
 const POPUP_SHORTCUT_ACTIONS: ShortcutAction[] = [
   'playPause',
@@ -49,6 +60,7 @@ const POPUP_SHORTCUT_ACTIONS: ShortcutAction[] = [
 ]
 
 const popupSpeedInputClassName = 'h-6 w-20 px-2 py-0 text-xs'
+const DIAGNOSTICS_REFRESH_INTERVAL_MS = 2_000
 
 const resolvePageStatus = (url: string | undefined): PageStatus => {
   if (!url) return 'unknown'
@@ -65,20 +77,40 @@ const resolvePageStatus = (url: string | undefined): PageStatus => {
   }
 }
 
-const getActivePageStatus = async (): Promise<PageStatus> => {
-  if (typeof chrome === 'undefined' || !chrome.tabs?.query) return 'unknown'
+const getActivePageContext = async (): Promise<ActivePageContext> => {
+  if (typeof chrome === 'undefined' || !chrome.tabs?.query) return { status: 'unknown' }
 
   return new Promise(resolve => {
     chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
       if (chrome.runtime.lastError) {
-        resolve('unknown')
+        resolve({ status: 'unknown' })
         return
       }
 
-      resolve(resolvePageStatus(tabs[0]?.url))
+      resolve({
+        status: resolvePageStatus(tabs[0]?.url),
+        tabId: tabs[0]?.id,
+      })
     })
   })
 }
+
+const getCompatibilityDiagnostics = async (
+  tabId: number
+): Promise<CompatibilityDiagnostics | null> =>
+  new Promise(resolve => {
+    chrome.tabs.sendMessage(
+      tabId,
+      { type: COMPATIBILITY_DIAGNOSTICS_MESSAGE_TYPE },
+      response => {
+        if (chrome.runtime.lastError || !response) {
+          resolve(null)
+          return
+        }
+        resolve(response as CompatibilityDiagnostics)
+      }
+    )
+  })
 
 const openOptionsPage = () => {
   if (typeof chrome !== 'undefined' && chrome.runtime?.openOptionsPage) {
@@ -108,15 +140,20 @@ export function PopupApp() {
     handleSeekKeyDown,
     handleSpaceHoldKeyDown,
   } = useShortcutSettingsForm()
-  const [pageStatus, setPageStatus] = useState<PageStatus>('unknown')
+  const [pageContext, setPageContext] = useState<ActivePageContext>({ status: 'unknown' })
+  const [diagnosticsState, setDiagnosticsState] = useState<CompatibilityDiagnosticsState>({
+    status: 'loading',
+    diagnostics: null,
+  })
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false)
   const copy = getCopy(settings.locale)
 
   useEffect(() => {
     let active = true
 
-    void getActivePageStatus().then(nextStatus => {
+    void getActivePageContext().then(nextContext => {
       if (!active) return
-      setPageStatus(nextStatus)
+      setPageContext(nextContext)
     })
 
     return () => {
@@ -124,11 +161,50 @@ export function PopupApp() {
     }
   }, [])
 
+  useEffect(() => {
+    if (
+      !diagnosticsOpen ||
+      pageContext.status !== 'watch' ||
+      typeof pageContext.tabId !== 'number'
+    ) {
+      return
+    }
+
+    let active = true
+    let refreshTimer: number | undefined
+    let hasDiagnosticsResult = false
+    const tabId = pageContext.tabId
+
+    const refreshDiagnostics = async () => {
+      if (!hasDiagnosticsResult) {
+        setDiagnosticsState({ status: 'loading', diagnostics: null })
+      }
+      const diagnostics = await getCompatibilityDiagnostics(tabId)
+      if (!active) return
+      hasDiagnosticsResult = true
+      setDiagnosticsState(
+        diagnostics
+          ? { status: 'ready', diagnostics }
+          : { status: 'unavailable', diagnostics: null }
+      )
+      if (!isCompatibilityCoreReady(diagnostics)) {
+        refreshTimer = window.setTimeout(refreshDiagnostics, DIAGNOSTICS_REFRESH_INTERVAL_MS)
+      }
+    }
+
+    void refreshDiagnostics()
+
+    return () => {
+      active = false
+      if (refreshTimer !== undefined) window.clearTimeout(refreshTimer)
+    }
+  }, [diagnosticsOpen, pageContext.status, pageContext.tabId])
+
   const statusText = useMemo(() => {
-    if (pageStatus === 'netflix') return copy.popupNetflixPage
-    if (pageStatus === 'external') return copy.popupNetflixOnly
+    if (pageContext.status === 'netflix') return copy.popupNetflixPage
+    if (pageContext.status === 'external') return copy.popupNetflixOnly
     return null
-  }, [copy, pageStatus])
+  }, [copy, pageContext.status])
   const shouldShowPageStatus = Boolean(statusText)
 
   if (!loaded) {
@@ -144,6 +220,14 @@ export function PopupApp() {
             <div className="min-w-0 flex-1">
               <h1 className="truncate text-sm font-semibold leading-tight">Shortcut Override</h1>
             </div>
+            {pageContext.status === 'watch' && (
+              <CompatibilityDiagnosticsDialog
+                copy={copy}
+                open={diagnosticsOpen}
+                state={diagnosticsState}
+                onOpenChange={setDiagnosticsOpen}
+              />
+            )}
             <Button variant="outline" size="sm" className="shrink-0" onClick={openOptionsPage}>
               <ExternalLinkIcon data-icon="inline-start" />
               {copy.openOptions}
