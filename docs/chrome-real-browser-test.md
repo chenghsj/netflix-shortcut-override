@@ -86,13 +86,26 @@ Do not use Chrome DevTools as the verification path for this real-browser check.
 
 ## 5. Verify Keyboard Shortcuts
 
-Before testing shortcuts, open the extension toolbar popup on the watch page, select the shield-shaped diagnostics button in the title bar, and verify:
+Before testing shortcuts, open the extension toolbar popup on the watch page.
+
+If the popup reports that the extension is not active:
+
+1. Verify the inline recovery notice explains that the Netflix tab must be reloaded.
+2. Select Reload Netflix.
+3. Verify the popup closes after starting the reload.
+4. Wait for the Netflix watch page to finish loading.
+5. Without clicking the Netflix page first, press `Space`.
+6. Verify playback pauses or resumes. This confirms keyboard focus returned to the page.
+7. Open the popup again and verify the recovery notice is gone and the diagnostics button is available.
+
+Select the shield-shaped diagnostics button in the title bar and verify:
 
 - Compatibility reports that Netflix playback features are ready.
 - Extension, video, page bridge, Netflix player API, and Picture-in-Picture rows show their expected available states.
-- Copy diagnostics produces a report without the active Netflix URL.
+- Copy diagnostics is available after diagnostics respond and produces a report without the active Netflix URL.
 - Missing playback state is retried within roughly two seconds while the diagnostics dialog stays open.
 - Automatic checks stop after playback is ready or a stable unsupported capability is identified.
+- A missing content-script receiver produces the inline reload recovery state instead of retrying indefinitely.
 - Closing the diagnostics dialog stops automatic checks and returns to the uncluttered popup.
 
 Run these against the real Netflix watch page:
@@ -242,8 +255,9 @@ Recommended recovery:
 These checks are useful before manual Netflix validation, but they do not replace it:
 
 ```sh
+npm run version:check
 npm run typecheck
-npm test
 npm run lint
+npm run test:coverage
 npm run build
 ```

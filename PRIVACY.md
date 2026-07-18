@@ -10,4 +10,8 @@ Shortcut Override for Netflix does not use analytics, tracking, advertising, or 
 
 The extension only runs on Netflix pages to listen for user-configured keyboard shortcuts and perform playback actions requested by the user.
 
+When the toolbar popup is opened, it checks the active Netflix tab and may request locally generated compatibility diagnostics. These diagnostics are not sent to an external server. A diagnostics report is written to the clipboard only when the user selects the copy action.
+
+If the extension has not connected to an open Netflix tab, the popup can reload that tab only after the user selects the reload action.
+
 This extension is unofficial and is not affiliated with, endorsed by, or sponsored by Netflix.

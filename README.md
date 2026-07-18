@@ -22,7 +22,9 @@ This project is not affiliated with, endorsed by, or sponsored by Netflix.
 - Override Netflix playback shortcuts on watch pages.
 - Use the toolbar popup to check page status, toggle shortcut handling, review keys, and open options.
 - Diagnose content-script, video, Netflix player API, page bridge, and Picture-in-Picture compatibility from a discreet toolbar-popup dialog.
-- Retry compatibility diagnostics automatically while unresolved, then stop after reaching a stable result.
+- Show an inline recovery notice when an updated extension has not connected to the open Netflix tab.
+- Reload the Netflix tab from the recovery notice, close the popup, and return keyboard focus to the page.
+- Retry compatibility diagnostics automatically while the dialog is open and playback state is unresolved, then stop after reaching a stable result or detecting that the tab must be reloaded.
 - Copy a privacy-safe compatibility report that excludes the active Netflix URL.
 - Edit every shortcut from the options page.
 - Enable or disable each shortcut independently.
@@ -178,8 +180,11 @@ Reload the extension in `chrome://extensions` after changes that affect the mani
 | --- | --- |
 | `npm run dev` | Remove `dist` and start the CRXJS/Vite dev server with HMR. |
 | `npm run build` | Type-check, build, and patch the production extension output. |
+| `npm run build:edge` | Build the production extension and create an Edge-compatible release package. |
 | `npm run lint` | Run ESLint. |
 | `npm test` | Run Vitest tests. |
+| `npm run test:coverage` | Run the complete test suite with enforced coverage thresholds. |
+| `npm run version:check` | Confirm the package and manifest versions match. |
 | `npm run icons` | Regenerate PNG icons from `public/icons/icon.svg`. |
 | `npm run changelog` | Generate release notes from git commits. |
 
@@ -240,7 +245,7 @@ The extension requests:
 | --- | --- |
 | `storage` | Save shortcut, language, playback speed, seek, and Space-hold settings. |
 | `scripting` | Execute Netflix player API operations from the extension context. |
-| `activeTab` | Read the active tab URL after the toolbar popup is opened so the popup can show page status. |
+| `activeTab` | Check the active Netflix tab, request local compatibility status, and reload that tab when the user selects the recovery action. |
 | `*://*.netflix.com/*` | Run the extension only on Netflix pages. |
 
 ## Privacy
@@ -249,7 +254,8 @@ The extension requests:
 - No external API calls are made by the extension.
 - Shortcut, language, playback speed, seek, and Space-hold settings are stored with `chrome.storage`.
 - Content scripts only run on pages matching `*://*.netflix.com/*`.
-- The toolbar popup reads the active tab URL only after the popup is opened, and only to show page status.
+- The toolbar popup checks the active tab only after it is opened. It uses that tab to show page status, request locally generated compatibility diagnostics, and reload the Netflix page only when the user selects the recovery action.
+- Compatibility diagnostics stay on the device. A report is written to the clipboard only when the user selects Copy diagnostics.
 - See the full privacy policy in [PRIVACY.md](PRIVACY.md).
 
 ## Testing
@@ -332,7 +338,7 @@ GitHub's bug-report form asks for:
 - Extension version.
 - The Netflix page type where the issue happened.
 - The shortcut or action that failed.
-- Compatibility diagnostics copied from the toolbar popup.
+- Compatibility diagnostics copied from the toolbar popup when available, or a note that the popup reported the extension was not active.
 - Any console errors from the Netflix tab or extension service worker.
 
 ## Troubleshooting
@@ -398,7 +404,9 @@ Check the options page:
 1. Make sure shortcut override is enabled.
 2. Make sure the specific action is enabled.
 3. Check whether another action already uses the same key.
-4. Refresh the Netflix tab after changing settings.
+4. Open the toolbar popup on the Netflix watch page.
+5. If the popup shows that the extension is not active, select Reload Netflix. The popup closes after starting the reload so keyboard focus returns to Netflix.
+6. If the compatibility button is available, open it and confirm the required playback features are ready.
 
 ## Packaging For Manual Distribution
 

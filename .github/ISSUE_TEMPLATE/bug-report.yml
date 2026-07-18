@@ -30,7 +30,7 @@ body:
     id: extension-version
     attributes:
       label: Extension version
-      placeholder: "For example: 0.3.1"
+      placeholder: "For example: 0.4.0"
     validations:
       required: true
 
@@ -76,7 +76,7 @@ body:
     id: diagnostics
     attributes:
       label: Compatibility diagnostics
-      description: Open the extension popup on a Netflix watch page, open Compatibility, and choose Copy diagnostics.
+      description: If Compatibility is available on a Netflix watch page, open it and choose Copy diagnostics. If the popup says the extension is not active, describe that state in Additional context instead.
       render: text
 
   - type: textarea

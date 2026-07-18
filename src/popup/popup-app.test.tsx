@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { PopupApp } from '@/popup/popup-app'
@@ -22,7 +22,7 @@ describe('PopupApp', () => {
     expect(screen.getByRole('combobox', { name: 'Other products' })).toBeInTheDocument()
     expect(screen.getByText('General settings')).toBeInTheDocument()
     expect(screen.queryByText('Netflix playback features are ready.')).not.toBeInTheDocument()
-    expect(chrome.tabs.sendMessage).not.toHaveBeenCalled()
+    await waitFor(() => expect(chrome.tabs.sendMessage).toHaveBeenCalledTimes(1))
     expect(screen.queryByText('Open a Netflix title to use shortcuts.')).not.toBeInTheDocument()
     expect(screen.queryByText('Shortcuts only run on Netflix watch pages.')).not.toBeInTheDocument()
     expect(screen.getByText('Space')).toBeInTheDocument()
@@ -134,7 +134,7 @@ describe('PopupApp', () => {
   })
 
   it('shows compatibility warnings returned by the Netflix content script', async () => {
-    vi.mocked(chrome.tabs.sendMessage).mockImplementationOnce(
+    vi.mocked(chrome.tabs.sendMessage).mockImplementation(
       (_tabId, _message, _optionsOrCallback, maybeCallback) => {
         const callback =
           typeof _optionsOrCallback === 'function' ? _optionsOrCallback : maybeCallback
@@ -164,7 +164,7 @@ describe('PopupApp', () => {
   })
 
   it('shows a stable compatibility warning when only Picture-in-Picture is unsupported', async () => {
-    vi.mocked(chrome.tabs.sendMessage).mockImplementationOnce(
+    vi.mocked(chrome.tabs.sendMessage).mockImplementation(
       (_tabId, _message, _optionsOrCallback, maybeCallback) => {
         const callback =
           typeof _optionsOrCallback === 'function' ? _optionsOrCallback : maybeCallback
@@ -190,6 +190,142 @@ describe('PopupApp', () => {
     expect(screen.queryByText(/Retrying automatically/)).not.toBeInTheDocument()
   })
 
+  it('keeps a disabled animated compatibility control visible while checking', async () => {
+    let resolveDiagnostics:
+      | ((response: Record<string, unknown>) => void)
+      | undefined
+    vi.mocked(chrome.tabs.sendMessage).mockImplementation(
+      (_tabId, _message, _optionsOrCallback, maybeCallback) => {
+        resolveDiagnostics =
+          typeof _optionsOrCallback === 'function' ? _optionsOrCallback : maybeCallback
+      }
+    )
+
+    render(<PopupApp />)
+
+    const checkingButton = await screen.findByRole('button', {
+      name: 'Checking compatibility…',
+    })
+    expect(checkingButton).toBeDisabled()
+    expect(checkingButton.querySelector('svg')).toHaveClass('animate-spin')
+
+    act(() => {
+      resolveDiagnostics?.({
+        contentScriptReady: true,
+        settingsLoaded: true,
+        enabled: true,
+        videoFound: true,
+        bridgeReady: true,
+        playerApiFound: true,
+        playerFound: true,
+        pipSupported: true,
+        pipActive: false,
+      })
+    })
+
+    expect(await screen.findByRole('button', { name: 'Compatibility' })).toBeEnabled()
+  })
+
+  it('does not require a reload when the content script becomes available during initial retry', async () => {
+    let attempt = 0
+    vi.mocked(chrome.tabs.sendMessage).mockImplementation(
+      (_tabId, _message, _optionsOrCallback, maybeCallback) => {
+        const callback =
+          typeof _optionsOrCallback === 'function' ? _optionsOrCallback : maybeCallback
+        attempt += 1
+
+        if (attempt === 1) {
+          Object.defineProperty(chrome.runtime, 'lastError', {
+            configurable: true,
+            value: {
+              message: 'Could not establish connection. Receiving end does not exist.',
+            },
+          })
+          callback?.(undefined as unknown as Record<string, unknown>)
+          Object.defineProperty(chrome.runtime, 'lastError', {
+            configurable: true,
+            value: undefined,
+          })
+          return
+        }
+
+        callback?.({
+          contentScriptReady: true,
+          settingsLoaded: true,
+          enabled: true,
+          videoFound: true,
+          bridgeReady: true,
+          playerApiFound: true,
+          playerFound: true,
+          pipSupported: true,
+          pipActive: false,
+        })
+      }
+    )
+
+    render(<PopupApp />)
+
+    await waitFor(() => expect(chrome.tabs.sendMessage).toHaveBeenCalledTimes(2))
+    expect(screen.queryByRole('alert', { name: 'Extension not active' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Compatibility' })).toBeInTheDocument()
+  })
+
+  it('requires a Netflix reload and stops retrying when the content script is missing', async () => {
+    vi.mocked(chrome.tabs.sendMessage).mockImplementation(
+      (_tabId, _message, _optionsOrCallback, maybeCallback) => {
+        const callback =
+          typeof _optionsOrCallback === 'function' ? _optionsOrCallback : maybeCallback
+        Object.defineProperty(chrome.runtime, 'lastError', {
+          configurable: true,
+          value: {
+            message: 'Could not establish connection. Receiving end does not exist.',
+          },
+        })
+        callback?.(undefined as unknown as Record<string, unknown>)
+        Object.defineProperty(chrome.runtime, 'lastError', {
+          configurable: true,
+          value: undefined,
+        })
+      }
+    )
+
+    render(<PopupApp />)
+    const connectionAlert = await screen.findByRole('alert', {
+      name: 'Extension not active',
+    })
+    expect(connectionAlert).toHaveTextContent(
+      'Reload the Netflix tab to reconnect the extension.'
+    )
+    expect(
+      screen.queryByRole('button', {
+        name: 'Compatibility: Extension not active',
+      })
+    ).not.toBeInTheDocument()
+    expect(chrome.tabs.sendMessage).toHaveBeenCalledTimes(3)
+
+    vi.useFakeTimers()
+    try {
+      const closePopup = vi.spyOn(window, 'close').mockImplementation(() => undefined)
+      await vi.advanceTimersByTimeAsync(4_000)
+      expect(chrome.tabs.sendMessage).toHaveBeenCalledTimes(3)
+      expect(screen.queryByText(/Retrying automatically/)).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Copy diagnostics' })).not.toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: 'Reload Netflix' }))
+      expect(chrome.tabs.reload).toHaveBeenCalledWith(1)
+      expect(closePopup).toHaveBeenCalledOnce()
+      expect(screen.queryByRole('alert', { name: 'Extension not active' })).not.toBeInTheDocument()
+      expect(
+        screen.getByRole('button', { name: 'Checking compatibility…' })
+      ).toBeDisabled()
+    } finally {
+      Object.defineProperty(chrome.runtime, 'lastError', {
+        configurable: true,
+        value: undefined,
+      })
+      vi.useRealTimers()
+    }
+  })
+
   it('copies a privacy-safe compatibility report', async () => {
     render(<PopupApp />)
 
@@ -198,7 +334,7 @@ describe('PopupApp', () => {
 
     await waitFor(() => {
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-        expect.stringContaining('Extension version: 0.3.1')
+        expect.stringContaining('Extension version: 0.4.0')
       )
     })
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
@@ -207,9 +343,33 @@ describe('PopupApp', () => {
     expect(screen.getByRole('button', { name: 'Copied' })).toBeInTheDocument()
   })
 
+  it('locks background scrolling while compatibility diagnostics are open', async () => {
+    render(<PopupApp />)
+
+    await openCompatibilityDiagnostics()
+    const wheelWhileOpen = new WheelEvent('wheel', {
+      bubbles: true,
+      cancelable: true,
+      deltaY: 100,
+    })
+    document.dispatchEvent(wheelWhileOpen)
+    expect(wheelWhileOpen.defaultPrevented).toBe(true)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    const wheelAfterClose = new WheelEvent('wheel', {
+      bubbles: true,
+      cancelable: true,
+      deltaY: 100,
+    })
+    document.dispatchEvent(wheelAfterClose)
+    expect(wheelAfterClose.defaultPrevented).toBe(false)
+  })
+
   it('stops compatibility diagnostics after playback is ready', async () => {
     render(<PopupApp />)
     const diagnosticsButton = await screen.findByRole('button', { name: 'Compatibility' })
+    await waitFor(() => expect(chrome.tabs.sendMessage).toHaveBeenCalledTimes(1))
+    vi.mocked(chrome.tabs.sendMessage).mockClear()
 
     vi.useFakeTimers()
     try {
@@ -244,6 +404,8 @@ describe('PopupApp', () => {
 
     render(<PopupApp />)
     const diagnosticsButton = await screen.findByRole('button', { name: 'Compatibility' })
+    await waitFor(() => expect(chrome.tabs.sendMessage).toHaveBeenCalledTimes(1))
+    vi.mocked(chrome.tabs.sendMessage).mockClear()
 
     vi.useFakeTimers()
     try {

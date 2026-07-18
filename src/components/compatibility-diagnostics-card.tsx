@@ -21,11 +21,13 @@ export type CompatibilityDiagnosticsState =
   | { status: 'loading'; diagnostics: null }
   | { status: 'ready'; diagnostics: CompatibilityDiagnostics }
   | { status: 'unavailable'; diagnostics: null }
+  | { status: 'reload-required'; diagnostics: null }
 
 type CompatibilityDiagnosticsCardProps = {
   className?: string
   copy: ReturnType<typeof getCopy>
   state: CompatibilityDiagnosticsState
+  onReloadPage: () => void
 }
 
 type DiagnosticsRowProps = {
@@ -62,6 +64,7 @@ export function CompatibilityDiagnosticsCard({
   className,
   copy,
   state,
+  onReloadPage,
 }: CompatibilityDiagnosticsCardProps) {
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle')
   const diagnostics = state.diagnostics
@@ -119,6 +122,15 @@ export function CompatibilityDiagnosticsCard({
           <RefreshCwIcon className="mt-0.5 size-4 shrink-0 animate-spin text-amber-600" />
           <p className="text-xs leading-relaxed text-muted-foreground">
             {copy.diagnosticsRetrying}
+          </p>
+        </div>
+      )}
+
+      {state.status === 'reload-required' && (
+        <div className="flex items-start gap-2">
+          <TriangleAlertIcon className="mt-0.5 size-4 shrink-0 text-amber-600" />
+          <p className="text-xs leading-relaxed text-muted-foreground" role="status">
+            {copy.diagnosticsReloadRequired}
           </p>
         </div>
       )}
@@ -197,7 +209,19 @@ export function CompatibilityDiagnosticsCard({
         </>
       )}
 
-      {state.status !== 'loading' && (
+      {state.status === 'reload-required' && (
+        <Button
+          variant="outline"
+          size="xs"
+          className="mt-2.5 w-full"
+          onClick={onReloadPage}
+        >
+          <RefreshCwIcon data-icon="inline-start" />
+          {copy.diagnosticsReloadPage}
+        </Button>
+      )}
+
+      {state.status === 'ready' && (
         <Button
           variant="outline"
           size="xs"

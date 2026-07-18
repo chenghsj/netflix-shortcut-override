@@ -11,8 +11,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { GitHubIcon } from '@/components/github-icon'
 import { HoldSpeedIcon } from '@/components/hold-speed-icon'
 import { KeyBindingKbd } from '@/components/key-binding-kbd'
+import { CompatibilityConnectionAlert } from '@/components/compatibility-connection-alert'
 import type { CompatibilityDiagnosticsState } from '@/components/compatibility-diagnostics-card'
-import { CompatibilityDiagnosticsDialog } from '@/components/compatibility-diagnostics-dialog'
+import {
+  CompatibilityDiagnosticsDialog,
+  type CompatibilityDiagnosticsTriggerState,
+} from '@/components/compatibility-diagnostics-dialog'
 import { LanguageCombobox } from '@/components/language-combobox'
 import { NumericSettingField } from '@/components/numeric-setting-field'
 import { OtherProjectsSelect } from '@/components/other-projects-select'
@@ -61,6 +65,10 @@ const POPUP_SHORTCUT_ACTIONS: ShortcutAction[] = [
 
 const popupSpeedInputClassName = 'h-6 w-20 px-2 py-0 text-xs'
 const DIAGNOSTICS_REFRESH_INTERVAL_MS = 2_000
+const MISSING_RECEIVER_RETRY_INTERVAL_MS = 200
+const MISSING_RECEIVER_MAX_ATTEMPTS = 3
+const MISSING_MESSAGE_RECEIVER_PATTERN =
+  /could not establish connection|receiving end does not exist/i
 
 const resolvePageStatus = (url: string | undefined): PageStatus => {
   if (!url) return 'unknown'
@@ -97,17 +105,25 @@ const getActivePageContext = async (): Promise<ActivePageContext> => {
 
 const getCompatibilityDiagnostics = async (
   tabId: number
-): Promise<CompatibilityDiagnostics | null> =>
+): Promise<CompatibilityDiagnosticsState> =>
   new Promise(resolve => {
     chrome.tabs.sendMessage(
       tabId,
       { type: COMPATIBILITY_DIAGNOSTICS_MESSAGE_TYPE },
       response => {
-        if (chrome.runtime.lastError || !response) {
-          resolve(null)
+        const errorMessage = chrome.runtime.lastError?.message
+        if (errorMessage && MISSING_MESSAGE_RECEIVER_PATTERN.test(errorMessage)) {
+          resolve({ status: 'reload-required', diagnostics: null })
           return
         }
-        resolve(response as CompatibilityDiagnostics)
+        if (errorMessage || !response) {
+          resolve({ status: 'unavailable', diagnostics: null })
+          return
+        }
+        resolve({
+          status: 'ready',
+          diagnostics: response as CompatibilityDiagnostics,
+        })
       }
     )
   })
@@ -145,6 +161,8 @@ export function PopupApp() {
     status: 'loading',
     diagnostics: null,
   })
+  const [diagnosticsTriggerState, setDiagnosticsTriggerState] =
+    useState<CompatibilityDiagnosticsTriggerState>('checking')
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false)
   const copy = getCopy(settings.locale)
 
@@ -160,6 +178,44 @@ export function PopupApp() {
       active = false
     }
   }, [])
+
+  useEffect(() => {
+    if (pageContext.status !== 'watch' || typeof pageContext.tabId !== 'number') return
+
+    let active = true
+    let retryTimer: number | undefined
+    let attempt = 0
+    const tabId = pageContext.tabId
+
+    const checkDiagnosticsConnection = async () => {
+      attempt += 1
+      const nextState = await getCompatibilityDiagnostics(tabId)
+      if (!active) return
+
+      if (
+        nextState.status === 'reload-required' &&
+        attempt < MISSING_RECEIVER_MAX_ATTEMPTS
+      ) {
+        retryTimer = window.setTimeout(
+          () => void checkDiagnosticsConnection(),
+          MISSING_RECEIVER_RETRY_INTERVAL_MS
+        )
+        return
+      }
+
+      setDiagnosticsState(nextState)
+      setDiagnosticsTriggerState(
+        nextState.status === 'reload-required' ? 'reload-required' : 'default'
+      )
+    }
+
+    void checkDiagnosticsConnection()
+
+    return () => {
+      active = false
+      if (retryTimer !== undefined) window.clearTimeout(retryTimer)
+    }
+  }, [pageContext.status, pageContext.tabId])
 
   useEffect(() => {
     if (
@@ -179,15 +235,17 @@ export function PopupApp() {
       if (!hasDiagnosticsResult) {
         setDiagnosticsState({ status: 'loading', diagnostics: null })
       }
-      const diagnostics = await getCompatibilityDiagnostics(tabId)
+      const nextState = await getCompatibilityDiagnostics(tabId)
       if (!active) return
       hasDiagnosticsResult = true
-      setDiagnosticsState(
-        diagnostics
-          ? { status: 'ready', diagnostics }
-          : { status: 'unavailable', diagnostics: null }
+      setDiagnosticsState(nextState)
+      setDiagnosticsTriggerState(
+        nextState.status === 'reload-required' ? 'reload-required' : 'default'
       )
-      if (!isCompatibilityCoreReady(diagnostics)) {
+      if (
+        nextState.status !== 'reload-required' &&
+        !isCompatibilityCoreReady(nextState.diagnostics)
+      ) {
         refreshTimer = window.setTimeout(refreshDiagnostics, DIAGNOSTICS_REFRESH_INTERVAL_MS)
       }
     }
@@ -206,6 +264,14 @@ export function PopupApp() {
     return null
   }, [copy, pageContext.status])
   const shouldShowPageStatus = Boolean(statusText)
+  const reloadNetflixPage = () => {
+    if (typeof pageContext.tabId === 'number' && chrome.tabs?.reload) {
+      void chrome.tabs.reload(pageContext.tabId)
+      window.close()
+    }
+    setDiagnosticsTriggerState('checking')
+    setDiagnosticsOpen(false)
+  }
 
   if (!loaded) {
     return <main className="h-40 w-[22rem] bg-background" aria-label="Loading" />
@@ -220,19 +286,26 @@ export function PopupApp() {
             <div className="min-w-0 flex-1">
               <h1 className="truncate text-sm font-semibold leading-tight">Shortcut Override</h1>
             </div>
-            {pageContext.status === 'watch' && (
+            {pageContext.status === 'watch' &&
+              diagnosticsTriggerState !== 'reload-required' && (
               <CompatibilityDiagnosticsDialog
                 copy={copy}
                 open={diagnosticsOpen}
                 state={diagnosticsState}
+                triggerState={diagnosticsTriggerState}
                 onOpenChange={setDiagnosticsOpen}
+                onReloadPage={reloadNetflixPage}
               />
-            )}
+              )}
             <Button variant="outline" size="sm" className="shrink-0" onClick={openOptionsPage}>
               <ExternalLinkIcon data-icon="inline-start" />
               {copy.openOptions}
             </Button>
           </header>
+
+          {diagnosticsTriggerState === 'reload-required' && (
+            <CompatibilityConnectionAlert copy={copy} onReloadPage={reloadNetflixPage} />
+          )}
 
           {shouldShowPageStatus && (
             <section className="rounded-lg border bg-card p-3 shadow-xs">

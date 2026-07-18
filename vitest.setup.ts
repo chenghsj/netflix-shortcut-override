@@ -37,6 +37,31 @@ const syncArea: ChromeStorageArea = {
   }),
 }
 
+const defaultTabsQuery = (
+  _query: chrome.tabs.QueryInfo,
+  callback: (tabs: chrome.tabs.Tab[]) => void
+) => {
+  callback([{ id: 1, url: 'https://www.netflix.com/watch/123' } as chrome.tabs.Tab])
+}
+
+const defaultTabsSendMessage = (
+  _tabId: number,
+  _message: unknown,
+  callback: (response: Record<string, unknown>) => void
+) => {
+  callback({
+    contentScriptReady: true,
+    settingsLoaded: true,
+    enabled: true,
+    videoFound: true,
+    bridgeReady: true,
+    playerApiFound: true,
+    playerFound: true,
+    pipSupported: true,
+    pipActive: false,
+  })
+}
+
 const chromeMock = {
   i18n: {
     getUILanguage: vi.fn(() => 'en-US'),
@@ -48,7 +73,7 @@ const chromeMock = {
   },
   runtime: {
     id: 'test-extension-id',
-    getManifest: vi.fn(() => ({ version: '0.3.1' })),
+    getManifest: vi.fn(() => ({ version: '0.4.0' })),
     openOptionsPage: vi.fn(),
     sendMessage: vi.fn(),
     onMessage: {
@@ -56,28 +81,9 @@ const chromeMock = {
     },
   },
   tabs: {
-    query: vi.fn((_query: chrome.tabs.QueryInfo, callback: (tabs: chrome.tabs.Tab[]) => void) => {
-      callback([{ id: 1, url: 'https://www.netflix.com/watch/123' } as chrome.tabs.Tab])
-    }),
-    sendMessage: vi.fn(
-      (
-        _tabId: number,
-        _message: unknown,
-        callback: (response: Record<string, unknown>) => void
-      ) => {
-        callback({
-          contentScriptReady: true,
-          settingsLoaded: true,
-          enabled: true,
-          videoFound: true,
-          bridgeReady: true,
-          playerApiFound: true,
-          playerFound: true,
-          pipSupported: true,
-          pipActive: false,
-        })
-      }
-    ),
+    reload: vi.fn(),
+    query: vi.fn(defaultTabsQuery),
+    sendMessage: vi.fn(defaultTabsSendMessage),
   },
   scripting: {
     executeScript: vi.fn().mockResolvedValue([]),
@@ -119,4 +125,6 @@ beforeEach(() => {
   for (const key of Object.keys(storageState)) delete storageState[key]
   vi.clearAllMocks()
   chromeMock.i18n.getUILanguage.mockReturnValue('en-US')
+  chromeMock.tabs.query.mockImplementation(defaultTabsQuery)
+  chromeMock.tabs.sendMessage.mockImplementation(defaultTabsSendMessage)
 })

@@ -37,6 +37,9 @@ type Copy = {
   diagnosticsPending: string
   diagnosticsChecking: string
   diagnosticsRetrying: string
+  diagnosticsInactive: string
+  diagnosticsReloadRequired: string
+  diagnosticsReloadPage: string
   diagnosticsContentScript: string
   diagnosticsSettings: string
   diagnosticsVideo: string
@@ -119,8 +122,10 @@ export const COPY: Record<Locale, Copy> = {
     diagnosticsWarning: 'Some playback features may be unavailable.',
     diagnosticsPending: 'The Netflix player is not ready yet. Retrying automatically…',
     diagnosticsChecking: 'Checking compatibility…',
-    diagnosticsRetrying:
-      'Unable to reach the extension on this tab. Reload Netflix if needed; retrying automatically…',
+    diagnosticsRetrying: 'Unable to retrieve diagnostics. Retrying automatically…',
+    diagnosticsInactive: 'Extension not active',
+    diagnosticsReloadRequired: 'Reload the Netflix tab to reconnect the extension.',
+    diagnosticsReloadPage: 'Reload Netflix',
     diagnosticsContentScript: 'Extension',
     diagnosticsSettings: 'Shortcut handling',
     diagnosticsVideo: 'Video',
@@ -216,7 +221,10 @@ export const COPY: Record<Locale, Copy> = {
     diagnosticsWarning: '部分播放功能可能無法使用。',
     diagnosticsPending: 'Netflix 播放器尚未就緒，正在自動重試…',
     diagnosticsChecking: '正在檢查相容性…',
-    diagnosticsRetrying: '無法連線到此分頁的擴充功能。如有需要請重新載入 Netflix；正在自動重試…',
+    diagnosticsRetrying: '暫時無法取得診斷資訊，正在自動重試…',
+    diagnosticsInactive: '擴充功能未生效',
+    diagnosticsReloadRequired: '請重新整理 Netflix 分頁，讓擴充功能重新連線。',
+    diagnosticsReloadPage: '重新整理 Netflix',
     diagnosticsContentScript: '擴充功能',
     diagnosticsSettings: '快捷鍵處理',
     diagnosticsVideo: '播放器影片',
@@ -311,7 +319,10 @@ export const COPY: Record<Locale, Copy> = {
     diagnosticsWarning: '部分播放功能可能无法使用。',
     diagnosticsPending: 'Netflix 播放器尚未就绪，正在自动重试…',
     diagnosticsChecking: '正在检查兼容性…',
-    diagnosticsRetrying: '无法连接到此标签页的扩展程序。如有需要请重新加载 Netflix；正在自动重试…',
+    diagnosticsRetrying: '暂时无法获取诊断信息，正在自动重试…',
+    diagnosticsInactive: '扩展程序未生效',
+    diagnosticsReloadRequired: '请重新加载 Netflix 标签页，让扩展程序重新连接。',
+    diagnosticsReloadPage: '重新加载 Netflix',
     diagnosticsContentScript: '扩展程序',
     diagnosticsSettings: '快捷键处理',
     diagnosticsVideo: '播放器视频',
@@ -406,8 +417,11 @@ export const COPY: Record<Locale, Copy> = {
     diagnosticsWarning: '一部の再生機能を使用できない可能性があります。',
     diagnosticsPending: 'Netflix プレーヤーの準備ができていません。自動的に再試行しています…',
     diagnosticsChecking: '互換性を確認しています…',
-    diagnosticsRetrying:
-      'このタブの拡張機能に接続できません。必要に応じて Netflix を再読み込みしてください。自動的に再試行しています…',
+    diagnosticsRetrying: '診断情報を取得できません。自動的に再試行しています…',
+    diagnosticsInactive: '拡張機能が動作していません',
+    diagnosticsReloadRequired:
+      'Netflix のタブを再読み込みして、拡張機能を再接続してください。',
+    diagnosticsReloadPage: 'Netflix を再読み込み',
     diagnosticsContentScript: '拡張機能',
     diagnosticsSettings: 'ショートカット処理',
     diagnosticsVideo: '動画',
@@ -503,8 +517,10 @@ export const COPY: Record<Locale, Copy> = {
     diagnosticsWarning: '일부 재생 기능을 사용하지 못할 수 있습니다.',
     diagnosticsPending: 'Netflix 플레이어가 아직 준비되지 않았습니다. 자동으로 다시 시도하는 중…',
     diagnosticsChecking: '호환성을 확인하는 중…',
-    diagnosticsRetrying:
-      '이 탭의 확장 프로그램에 연결할 수 없습니다. 필요한 경우 Netflix를 새로고침하세요. 자동으로 다시 시도하는 중…',
+    diagnosticsRetrying: '진단 정보를 가져올 수 없습니다. 자동으로 다시 시도하는 중…',
+    diagnosticsInactive: '확장 프로그램이 작동하지 않음',
+    diagnosticsReloadRequired: '확장 프로그램을 다시 연결하려면 Netflix 탭을 새로고침하세요.',
+    diagnosticsReloadPage: 'Netflix 새로고침',
     diagnosticsContentScript: '확장 프로그램',
     diagnosticsSettings: '단축키 처리',
     diagnosticsVideo: '동영상',
