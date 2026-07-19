@@ -6,17 +6,13 @@ import {
   KeyboardIcon,
   SettingsIcon,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 
 import { GitHubIcon } from '@/components/github-icon'
 import { HoldSpeedIcon } from '@/components/hold-speed-icon'
 import { KeyBindingKbd } from '@/components/key-binding-kbd'
 import { CompatibilityConnectionAlert } from '@/components/compatibility-connection-alert'
-import type { CompatibilityDiagnosticsState } from '@/components/compatibility-diagnostics-card'
-import {
-  CompatibilityDiagnosticsDialog,
-  type CompatibilityDiagnosticsTriggerState,
-} from '@/components/compatibility-diagnostics-dialog'
+import { CompatibilityDiagnosticsDialog } from '@/components/compatibility-diagnostics-dialog'
 import { LanguageCombobox } from '@/components/language-combobox'
 import { NumericSettingField } from '@/components/numeric-setting-field'
 import { OtherProjectsSelect } from '@/components/other-projects-select'
@@ -27,12 +23,8 @@ import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
+import { useCompatibilitySession } from '@/popup/use-compatibility-session'
 import { EXTERNAL_LINKS } from '@/shared/external-links'
-import {
-  COMPATIBILITY_DIAGNOSTICS_MESSAGE_TYPE,
-  isCompatibilityCoreReady,
-  type CompatibilityDiagnostics,
-} from '@/shared/diagnostics'
 import { getCopy } from '@/shared/i18n'
 import {
   SEEK_LIMITS,
@@ -41,12 +33,6 @@ import {
   type ShortcutAction,
 } from '@/shared/shortcuts'
 import { useShortcutSettingsForm } from '@/shared/use-shortcut-settings-form'
-
-type PageStatus = 'watch' | 'netflix' | 'external' | 'unknown'
-type ActivePageContext = {
-  status: PageStatus
-  tabId?: number
-}
 
 const POPUP_SHORTCUT_ACTIONS: ShortcutAction[] = [
   'playPause',
@@ -64,69 +50,6 @@ const POPUP_SHORTCUT_ACTIONS: ShortcutAction[] = [
 ]
 
 const popupSpeedInputClassName = 'h-6 w-20 px-2 py-0 text-xs'
-const DIAGNOSTICS_REFRESH_INTERVAL_MS = 2_000
-const MISSING_RECEIVER_RETRY_INTERVAL_MS = 200
-const MISSING_RECEIVER_MAX_ATTEMPTS = 3
-const MISSING_MESSAGE_RECEIVER_PATTERN =
-  /could not establish connection|receiving end does not exist/i
-
-const resolvePageStatus = (url: string | undefined): PageStatus => {
-  if (!url) return 'unknown'
-
-  try {
-    const parsed = new URL(url)
-    const host = parsed.hostname.toLowerCase()
-    const isNetflix = host === 'netflix.com' || host.endsWith('.netflix.com')
-
-    if (!isNetflix) return 'external'
-    return parsed.pathname.startsWith('/watch') ? 'watch' : 'netflix'
-  } catch {
-    return 'unknown'
-  }
-}
-
-const getActivePageContext = async (): Promise<ActivePageContext> => {
-  if (typeof chrome === 'undefined' || !chrome.tabs?.query) return { status: 'unknown' }
-
-  return new Promise(resolve => {
-    chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
-      if (chrome.runtime.lastError) {
-        resolve({ status: 'unknown' })
-        return
-      }
-
-      resolve({
-        status: resolvePageStatus(tabs[0]?.url),
-        tabId: tabs[0]?.id,
-      })
-    })
-  })
-}
-
-const getCompatibilityDiagnostics = async (
-  tabId: number
-): Promise<CompatibilityDiagnosticsState> =>
-  new Promise(resolve => {
-    chrome.tabs.sendMessage(
-      tabId,
-      { type: COMPATIBILITY_DIAGNOSTICS_MESSAGE_TYPE },
-      response => {
-        const errorMessage = chrome.runtime.lastError?.message
-        if (errorMessage && MISSING_MESSAGE_RECEIVER_PATTERN.test(errorMessage)) {
-          resolve({ status: 'reload-required', diagnostics: null })
-          return
-        }
-        if (errorMessage || !response) {
-          resolve({ status: 'unavailable', diagnostics: null })
-          return
-        }
-        resolve({
-          status: 'ready',
-          diagnostics: response as CompatibilityDiagnostics,
-        })
-      }
-    )
-  })
 
 const openOptionsPage = () => {
   if (typeof chrome !== 'undefined' && chrome.runtime?.openOptionsPage) {
@@ -156,122 +79,22 @@ export function PopupApp() {
     handleSeekKeyDown,
     handleSpaceHoldKeyDown,
   } = useShortcutSettingsForm()
-  const [pageContext, setPageContext] = useState<ActivePageContext>({ status: 'unknown' })
-  const [diagnosticsState, setDiagnosticsState] = useState<CompatibilityDiagnosticsState>({
-    status: 'loading',
-    diagnostics: null,
-  })
-  const [diagnosticsTriggerState, setDiagnosticsTriggerState] =
-    useState<CompatibilityDiagnosticsTriggerState>('checking')
-  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false)
+  const {
+    pageStatus,
+    diagnosticsState,
+    diagnosticsTriggerState,
+    diagnosticsOpen,
+    setDiagnosticsOpen,
+    reloadNetflixPage,
+  } = useCompatibilitySession()
   const copy = getCopy(settings.locale)
 
-  useEffect(() => {
-    let active = true
-
-    void getActivePageContext().then(nextContext => {
-      if (!active) return
-      setPageContext(nextContext)
-    })
-
-    return () => {
-      active = false
-    }
-  }, [])
-
-  useEffect(() => {
-    if (pageContext.status !== 'watch' || typeof pageContext.tabId !== 'number') return
-
-    let active = true
-    let retryTimer: number | undefined
-    let attempt = 0
-    const tabId = pageContext.tabId
-
-    const checkDiagnosticsConnection = async () => {
-      attempt += 1
-      const nextState = await getCompatibilityDiagnostics(tabId)
-      if (!active) return
-
-      if (
-        nextState.status === 'reload-required' &&
-        attempt < MISSING_RECEIVER_MAX_ATTEMPTS
-      ) {
-        retryTimer = window.setTimeout(
-          () => void checkDiagnosticsConnection(),
-          MISSING_RECEIVER_RETRY_INTERVAL_MS
-        )
-        return
-      }
-
-      setDiagnosticsState(nextState)
-      setDiagnosticsTriggerState(
-        nextState.status === 'reload-required' ? 'reload-required' : 'default'
-      )
-    }
-
-    void checkDiagnosticsConnection()
-
-    return () => {
-      active = false
-      if (retryTimer !== undefined) window.clearTimeout(retryTimer)
-    }
-  }, [pageContext.status, pageContext.tabId])
-
-  useEffect(() => {
-    if (
-      !diagnosticsOpen ||
-      pageContext.status !== 'watch' ||
-      typeof pageContext.tabId !== 'number'
-    ) {
-      return
-    }
-
-    let active = true
-    let refreshTimer: number | undefined
-    let hasDiagnosticsResult = false
-    const tabId = pageContext.tabId
-
-    const refreshDiagnostics = async () => {
-      if (!hasDiagnosticsResult) {
-        setDiagnosticsState({ status: 'loading', diagnostics: null })
-      }
-      const nextState = await getCompatibilityDiagnostics(tabId)
-      if (!active) return
-      hasDiagnosticsResult = true
-      setDiagnosticsState(nextState)
-      setDiagnosticsTriggerState(
-        nextState.status === 'reload-required' ? 'reload-required' : 'default'
-      )
-      if (
-        nextState.status !== 'reload-required' &&
-        !isCompatibilityCoreReady(nextState.diagnostics)
-      ) {
-        refreshTimer = window.setTimeout(refreshDiagnostics, DIAGNOSTICS_REFRESH_INTERVAL_MS)
-      }
-    }
-
-    void refreshDiagnostics()
-
-    return () => {
-      active = false
-      if (refreshTimer !== undefined) window.clearTimeout(refreshTimer)
-    }
-  }, [diagnosticsOpen, pageContext.status, pageContext.tabId])
-
   const statusText = useMemo(() => {
-    if (pageContext.status === 'netflix') return copy.popupNetflixPage
-    if (pageContext.status === 'external') return copy.popupNetflixOnly
+    if (pageStatus === 'netflix') return copy.popupNetflixPage
+    if (pageStatus === 'external') return copy.popupNetflixOnly
     return null
-  }, [copy, pageContext.status])
+  }, [copy, pageStatus])
   const shouldShowPageStatus = Boolean(statusText)
-  const reloadNetflixPage = () => {
-    if (typeof pageContext.tabId === 'number' && chrome.tabs?.reload) {
-      void chrome.tabs.reload(pageContext.tabId)
-      window.close()
-    }
-    setDiagnosticsTriggerState('checking')
-    setDiagnosticsOpen(false)
-  }
 
   if (!loaded) {
     return <main className="h-40 w-[22rem] bg-background" aria-label="Loading" />
@@ -286,7 +109,7 @@ export function PopupApp() {
             <div className="min-w-0 flex-1">
               <h1 className="truncate text-sm font-semibold leading-tight">Shortcut Override</h1>
             </div>
-            {pageContext.status === 'watch' &&
+            {pageStatus === 'watch' &&
               diagnosticsTriggerState !== 'reload-required' && (
               <CompatibilityDiagnosticsDialog
                 copy={copy}

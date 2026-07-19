@@ -3,7 +3,6 @@ import { useEffect } from 'react'
 
 import {
   CompatibilityDiagnosticsCard,
-  type CompatibilityDiagnosticsState,
 } from '@/components/compatibility-diagnostics-card'
 import { Button } from '@/components/ui/button'
 import {
@@ -15,11 +14,10 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { getCopy } from '@/shared/i18n'
-
-export type CompatibilityDiagnosticsTriggerState =
-  | 'checking'
-  | 'default'
-  | 'reload-required'
+import type {
+  CompatibilityDiagnosticsState,
+  CompatibilityDiagnosticsTriggerState,
+} from '@/popup/use-compatibility-session'
 
 type CompatibilityDiagnosticsDialogProps = {
   copy: ReturnType<typeof getCopy>

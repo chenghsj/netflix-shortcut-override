@@ -13,15 +13,9 @@ import { cn } from '@/lib/utils'
 import {
   formatCompatibilityDiagnosticsReport,
   isCompatibilityCoreReady,
-  type CompatibilityDiagnostics,
 } from '@/shared/diagnostics'
 import { getCopy } from '@/shared/i18n'
-
-export type CompatibilityDiagnosticsState =
-  | { status: 'loading'; diagnostics: null }
-  | { status: 'ready'; diagnostics: CompatibilityDiagnostics }
-  | { status: 'unavailable'; diagnostics: null }
-  | { status: 'reload-required'; diagnostics: null }
+import type { CompatibilityDiagnosticsState } from '@/popup/use-compatibility-session'
 
 type CompatibilityDiagnosticsCardProps = {
   className?: string

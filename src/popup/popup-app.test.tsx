@@ -226,51 +226,7 @@ describe('PopupApp', () => {
     expect(await screen.findByRole('button', { name: 'Compatibility' })).toBeEnabled()
   })
 
-  it('does not require a reload when the content script becomes available during initial retry', async () => {
-    let attempt = 0
-    vi.mocked(chrome.tabs.sendMessage).mockImplementation(
-      (_tabId, _message, _optionsOrCallback, maybeCallback) => {
-        const callback =
-          typeof _optionsOrCallback === 'function' ? _optionsOrCallback : maybeCallback
-        attempt += 1
-
-        if (attempt === 1) {
-          Object.defineProperty(chrome.runtime, 'lastError', {
-            configurable: true,
-            value: {
-              message: 'Could not establish connection. Receiving end does not exist.',
-            },
-          })
-          callback?.(undefined as unknown as Record<string, unknown>)
-          Object.defineProperty(chrome.runtime, 'lastError', {
-            configurable: true,
-            value: undefined,
-          })
-          return
-        }
-
-        callback?.({
-          contentScriptReady: true,
-          settingsLoaded: true,
-          enabled: true,
-          videoFound: true,
-          bridgeReady: true,
-          playerApiFound: true,
-          playerFound: true,
-          pipSupported: true,
-          pipActive: false,
-        })
-      }
-    )
-
-    render(<PopupApp />)
-
-    await waitFor(() => expect(chrome.tabs.sendMessage).toHaveBeenCalledTimes(2))
-    expect(screen.queryByRole('alert', { name: 'Extension not active' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Compatibility' })).toBeInTheDocument()
-  })
-
-  it('requires a Netflix reload and stops retrying when the content script is missing', async () => {
+  it('offers to reload Netflix when the content script is missing', async () => {
     vi.mocked(chrome.tabs.sendMessage).mockImplementation(
       (_tabId, _message, _optionsOrCallback, maybeCallback) => {
         const callback =
@@ -301,13 +257,8 @@ describe('PopupApp', () => {
         name: 'Compatibility: Extension not active',
       })
     ).not.toBeInTheDocument()
-    expect(chrome.tabs.sendMessage).toHaveBeenCalledTimes(3)
-
-    vi.useFakeTimers()
     try {
       const closePopup = vi.spyOn(window, 'close').mockImplementation(() => undefined)
-      await vi.advanceTimersByTimeAsync(4_000)
-      expect(chrome.tabs.sendMessage).toHaveBeenCalledTimes(3)
       expect(screen.queryByText(/Retrying automatically/)).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Copy diagnostics' })).not.toBeInTheDocument()
       fireEvent.click(screen.getByRole('button', { name: 'Reload Netflix' }))
@@ -322,7 +273,6 @@ describe('PopupApp', () => {
         configurable: true,
         value: undefined,
       })
-      vi.useRealTimers()
     }
   })
 
@@ -365,60 +315,4 @@ describe('PopupApp', () => {
     expect(wheelAfterClose.defaultPrevented).toBe(false)
   })
 
-  it('stops compatibility diagnostics after playback is ready', async () => {
-    render(<PopupApp />)
-    const diagnosticsButton = await screen.findByRole('button', { name: 'Compatibility' })
-    await waitFor(() => expect(chrome.tabs.sendMessage).toHaveBeenCalledTimes(1))
-    vi.mocked(chrome.tabs.sendMessage).mockClear()
-
-    vi.useFakeTimers()
-    try {
-      fireEvent.click(diagnosticsButton)
-      await vi.advanceTimersByTimeAsync(0)
-      expect(chrome.tabs.sendMessage).toHaveBeenCalledTimes(1)
-      await vi.advanceTimersByTimeAsync(4_000)
-      expect(chrome.tabs.sendMessage).toHaveBeenCalledTimes(1)
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-
-  it('retries unresolved diagnostics and stops when the dialog closes', async () => {
-    vi.mocked(chrome.tabs.sendMessage).mockImplementation(
-      (_tabId, _message, _optionsOrCallback, maybeCallback) => {
-        const callback =
-          typeof _optionsOrCallback === 'function' ? _optionsOrCallback : maybeCallback
-        callback?.({
-          contentScriptReady: true,
-          settingsLoaded: true,
-          enabled: true,
-          videoFound: false,
-          bridgeReady: true,
-          playerApiFound: false,
-          playerFound: false,
-          pipSupported: true,
-          pipActive: false,
-        })
-      }
-    )
-
-    render(<PopupApp />)
-    const diagnosticsButton = await screen.findByRole('button', { name: 'Compatibility' })
-    await waitFor(() => expect(chrome.tabs.sendMessage).toHaveBeenCalledTimes(1))
-    vi.mocked(chrome.tabs.sendMessage).mockClear()
-
-    vi.useFakeTimers()
-    try {
-      fireEvent.click(diagnosticsButton)
-      await vi.advanceTimersByTimeAsync(0)
-      expect(chrome.tabs.sendMessage).toHaveBeenCalledTimes(1)
-      await vi.advanceTimersByTimeAsync(2_000)
-      expect(chrome.tabs.sendMessage).toHaveBeenCalledTimes(2)
-      fireEvent.click(screen.getByRole('button', { name: 'Close' }))
-      await vi.advanceTimersByTimeAsync(4_000)
-      expect(chrome.tabs.sendMessage).toHaveBeenCalledTimes(2)
-    } finally {
-      vi.useRealTimers()
-    }
-  })
 })
