@@ -1,6 +1,7 @@
-import { sendNetflixApi } from '@/content/netflix-api-client'
+import type { NetflixPlaybackSession } from '@/content/netflix-playback-session'
+import { resolveLocalePreference } from '@/shared/browser-locale'
 import type { CommandContext } from './shortcut-command-types'
-import type { ShortcutSettings } from '@/shared/shortcuts'
+import type { Locale } from '@/shared/shortcuts'
 
 type SpaceInteractionState = {
   targetDoc: Document
@@ -17,12 +18,7 @@ type SpaceInteractionDependencies = {
   startAction: () => number
   executeShortPress: (targetDoc: Document) => boolean
   hideHints: (targetDoc: Document) => void
-  setPlaybackRate: (
-    video: HTMLVideoElement,
-    rate: number,
-    context: CommandContext,
-    displayHint: boolean
-  ) => void
+  playbackSession: NetflixPlaybackSession
   showSpaceHoldHint: (context: CommandContext, label: string) => void
 }
 
@@ -46,7 +42,7 @@ const getRestorablePlaybackRate = (video: HTMLVideoElement): number =>
 const formatPlaybackRate = (rate: number): string =>
   `${rate.toFixed(2).replace(/\.00$/, '').replace(/0$/, '')}x`
 
-const formatSpaceHoldRate = (rate: number, locale: ShortcutSettings['locale']): string => {
+const formatSpaceHoldRate = (rate: number, locale: Locale): string => {
   const value = formatPlaybackRate(rate).replace(/x$/, '')
   if (locale === 'zh-TW' || locale === 'zh-CN') return `${value} 倍`
   if (locale === 'ja') return `${value}倍`
@@ -60,16 +56,13 @@ export const createSpaceInteractionController = (
   let state: SpaceInteractionState | null = null
 
   const restore = (currentState: SpaceInteractionState): void => {
-    const context = dependencies.createContext(currentState.targetDoc)
     dependencies.hideHints(currentState.targetDoc)
-    dependencies.setPlaybackRate(currentState.video, currentState.restoreRate, context, false)
+    void dependencies.playbackSession.setPlaybackRate(currentState.video, currentState.restoreRate)
 
     if (currentState.wasPaused) {
-      currentState.video.pause()
-      sendNetflixApi('pause')
+      void dependencies.playbackSession.pause(currentState.video)
     } else if (currentState.video.paused) {
-      void currentState.video.play().catch(() => undefined)
-      sendNetflixApi('play')
+      void dependencies.playbackSession.play(currentState.video)
     }
   }
 
@@ -111,16 +104,23 @@ export const createSpaceInteractionController = (
         nextState.active = true
 
         if (nextState.wasPaused || nextState.video.paused) {
-          void nextState.video.play().catch(() => undefined)
-          sendNetflixApi('play')
+          void dependencies.playbackSession.play(nextState.video)
         }
 
         const context = dependencies.createContext(nextState.targetDoc, actionToken)
-        dependencies.setPlaybackRate(nextState.video, context.settings.spaceHold.speed, context, false)
-        dependencies.showSpaceHoldHint(
-          context,
-          formatSpaceHoldRate(context.settings.spaceHold.speed, context.settings.locale)
+        void dependencies.playbackSession.setPlaybackRate(
+          nextState.video,
+          context.settings.spaceHold.speed
         )
+        if (context.settings.spaceHold.showHint) {
+          dependencies.showSpaceHoldHint(
+            context,
+            formatSpaceHoldRate(
+              context.settings.spaceHold.speed,
+              resolveLocalePreference(context.settings.locale)
+            )
+          )
+        }
       }, SPACE_HOLD_DELAY_MS)
     }
 

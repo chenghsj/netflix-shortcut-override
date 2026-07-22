@@ -78,12 +78,3 @@ export const sendNetflixApi = async (
   const backgroundResponse = await sendNetflixBackgroundApi(action, value)
   return backgroundResponse.success ? backgroundResponse : pageResponse
 }
-
-export const getSeekFailureLabel = (response: NetflixApiResponse): string | null => {
-  if (!response.success) return `Seek failed: ${response.error ?? 'background error'}`
-  if (response.result?.seekCalled) return null
-  if (response.result?.error) return `Seek failed: ${response.result.error}`
-  if (response.result?.playerApiFound === false) return 'Seek failed: no Netflix API'
-  if (response.result?.playerFound === false) return 'Seek failed: no Netflix player'
-  return 'Seek failed: no seek call'
-}

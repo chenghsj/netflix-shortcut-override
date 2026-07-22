@@ -38,32 +38,6 @@ export const executeNetflixPageApi = (
     const restored = clampVolume(nextVolume)
     return restored > 0 ? restored : defaultUnmuteVolume
   }
-  const nativeVideo = () => document.querySelector('video')
-  const syncAudio = (state: { muted?: boolean; volume?: number }) => {
-    const video = nativeVideo()
-    if (!(video instanceof HTMLVideoElement)) return
-
-    if (state.muted === false) video.muted = false
-    if (typeof state.volume === 'number') video.volume = clampVolume(state.volume)
-    if (state.muted === true) video.muted = true
-    video.dispatchEvent(new Event('volumechange', { bubbles: true }))
-  }
-  const syncPlayback = (state: { paused?: boolean; playbackRate?: number }) => {
-    const video = nativeVideo()
-    if (!(video instanceof HTMLVideoElement)) return
-
-    if (state.paused === true) {
-      video.pause()
-    } else if (state.paused === false) {
-      void video.play().catch(() => undefined)
-    }
-    if (typeof state.playbackRate === 'number' && Number.isFinite(state.playbackRate)) {
-      video.playbackRate = state.playbackRate
-      video.defaultPlaybackRate = state.playbackRate
-      video.dispatchEvent(new Event('ratechange', { bubbles: true }))
-    }
-  }
-
   const result: NetflixPageResult = {
     action,
     bridge: 'main-world',
@@ -72,8 +46,6 @@ export const executeNetflixPageApi = (
     playerFound: false,
     seekCalled: false,
   }
-  let handledByNetflixPlaybackApi = false
-
   try {
     const playerApi = (window as NetflixWindow).netflix?.appContext?.state?.playerApp?.getAPI()
       .videoPlayer
@@ -91,13 +63,11 @@ export const executeNetflixPageApi = (
         // Diagnostics only inspect API availability and must not alter playback.
       } else if (action === 'play') {
         player.play()
-        handledByNetflixPlaybackApi = true
       } else if (action === 'pause') {
         player.pause()
-        handledByNetflixPlaybackApi = true
-      } else if (action === 'seek' && value !== undefined) {
+      } else if ((action === 'seek' || action === 'seekTo') && value !== undefined) {
         result.currentTime = player.getCurrentTime()
-        result.targetTime = result.currentTime + value
+        result.targetTime = action === 'seek' ? result.currentTime + value : value
         player.seek(result.targetTime)
         result.seekCalled = true
       } else if (action === 'setVolume' && value !== undefined) {
@@ -113,20 +83,6 @@ export const executeNetflixPageApi = (
     }
   } catch (error) {
     result.error = error instanceof Error ? error.message : 'Unable to access Netflix player API.'
-  }
-
-  if (action === 'setVolume' && value !== undefined) {
-    syncAudio({ volume: value })
-  } else if (action === 'setMuted') {
-    syncAudio({ muted: Boolean(value) })
-  } else if (action === 'unmuteWithVolume' && value !== undefined) {
-    syncAudio({ volume: normalizeRestoreVolume(value), muted: false })
-  } else if (action === 'play' && !handledByNetflixPlaybackApi) {
-    syncPlayback({ paused: false })
-  } else if (action === 'pause' && !handledByNetflixPlaybackApi) {
-    syncPlayback({ paused: true })
-  } else if (action === 'setPlaybackRate' && value !== undefined) {
-    syncPlayback({ playbackRate: value })
   }
 
   return result

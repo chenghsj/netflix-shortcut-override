@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { getHintManager } from '@/content/hints/hint-manager'
+import { createNetflixPlaybackSession } from '@/content/netflix-playback-session'
 import { createShortcutCommandController } from './shortcut-command-controller'
 import { DEFAULT_SETTINGS } from '@/shared/shortcuts'
+import { PipControls } from '@/content/pip/pip-controls'
 
 describe('ShortcutCommandController', () => {
   beforeEach(() => {
@@ -12,6 +14,56 @@ describe('ShortcutCommandController', () => {
   afterEach(() => {
     getHintManager(document).destroy()
     vi.useRealTimers()
+  })
+
+  it('routes keyboard, Space-hold, and PiP commands through one playback session', async () => {
+    vi.useFakeTimers()
+    const transport = vi.fn().mockResolvedValue({
+      success: true,
+      result: {
+        action: 'seek',
+        playerApiFound: true,
+        playerFound: true,
+        seekCalled: true,
+        sessionIds: ['session-id'],
+      },
+    })
+    const playbackSession = createNetflixPlaybackSession(transport)
+    const controller = createShortcutCommandController(() => DEFAULT_SETTINGS, playbackSession)
+    const video = document.createElement('video')
+    Object.defineProperty(video, 'paused', { configurable: true, value: false })
+    video.playbackRate = 1
+    document.body.append(video)
+
+    controller.execute('seekForward', document)
+    controller.beginSpaceInteraction(document, video, true)
+    vi.advanceTimersByTime(250)
+    controller.completeSpaceInteraction()
+
+    const videoArea = document.createElement('div')
+    document.body.append(videoArea)
+    Object.defineProperty(video, 'currentTime', { configurable: true, value: 12 })
+    Object.defineProperty(video, 'duration', { configurable: true, value: 240 })
+    const pipControls = new PipControls({
+      pipWindow: window,
+      video,
+      videoArea,
+      playbackSession,
+    })
+    pipControls.start()
+    const timeline = videoArea.querySelector<HTMLInputElement>('[data-pip-control="timeline"]')
+    if (!timeline) throw new Error('Expected PiP timeline')
+    timeline.value = '90'
+    timeline.dispatchEvent(new Event('input', { bubbles: true }))
+    timeline.dispatchEvent(new Event('change', { bubbles: true }))
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(transport).toHaveBeenNthCalledWith(1, 'seek', 10_000)
+    expect(transport).toHaveBeenNthCalledWith(2, 'setPlaybackRate', 2)
+    expect(transport).toHaveBeenNthCalledWith(3, 'setPlaybackRate', 1)
+    expect(transport).toHaveBeenNthCalledWith(4, 'seekTo', 90_000)
+    pipControls.destroy()
   })
 
   it('ignores a late seek failure after a newer action', async () => {

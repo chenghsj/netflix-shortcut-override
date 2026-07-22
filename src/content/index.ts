@@ -7,6 +7,7 @@ import {
   isTypingTarget,
 } from '@/content/dom-utils'
 import { PipManager } from '@/content/pip/pip-manager'
+import { createNetflixPlaybackSession } from '@/content/netflix-playback-session'
 import { createShortcutCommandController } from '@/content/shortcuts/shortcut-command-controller'
 import {
   DEFAULT_SETTINGS,
@@ -26,7 +27,8 @@ import { sendNetflixApi } from '@/content/netflix-api-client'
 let settings: ShortcutSettings = DEFAULT_SETTINGS
 let settingsLoaded = false
 
-const commandController = createShortcutCommandController(() => settings)
+const playbackSession = createNetflixPlaybackSession()
+const commandController = createShortcutCommandController(() => settings, playbackSession)
 let pipManager: PipManager | null = null
 
 const clearSpaceHoldOnWindowBlur = () => {
@@ -134,6 +136,7 @@ const handleKeyup = (event: KeyboardEvent) => {
 
 pipManager = new PipManager({
   sourceDocument: document,
+  playbackSession,
   onKeydown: (event, targetDoc) => handleKeydown(event, targetDoc),
   onKeyup: event => handleKeyup(event),
   onBlur: () => commandController.clearSpaceInteraction(),
@@ -145,7 +148,6 @@ pipManager = new PipManager({
     commandController.execute('playPause', targetDoc)
   },
 })
-
 const applySettings = (nextSettings: ShortcutSettings) => {
   settings = nextSettings
   settingsLoaded = true

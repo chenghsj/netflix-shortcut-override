@@ -4,6 +4,10 @@ import { isFirefoxBrowser } from '@/shared/browser-info'
 import { findSubtitleSearchRoot, SubtitleMirror } from './pip-subtitle-mirror'
 import { PipControls } from './pip-controls'
 import { createPipVideoHandoff } from './pip-video-handoff'
+import {
+  createNetflixPlaybackSession,
+  type NetflixPlaybackSession,
+} from '@/content/netflix-playback-session'
 import { VideoPlacement } from './video-placement'
 
 type DocumentPictureInPictureApi = {
@@ -54,6 +58,7 @@ export class PipManager {
   private readonly sourceDocument: Document
   private readonly keyboardHandlers: PipKeyboardHandlers
   private readonly videoPlacement: VideoPlacement
+  private readonly playbackSession: NetflixPlaybackSession
   private pipWindow: Window | null = null
 
   private subtitleMirror: SubtitleMirror | null = null
@@ -65,10 +70,16 @@ export class PipManager {
   private entering = false
   private entryVersion = 0
 
-  constructor(options: PipKeyboardHandlers & { sourceDocument?: Document }) {
-    const { sourceDocument, onKeydown, onKeyup, onBlur, onClick } = options
+  constructor(
+    options: PipKeyboardHandlers & {
+      sourceDocument?: Document
+      playbackSession?: NetflixPlaybackSession
+    }
+  ) {
+    const { sourceDocument, onKeydown, onKeyup, onBlur, onClick, playbackSession } = options
     this.sourceDocument = sourceDocument ?? document
     this.videoPlacement = new VideoPlacement(this.sourceDocument)
+    this.playbackSession = playbackSession ?? createNetflixPlaybackSession()
     this.keyboardHandlers = { onKeydown, onKeyup, onBlur, onClick }
   }
 
@@ -258,6 +269,7 @@ export class PipManager {
       pipWindow: pipWin,
       video,
       videoArea,
+      playbackSession: this.playbackSession,
     })
     this.pipControls.start()
     this.subtitleMirror = new SubtitleMirror({
