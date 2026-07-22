@@ -35,6 +35,7 @@ type Copy = {
   diagnosticsReady: string
   diagnosticsWarning: string
   diagnosticsPending: string
+  diagnosticsPageLoadingLong: string
   diagnosticsChecking: string
   diagnosticsRetrying: string
   diagnosticsInactive: string
@@ -121,6 +122,8 @@ export const COPY: Record<Locale, Copy> = {
     diagnosticsReady: 'Netflix playback features are ready.',
     diagnosticsWarning: 'Some playback features may be unavailable.',
     diagnosticsPending: 'The Netflix player is not ready yet. Retrying automatically…',
+    diagnosticsPageLoadingLong:
+      'Netflix is still loading. Compatibility will be checked automatically when loading finishes.',
     diagnosticsChecking: 'Checking compatibility…',
     diagnosticsRetrying: 'Unable to retrieve diagnostics. Retrying automatically…',
     diagnosticsInactive: 'Extension not active',
@@ -220,6 +223,7 @@ export const COPY: Record<Locale, Copy> = {
     diagnosticsReady: 'Netflix 播放功能已就緒。',
     diagnosticsWarning: '部分播放功能可能無法使用。',
     diagnosticsPending: 'Netflix 播放器尚未就緒，正在自動重試…',
+    diagnosticsPageLoadingLong: 'Netflix 仍在載入，完成後會自動重新檢查相容性。',
     diagnosticsChecking: '正在檢查相容性…',
     diagnosticsRetrying: '暫時無法取得診斷資訊，正在自動重試…',
     diagnosticsInactive: '擴充功能未生效',
@@ -318,6 +322,7 @@ export const COPY: Record<Locale, Copy> = {
     diagnosticsReady: 'Netflix 播放功能已就绪。',
     diagnosticsWarning: '部分播放功能可能无法使用。',
     diagnosticsPending: 'Netflix 播放器尚未就绪，正在自动重试…',
+    diagnosticsPageLoadingLong: 'Netflix 仍在加载，完成后会自动重新检查兼容性。',
     diagnosticsChecking: '正在检查兼容性…',
     diagnosticsRetrying: '暂时无法获取诊断信息，正在自动重试…',
     diagnosticsInactive: '扩展程序未生效',
@@ -416,6 +421,8 @@ export const COPY: Record<Locale, Copy> = {
     diagnosticsReady: 'Netflix の再生機能を使用できます。',
     diagnosticsWarning: '一部の再生機能を使用できない可能性があります。',
     diagnosticsPending: 'Netflix プレーヤーの準備ができていません。自動的に再試行しています…',
+    diagnosticsPageLoadingLong:
+      'Netflix はまだ読み込み中です。完了後に互換性を自動で再確認します。',
     diagnosticsChecking: '互換性を確認しています…',
     diagnosticsRetrying: '診断情報を取得できません。自動的に再試行しています…',
     diagnosticsInactive: '拡張機能が動作していません',
@@ -516,6 +523,8 @@ export const COPY: Record<Locale, Copy> = {
     diagnosticsReady: 'Netflix 재생 기능을 사용할 수 있습니다.',
     diagnosticsWarning: '일부 재생 기능을 사용하지 못할 수 있습니다.',
     diagnosticsPending: 'Netflix 플레이어가 아직 준비되지 않았습니다. 자동으로 다시 시도하는 중…',
+    diagnosticsPageLoadingLong:
+      'Netflix가 아직 로드 중입니다. 완료되면 호환성을 자동으로 다시 확인합니다.',
     diagnosticsChecking: '호환성을 확인하는 중…',
     diagnosticsRetrying: '진단 정보를 가져올 수 없습니다. 자동으로 다시 시도하는 중…',
     diagnosticsInactive: '확장 프로그램이 작동하지 않음',

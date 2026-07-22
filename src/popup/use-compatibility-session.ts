@@ -5,6 +5,10 @@ import {
   isCompatibilityCoreReady,
   type CompatibilityDiagnostics,
 } from '@/shared/diagnostics'
+import {
+  isNetflixWatchUrl,
+  type PlaybackFocusTarget,
+} from '@/shared/playback-focus-restoration'
 
 export type PageStatus = 'watch' | 'netflix' | 'external' | 'unknown'
 
@@ -20,13 +24,17 @@ export type CompatibilityDiagnosticsTriggerState =
   | 'reload-required'
 
 type ActivePageContext = {
+  generation: number
   status: PageStatus
   tabId?: number
+  windowId?: number
+  loadStatus?: chrome.tabs.Tab['status']
 }
 
 const DIAGNOSTICS_REFRESH_INTERVAL_MS = 2_000
 const MISSING_RECEIVER_RETRY_INTERVAL_MS = 200
 const MISSING_RECEIVER_MAX_ATTEMPTS = 3
+const LONG_PAGE_LOAD_THRESHOLD_MS = 10_000
 const MISSING_MESSAGE_RECEIVER_PATTERN =
   /could not establish connection|receiving end does not exist/i
 
@@ -44,29 +52,43 @@ const resolvePageStatus = (url: string | undefined): PageStatus => {
     const isNetflix = host === 'netflix.com' || host.endsWith('.netflix.com')
 
     if (!isNetflix) return 'external'
-    return parsed.pathname.startsWith('/watch') ? 'watch' : 'netflix'
+    return isNetflixWatchUrl(url) ? 'watch' : 'netflix'
   } catch {
     return 'unknown'
   }
 }
 
 const getActivePageContext = async (): Promise<ActivePageContext> => {
-  if (typeof chrome === 'undefined' || !chrome.tabs?.query) return { status: 'unknown' }
+  if (typeof chrome === 'undefined' || !chrome.tabs?.query) {
+    return { generation: 0, status: 'unknown' }
+  }
 
   return new Promise(resolve => {
     chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
       if (chrome.runtime.lastError) {
-        resolve({ status: 'unknown' })
+        resolve({ generation: 0, status: 'unknown' })
         return
       }
 
       resolve({
+        generation: 0,
         status: resolvePageStatus(tabs[0]?.url),
         tabId: tabs[0]?.id,
+        windowId: tabs[0]?.windowId,
+        loadStatus: tabs[0]?.status,
       })
     })
   })
 }
+
+const getPlaybackFocusTarget = (
+  pageContext: ActivePageContext
+): PlaybackFocusTarget | undefined =>
+  pageContext.status === 'watch' &&
+  typeof pageContext.tabId === 'number' &&
+  typeof pageContext.windowId === 'number'
+    ? { tabId: pageContext.tabId, windowId: pageContext.windowId }
+    : undefined
 
 const getCompatibilityDiagnostics = async (
   tabId: number
@@ -96,13 +118,20 @@ const getCompatibilityDiagnostics = async (
 export const useCompatibilitySession = () => {
   const latestDiagnosticsRequestRef = useRef(0)
   const initialDiagnosticsCompleteRef = useRef(false)
+  const pageContextRef = useRef<ActivePageContext>({ generation: 0, status: 'unknown' })
+  const pageContextRequestRef = useRef<Promise<ActivePageContext> | null>(null)
   const settledDiagnosticsStateRef = useRef<CompatibilityDiagnosticsState>(
     INITIAL_DIAGNOSTICS_STATE
   )
-  const [pageContext, setPageContext] = useState<ActivePageContext>({ status: 'unknown' })
+  const [pageContext, setPageContext] = useState<ActivePageContext>({
+    generation: 0,
+    status: 'unknown',
+  })
   const [diagnosticsState, setDiagnosticsState] =
     useState<CompatibilityDiagnosticsState>(INITIAL_DIAGNOSTICS_STATE)
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false)
+  const [longLoadingGeneration, setLongLoadingGeneration] =
+    useState<number | null>(null)
 
   const requestCompatibilityDiagnostics = useCallback(async (tabId: number) => {
     const requestId = (latestDiagnosticsRequestRef.current += 1)
@@ -124,9 +153,14 @@ export const useCompatibilitySession = () => {
 
   useEffect(() => {
     let active = true
+    const pageContextRequest = getActivePageContext()
+    pageContextRequestRef.current = pageContextRequest
 
-    void getActivePageContext().then(nextContext => {
-      if (active) setPageContext(nextContext)
+    void pageContextRequest.then(nextContext => {
+      if (active && pageContextRef.current.generation === 0) {
+        pageContextRef.current = nextContext
+        setPageContext(nextContext)
+      }
     })
 
     return () => {
@@ -135,10 +169,71 @@ export const useCompatibilitySession = () => {
   }, [])
 
   useEffect(() => {
+    const handleTabUpdated: Parameters<
+      typeof chrome.tabs.onUpdated.addListener
+    >[0] = (tabId, changeInfo, tab) => {
+      if (
+        tabId !== pageContextRef.current.tabId ||
+        (changeInfo.status !== 'loading' && changeInfo.status !== 'complete')
+      ) {
+        return
+      }
+
+      cancelCompatibilityDiagnosticsRequest()
+      initialDiagnosticsCompleteRef.current = false
+      settledDiagnosticsStateRef.current = INITIAL_DIAGNOSTICS_STATE
+      setDiagnosticsState(INITIAL_DIAGNOSTICS_STATE)
+
+      const nextContext: ActivePageContext = {
+        generation: pageContextRef.current.generation + 1,
+        status: resolvePageStatus(tab.url),
+        tabId,
+        windowId: tab.windowId,
+        loadStatus: changeInfo.status,
+      }
+      pageContextRef.current = nextContext
+      setPageContext(nextContext)
+    }
+
+    chrome.tabs.onUpdated.addListener(handleTabUpdated)
+    return () => chrome.tabs.onUpdated.removeListener(handleTabUpdated)
+  }, [cancelCompatibilityDiagnosticsRequest])
+
+  const resolvePlaybackFocusTarget = useCallback(():
+    | PlaybackFocusTarget
+    | undefined
+    | Promise<PlaybackFocusTarget | undefined> => {
+    const currentContext = pageContextRef.current
+    if (currentContext.status !== 'unknown') {
+      return getPlaybackFocusTarget(currentContext)
+    }
+
+    return pageContextRequestRef.current?.then(getPlaybackFocusTarget)
+  }, [])
+
+  useEffect(() => {
+    if (pageContext.status !== 'watch' || pageContext.loadStatus !== 'loading') {
+      return
+    }
+
+    const timer = window.setTimeout(
+      () => setLongLoadingGeneration(pageContext.generation),
+      LONG_PAGE_LOAD_THRESHOLD_MS
+    )
+    return () => window.clearTimeout(timer)
+  }, [pageContext])
+
+  const isPageLoadingLong =
+    pageContext.status === 'watch' &&
+    pageContext.loadStatus === 'loading' &&
+    longLoadingGeneration === pageContext.generation
+
+  useEffect(() => {
     if (
       diagnosticsOpen ||
       initialDiagnosticsCompleteRef.current ||
       pageContext.status !== 'watch' ||
+      pageContext.loadStatus === 'loading' ||
       typeof pageContext.tabId !== 'number'
     ) {
       return
@@ -182,6 +277,7 @@ export const useCompatibilitySession = () => {
     diagnosticsOpen,
     pageContext.status,
     pageContext.tabId,
+    pageContext.loadStatus,
     requestCompatibilityDiagnostics,
   ])
 
@@ -189,6 +285,7 @@ export const useCompatibilitySession = () => {
     if (
       !diagnosticsOpen ||
       pageContext.status !== 'watch' ||
+      pageContext.loadStatus === 'loading' ||
       typeof pageContext.tabId !== 'number'
     ) {
       return
@@ -234,6 +331,7 @@ export const useCompatibilitySession = () => {
     diagnosticsOpen,
     pageContext.status,
     pageContext.tabId,
+    pageContext.loadStatus,
     requestCompatibilityDiagnostics,
   ])
 
@@ -258,6 +356,8 @@ export const useCompatibilitySession = () => {
 
   return {
     pageStatus: pageContext.status,
+    isPageLoadingLong,
+    resolvePlaybackFocusTarget,
     diagnosticsState,
     diagnosticsTriggerState,
     diagnosticsOpen,

@@ -31,6 +31,7 @@ type OtherProjectsSelectProps = {
   size?: 'sm' | 'default'
   className?: string
   labelClassName?: string
+  onNavigate?: () => void
 }
 
 export function OtherProjectsSelect({
@@ -41,6 +42,7 @@ export function OtherProjectsSelect({
   size = 'sm',
   className,
   labelClassName,
+  onNavigate,
 }: OtherProjectsSelectProps) {
   const [open, setOpen] = useState(false)
 
@@ -77,6 +79,7 @@ export function OtherProjectsSelect({
                 keywords={[streamDanmakuLabel, streamDanmakuTitle]}
                 className="[&>svg:last-child]:hidden"
                 onSelect={() => {
+                  onNavigate?.()
                   setOpen(false)
                   openExternalProject(getStreamDanmakuStoreUrl())
                 }}

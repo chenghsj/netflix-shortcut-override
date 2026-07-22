@@ -24,6 +24,7 @@ import { Switch } from '@/components/ui/switch'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { useCompatibilitySession } from '@/popup/use-compatibility-session'
+import { usePopupFocusRestoration } from '@/popup/use-popup-focus-restoration'
 import { EXTERNAL_LINKS } from '@/shared/external-links'
 import { getCopy } from '@/shared/i18n'
 import {
@@ -51,7 +52,8 @@ const POPUP_SHORTCUT_ACTIONS: ShortcutAction[] = [
 
 const popupSpeedInputClassName = 'h-6 w-20 px-2 py-0 text-xs'
 
-const openOptionsPage = () => {
+const openOptionsPage = (beforeNavigate: () => void) => {
+  beforeNavigate()
   if (typeof chrome !== 'undefined' && chrome.runtime?.openOptionsPage) {
     chrome.runtime.openOptionsPage()
     return
@@ -81,12 +83,16 @@ export function PopupApp() {
   } = useShortcutSettingsForm()
   const {
     pageStatus,
+    isPageLoadingLong,
+    resolvePlaybackFocusTarget,
     diagnosticsState,
     diagnosticsTriggerState,
     diagnosticsOpen,
     setDiagnosticsOpen,
     reloadNetflixPage,
   } = useCompatibilitySession()
+  const { suppressFocusRestoration } =
+    usePopupFocusRestoration(resolvePlaybackFocusTarget)
   const copy = getCopy(settings.locale)
 
   const statusText = useMemo(() => {
@@ -120,7 +126,12 @@ export function PopupApp() {
                 onReloadPage={reloadNetflixPage}
               />
               )}
-            <Button variant="outline" size="sm" className="shrink-0" onClick={openOptionsPage}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              onClick={() => openOptionsPage(suppressFocusRestoration)}
+            >
               <ExternalLinkIcon data-icon="inline-start" />
               {copy.openOptions}
             </Button>
@@ -128,6 +139,20 @@ export function PopupApp() {
 
           {diagnosticsTriggerState === 'reload-required' && (
             <CompatibilityConnectionAlert copy={copy} onReloadPage={reloadNetflixPage} />
+          )}
+
+          {isPageLoadingLong && (
+            <section
+              className="rounded-lg border bg-card p-3 shadow-xs"
+              role="status"
+            >
+              <div className="flex items-start gap-2.5">
+                <AlertCircleIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  {copy.diagnosticsPageLoadingLong}
+                </p>
+              </div>
+            </section>
           )}
 
           {shouldShowPageStatus && (
@@ -354,6 +379,8 @@ export function PopupApp() {
                 target="_blank"
                 rel="noreferrer"
                 aria-label={copy.githubRepositoryAriaLabel}
+                onClick={suppressFocusRestoration}
+                onAuxClick={suppressFocusRestoration}
               >
                 <GitHubIcon data-icon="inline-start" />
                 <span className="min-w-0 truncate">{copy.githubRepository}</span>
@@ -366,6 +393,7 @@ export function PopupApp() {
               streamDanmakuTitle={copy.streamDanmakuStoreAriaLabel}
               className="h-6 min-w-0 text-xs has-data-[icon=inline-start]:pl-2"
               labelClassName="text-center"
+              onNavigate={suppressFocusRestoration}
             />
             <SettingsSaveStatus
               error={saveError}

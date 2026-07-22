@@ -88,6 +88,30 @@ Do not use Chrome DevTools as the verification path for this real-browser check.
 
 Before testing shortcuts, open the extension toolbar popup on the watch page.
 
+Verify playback focus restoration:
+
+1. Select the Netflix video to dismiss the popup.
+2. Without selecting the page again, press `Space`, `ArrowRight`, and `M`.
+3. Verify each shortcut takes effect.
+4. Repeat the popup-open, dismiss, and shortcut sequence at least five times.
+5. Open the popup again, press `Esc`, and verify `Space` works without another page click.
+6. Open Options, GitHub, and Other products from the popup and verify Netflix does not pull focus back from the destination.
+7. Change to another browser tab while the popup is open and verify Netflix does not pull focus back.
+
+Verify the reload-in-progress regression with the local build ten consecutive times:
+
+1. Reload the Netflix watch tab.
+2. While the page is still showing its loading spinner, open the toolbar popup.
+3. Confirm the shield remains in the checking state while the tab is loading and never reports ready early.
+4. If loading lasts more than ten seconds, confirm the popup says it will recheck automatically and does not reload the tab.
+5. Wait until the shield reports that compatibility is ready.
+6. Select the Netflix video once to dismiss the popup.
+7. Immediately press `Shift+.` without another page click.
+8. Confirm the first key press changes playback speed.
+9. Restore speed to `1x`, then repeat from step 1 until all ten runs pass.
+
+Any early ready result or first-key failure fails the run. Record the consecutive-pass count and reset it to zero after a failure.
+
 If the popup reports that the extension is not active:
 
 1. Verify the inline recovery notice explains that the Netflix tab must be reloaded.

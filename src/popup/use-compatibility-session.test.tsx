@@ -69,8 +69,165 @@ describe('useCompatibilitySession', () => {
       expect(result.current.diagnosticsState.status).toBe('ready')
     })
 
+    expect(result.current.resolvePlaybackFocusTarget()).toEqual({
+      tabId: 1,
+      windowId: 1,
+    })
     expect(result.current.diagnosticsTriggerState).toBe('default')
     expect(chrome.tabs.sendMessage).toHaveBeenCalledOnce()
+  })
+
+  it('keeps compatibility checking while the Netflix tab is loading', async () => {
+    vi.mocked(chrome.tabs.query).mockImplementationOnce((_query, callback) => {
+      callback([
+        {
+          id: 1,
+          windowId: 1,
+          status: 'loading',
+          url: 'https://www.netflix.com/watch/123',
+        } as chrome.tabs.Tab,
+      ])
+    })
+
+    const { result } = renderHook(() => useCompatibilitySession())
+
+    await waitFor(() => expect(result.current.pageStatus).toBe('watch'))
+    expect(result.current.diagnosticsTriggerState).toBe('checking')
+    expect(chrome.tabs.sendMessage).not.toHaveBeenCalled()
+  })
+
+  it('starts fresh diagnostics after the loading Netflix tab completes', async () => {
+    vi.mocked(chrome.tabs.query).mockImplementationOnce((_query, callback) => {
+      callback([
+        {
+          id: 1,
+          windowId: 1,
+          status: 'loading',
+          url: 'https://www.netflix.com/watch/123',
+        } as chrome.tabs.Tab,
+      ])
+    })
+
+    const { result } = renderHook(() => useCompatibilitySession())
+
+    await waitFor(() => expect(result.current.pageStatus).toBe('watch'))
+    expect(chrome.tabs.sendMessage).not.toHaveBeenCalled()
+    const onUpdated = vi.mocked(chrome.tabs.onUpdated.addListener).mock.calls[0]?.[0]
+    expect(onUpdated).toBeDefined()
+
+    act(() => {
+      onUpdated?.(
+        1,
+        { status: 'complete' },
+        {
+          id: 1,
+          windowId: 1,
+          status: 'complete',
+          url: 'https://www.netflix.com/watch/123',
+        } as chrome.tabs.Tab
+      )
+    })
+
+    await waitFor(() => {
+      expect(chrome.tabs.sendMessage).toHaveBeenCalledOnce()
+      expect(result.current.diagnosticsState.status).toBe('ready')
+    })
+  })
+
+  it('ignores diagnostics from the generation before a tab reload', async () => {
+    const diagnosticsCallbacks: DiagnosticsCallback[] = []
+    vi.mocked(chrome.tabs.sendMessage).mockImplementation(
+      (_tabId, _message, optionsOrCallback, maybeCallback) => {
+        const callback = getDiagnosticsCallback(optionsOrCallback, maybeCallback)
+        if (callback) diagnosticsCallbacks.push(callback)
+      }
+    )
+    const { result } = renderHook(() => useCompatibilitySession())
+
+    await waitFor(() => expect(diagnosticsCallbacks).toHaveLength(1))
+    const onUpdated = vi.mocked(chrome.tabs.onUpdated.addListener).mock.calls[0]?.[0]
+
+    act(() => {
+      onUpdated?.(
+        1,
+        { status: 'loading' },
+        {
+          id: 1,
+          windowId: 1,
+          status: 'loading',
+          url: 'https://www.netflix.com/watch/123',
+        } as chrome.tabs.Tab
+      )
+      diagnosticsCallbacks[0](READY_DIAGNOSTICS)
+    })
+    expect(result.current.diagnosticsState.status).toBe('loading')
+
+    act(() => {
+      onUpdated?.(
+        1,
+        { status: 'complete' },
+        {
+          id: 1,
+          windowId: 1,
+          status: 'complete',
+          url: 'https://www.netflix.com/watch/123',
+        } as chrome.tabs.Tab
+      )
+    })
+    await waitFor(() => expect(diagnosticsCallbacks).toHaveLength(2))
+
+    act(() => diagnosticsCallbacks[1](READY_DIAGNOSTICS))
+    await waitFor(() => expect(result.current.diagnosticsState.status).toBe('ready'))
+  })
+
+  it('reports prolonged Netflix loading after ten seconds and clears it on completion', async () => {
+    vi.useFakeTimers()
+    vi.mocked(chrome.tabs.query).mockImplementationOnce((_query, callback) => {
+      callback([
+        {
+          id: 1,
+          windowId: 1,
+          status: 'loading',
+          url: 'https://www.netflix.com/watch/123',
+        } as chrome.tabs.Tab,
+      ])
+    })
+    const { result, unmount } = renderHook(() => useCompatibilitySession())
+
+    try {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0)
+      })
+      expect(result.current.isPageLoadingLong).toBe(false)
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(9_999)
+      })
+      expect(result.current.isPageLoadingLong).toBe(false)
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1)
+      })
+      expect(result.current.isPageLoadingLong).toBe(true)
+
+      const onUpdated = vi.mocked(chrome.tabs.onUpdated.addListener).mock.calls[0]?.[0]
+      act(() => {
+        onUpdated?.(
+          1,
+          { status: 'complete' },
+          {
+            id: 1,
+            windowId: 1,
+            status: 'complete',
+            url: 'https://www.netflix.com/watch/123',
+          } as chrome.tabs.Tab
+        )
+      })
+      expect(result.current.isPageLoadingLong).toBe(false)
+    } finally {
+      unmount()
+      vi.useRealTimers()
+    }
   })
 
   it('requires a reload after three missing-receiver attempts', async () => {
@@ -116,6 +273,7 @@ describe('useCompatibilitySession', () => {
     const { result } = renderHook(() => useCompatibilitySession())
 
     await waitFor(() => expect(result.current.pageStatus).toBe('external'))
+    expect(result.current.resolvePlaybackFocusTarget()).toBeUndefined()
     expect(chrome.tabs.sendMessage).not.toHaveBeenCalled()
     expect(result.current.diagnosticsTriggerState).toBe('checking')
   })
@@ -128,6 +286,25 @@ describe('useCompatibilitySession', () => {
     const { result } = renderHook(() => useCompatibilitySession())
 
     await waitFor(() => expect(result.current.pageStatus).toBe('netflix'))
+    expect(chrome.tabs.sendMessage).not.toHaveBeenCalled()
+  })
+
+  it('does not treat a Netflix watchlist route as active playback', async () => {
+    vi.mocked(chrome.tabs.query).mockImplementationOnce((_query, callback) => {
+      callback([
+        {
+          id: 7,
+          windowId: 1,
+          status: 'complete',
+          url: 'https://www.netflix.com/watchlist',
+        } as chrome.tabs.Tab,
+      ])
+    })
+
+    const { result } = renderHook(() => useCompatibilitySession())
+
+    await waitFor(() => expect(result.current.pageStatus).toBe('netflix'))
+    expect(result.current.resolvePlaybackFocusTarget()).toBeUndefined()
     expect(chrome.tabs.sendMessage).not.toHaveBeenCalled()
   })
 

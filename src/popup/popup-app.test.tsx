@@ -3,12 +3,56 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { PopupApp } from '@/popup/popup-app'
 import { EXTERNAL_LINKS } from '@/shared/external-links'
+import { PLAYBACK_FOCUS_RESTORATION_MESSAGE_TYPE } from '@/shared/playback-focus-restoration'
 
 const openCompatibilityDiagnostics = async () => {
   fireEvent.click(await screen.findByRole('button', { name: 'Compatibility' }))
 }
 
 describe('PopupApp', () => {
+  it('explains prolonged Netflix loading without reporting compatibility ready', async () => {
+    vi.useFakeTimers()
+    vi.mocked(chrome.tabs.query).mockImplementation((_query, callback) => {
+      callback([
+        {
+          id: 1,
+          windowId: 1,
+          status: 'loading',
+          url: 'https://www.netflix.com/watch/123',
+        } as chrome.tabs.Tab,
+      ])
+    })
+
+    try {
+      render(<PopupApp />)
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0)
+      })
+
+      expect(
+        screen.getByRole('button', { name: 'Checking compatibility…' })
+      ).toBeDisabled()
+      expect(
+        screen.queryByText(
+          'Netflix is still loading. Compatibility will be checked automatically when loading finishes.'
+        )
+      ).not.toBeInTheDocument()
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000)
+      })
+
+      expect(
+        screen.getByText(
+          'Netflix is still loading. Compatibility will be checked automatically when loading finishes.'
+        )
+      ).toBeInTheDocument()
+      expect(chrome.tabs.sendMessage).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('renders key summary and speed settings without a ready status card', async () => {
     render(<PopupApp />)
 
@@ -118,8 +162,81 @@ describe('PopupApp', () => {
     render(<PopupApp />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Open options' }))
+    await act(async () => {
+      window.dispatchEvent(new Event('pagehide'))
+      await Promise.resolve()
+    })
 
     expect(chrome.runtime.openOptionsPage).toHaveBeenCalledOnce()
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalled()
+  })
+
+  it('requests Netflix focus restoration when the popup closes', async () => {
+    render(<PopupApp />)
+    await screen.findByRole('button', { name: 'Compatibility' })
+
+    await act(async () => {
+      window.dispatchEvent(new Event('pagehide'))
+      await Promise.resolve()
+    })
+
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+      type: PLAYBACK_FOCUS_RESTORATION_MESSAGE_TYPE,
+      tabId: 1,
+      windowId: 1,
+    })
+  })
+
+  it('can restore focus when the popup closes before page detection finishes', async () => {
+    const queryCallbacks: Array<(tabs: chrome.tabs.Tab[]) => void> = []
+    vi.mocked(chrome.tabs.query).mockImplementation((_query, callback) => {
+      queryCallbacks.push(callback)
+    })
+    render(<PopupApp />)
+
+    expect(queryCallbacks).toHaveLength(1)
+    act(() => window.dispatchEvent(new Event('pagehide')))
+    expect(queryCallbacks).toHaveLength(1)
+
+    act(() => {
+      queryCallbacks[0]([
+        {
+          id: 17,
+          windowId: 3,
+          url: 'https://www.netflix.com/watch/123',
+        } as chrome.tabs.Tab,
+      ])
+    })
+
+    await waitFor(() => {
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+        type: PLAYBACK_FOCUS_RESTORATION_MESSAGE_TYPE,
+        tabId: 17,
+        windowId: 3,
+      })
+    })
+  })
+
+  it('does not restore Netflix focus after opening GitHub', async () => {
+    render(<PopupApp />)
+    const githubLink = await screen.findByRole('link', {
+      name: 'Open GitHub repository',
+    })
+
+    fireEvent.click(githubLink)
+    act(() => window.dispatchEvent(new Event('pagehide')))
+
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalled()
+  })
+
+  it('does not restore Netflix focus after opening another project', async () => {
+    render(<PopupApp />)
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Other products' }))
+    fireEvent.click(await screen.findByText('Stream Danmaku'))
+
+    act(() => window.dispatchEvent(new Event('pagehide')))
+
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalled()
   })
 
   it('shows a Netflix-only message outside Netflix', async () => {
@@ -262,8 +379,17 @@ describe('PopupApp', () => {
       expect(screen.queryByText(/Retrying automatically/)).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Copy diagnostics' })).not.toBeInTheDocument()
       fireEvent.click(screen.getByRole('button', { name: 'Reload Netflix' }))
+      await act(async () => {
+        window.dispatchEvent(new Event('pagehide'))
+        await Promise.resolve()
+      })
       expect(chrome.tabs.reload).toHaveBeenCalledWith(1)
       expect(closePopup).toHaveBeenCalledOnce()
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+        type: PLAYBACK_FOCUS_RESTORATION_MESSAGE_TYPE,
+        tabId: 1,
+        windowId: 1,
+      })
       expect(screen.queryByRole('alert', { name: 'Extension not active' })).not.toBeInTheDocument()
       expect(
         screen.getByRole('button', { name: 'Checking compatibility…' })

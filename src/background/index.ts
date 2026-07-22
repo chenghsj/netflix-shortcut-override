@@ -4,13 +4,27 @@ import {
   type NetflixApiMessage,
 } from '@/shared/netflix-api'
 import { executeNetflixPageApi } from '@/shared/netflix-page-api-executor'
+import { requestPlaybackFocusRestoration } from '@/background/playback-focus-restoration'
+import { isPlaybackFocusRestorationRequest } from '@/shared/playback-focus-restoration'
 
 chrome.action?.onClicked.addListener(() => {
   chrome.runtime.openOptionsPage()
 })
 
-chrome.runtime.onMessage.addListener((message: Partial<NetflixApiMessage>, sender, sendResponse) => {
-  if (message.type !== NETFLIX_API_MESSAGE_TYPE || !isNetflixApiAction(message.action)) {
+chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse) => {
+  if (isPlaybackFocusRestorationRequest(message)) {
+    void requestPlaybackFocusRestoration({
+      tabId: message.tabId,
+      windowId: message.windowId,
+    }).catch(() => undefined)
+    return false
+  }
+
+  const apiMessage = message as Partial<NetflixApiMessage>
+  if (
+    apiMessage.type !== NETFLIX_API_MESSAGE_TYPE ||
+    !isNetflixApiAction(apiMessage.action)
+  ) {
     return false
   }
 
@@ -25,7 +39,7 @@ chrome.runtime.onMessage.addListener((message: Partial<NetflixApiMessage>, sende
       target: { tabId },
       world: 'MAIN',
       func: executeNetflixPageApi,
-      args: [message.action, message.value],
+      args: [apiMessage.action, apiMessage.value],
     })
     .then(injectionResults => sendResponse({ success: true, result: injectionResults[0]?.result }))
     .catch(error =>

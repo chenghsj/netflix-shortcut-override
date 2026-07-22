@@ -22,7 +22,8 @@ export const isCompatibilityCoreReady = (
   diagnostics: CompatibilityDiagnostics | null
 ): boolean =>
   Boolean(
-    diagnostics?.settingsLoaded &&
+    diagnostics?.contentScriptReady &&
+      diagnostics.settingsLoaded &&
       diagnostics.videoFound &&
       diagnostics.bridgeReady &&
       diagnostics.playerApiFound &&
