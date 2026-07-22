@@ -1,10 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import {
   COMPATIBILITY_DIAGNOSTICS_MESSAGE_TYPE,
-  isCompatibilityCoreReady,
   type CompatibilityDiagnostics,
 } from '@/shared/diagnostics'
+import {
+  createCompatibilityReadinessPolicy,
+  createCompatibilityRequestGeneration,
+  INITIAL_COMPATIBILITY_DIAGNOSTICS_STATE,
+  type CompatibilityDiagnosticsState,
+} from '@/shared/compatibility-readiness'
 import {
   isNetflixWatchUrl,
   type PlaybackFocusTarget,
@@ -12,11 +17,7 @@ import {
 
 export type PageStatus = 'watch' | 'netflix' | 'external' | 'unknown'
 
-export type CompatibilityDiagnosticsState =
-  | { status: 'loading'; diagnostics: null }
-  | { status: 'ready'; diagnostics: CompatibilityDiagnostics }
-  | { status: 'unavailable'; diagnostics: null }
-  | { status: 'reload-required'; diagnostics: null }
+export type { CompatibilityDiagnosticsState } from '@/shared/compatibility-readiness'
 
 export type CompatibilityDiagnosticsTriggerState =
   | 'checking'
@@ -31,17 +32,7 @@ type ActivePageContext = {
   loadStatus?: chrome.tabs.Tab['status']
 }
 
-const DIAGNOSTICS_REFRESH_INTERVAL_MS = 2_000
-const MISSING_RECEIVER_RETRY_INTERVAL_MS = 200
-const MISSING_RECEIVER_MAX_ATTEMPTS = 3
 const LONG_PAGE_LOAD_THRESHOLD_MS = 10_000
-const MISSING_MESSAGE_RECEIVER_PATTERN =
-  /could not establish connection|receiving end does not exist/i
-
-const INITIAL_DIAGNOSTICS_STATE = {
-  status: 'loading',
-  diagnostics: null,
-} satisfies CompatibilityDiagnosticsState
 
 const resolvePageStatus = (url: string | undefined): PageStatus => {
   if (!url) return 'unknown'
@@ -91,7 +82,8 @@ const getPlaybackFocusTarget = (
     : undefined
 
 const getCompatibilityDiagnostics = async (
-  tabId: number
+  tabId: number,
+  readinessPolicy: ReturnType<typeof createCompatibilityReadinessPolicy>
 ): Promise<CompatibilityDiagnosticsState> =>
   new Promise(resolve => {
     chrome.tabs.sendMessage(
@@ -99,48 +91,47 @@ const getCompatibilityDiagnostics = async (
       { type: COMPATIBILITY_DIAGNOSTICS_MESSAGE_TYPE },
       response => {
         const errorMessage = chrome.runtime.lastError?.message
-        if (errorMessage && MISSING_MESSAGE_RECEIVER_PATTERN.test(errorMessage)) {
-          resolve({ status: 'reload-required', diagnostics: null })
-          return
-        }
-        if (errorMessage || !response) {
-          resolve({ status: 'unavailable', diagnostics: null })
-          return
-        }
-        resolve({
-          status: 'ready',
-          diagnostics: response as CompatibilityDiagnostics,
-        })
+        resolve(
+          readinessPolicy.resolveState({
+            diagnostics: response
+              ? (response as CompatibilityDiagnostics)
+              : undefined,
+            errorMessage,
+          })
+        )
       }
     )
   })
 
 export const useCompatibilitySession = () => {
-  const latestDiagnosticsRequestRef = useRef(0)
+  const readinessPolicy = useMemo(() => createCompatibilityReadinessPolicy(), [])
+  const diagnosticsRequestGenerationRef = useRef(createCompatibilityRequestGeneration())
   const initialDiagnosticsCompleteRef = useRef(false)
   const pageContextRef = useRef<ActivePageContext>({ generation: 0, status: 'unknown' })
   const pageContextRequestRef = useRef<Promise<ActivePageContext> | null>(null)
   const settledDiagnosticsStateRef = useRef<CompatibilityDiagnosticsState>(
-    INITIAL_DIAGNOSTICS_STATE
+    INITIAL_COMPATIBILITY_DIAGNOSTICS_STATE
   )
   const [pageContext, setPageContext] = useState<ActivePageContext>({
     generation: 0,
     status: 'unknown',
   })
   const [diagnosticsState, setDiagnosticsState] =
-    useState<CompatibilityDiagnosticsState>(INITIAL_DIAGNOSTICS_STATE)
+    useState<CompatibilityDiagnosticsState>(INITIAL_COMPATIBILITY_DIAGNOSTICS_STATE)
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false)
   const [longLoadingGeneration, setLongLoadingGeneration] =
     useState<number | null>(null)
 
   const requestCompatibilityDiagnostics = useCallback(async (tabId: number) => {
-    const requestId = (latestDiagnosticsRequestRef.current += 1)
-    const nextState = await getCompatibilityDiagnostics(tabId)
-    return latestDiagnosticsRequestRef.current === requestId ? nextState : null
-  }, [])
+    const requestGeneration = diagnosticsRequestGenerationRef.current.start()
+    const nextState = await getCompatibilityDiagnostics(tabId, readinessPolicy)
+    return diagnosticsRequestGenerationRef.current.isCurrent(requestGeneration)
+      ? nextState
+      : null
+  }, [readinessPolicy])
 
   const cancelCompatibilityDiagnosticsRequest = useCallback(() => {
-    latestDiagnosticsRequestRef.current += 1
+    diagnosticsRequestGenerationRef.current.cancel()
   }, [])
 
   const commitCompatibilityDiagnosticsState = useCallback(
@@ -181,8 +172,8 @@ export const useCompatibilitySession = () => {
 
       cancelCompatibilityDiagnosticsRequest()
       initialDiagnosticsCompleteRef.current = false
-      settledDiagnosticsStateRef.current = INITIAL_DIAGNOSTICS_STATE
-      setDiagnosticsState(INITIAL_DIAGNOSTICS_STATE)
+      settledDiagnosticsStateRef.current = INITIAL_COMPATIBILITY_DIAGNOSTICS_STATE
+      setDiagnosticsState(INITIAL_COMPATIBILITY_DIAGNOSTICS_STATE)
 
       const nextContext: ActivePageContext = {
         generation: pageContextRef.current.generation + 1,
@@ -250,12 +241,11 @@ export const useCompatibilitySession = () => {
       if (!active || nextState === null) return
 
       if (
-        nextState.status === 'reload-required' &&
-        attempt < MISSING_RECEIVER_MAX_ATTEMPTS
+        readinessPolicy.shouldRetryMissingReceiver(nextState, attempt)
       ) {
         retryTimer = window.setTimeout(
           () => void checkDiagnosticsConnection(),
-          MISSING_RECEIVER_RETRY_INTERVAL_MS
+          readinessPolicy.missingReceiverRetryIntervalMs
         )
         return
       }
@@ -279,6 +269,7 @@ export const useCompatibilitySession = () => {
     pageContext.tabId,
     pageContext.loadStatus,
     requestCompatibilityDiagnostics,
+    readinessPolicy,
   ])
 
   useEffect(() => {
@@ -298,7 +289,7 @@ export const useCompatibilitySession = () => {
 
     const refreshDiagnostics = async () => {
       if (!hasDiagnosticsResult) {
-        setDiagnosticsState(INITIAL_DIAGNOSTICS_STATE)
+        setDiagnosticsState(INITIAL_COMPATIBILITY_DIAGNOSTICS_STATE)
       }
       const nextState = await requestCompatibilityDiagnostics(tabId)
       if (!active || nextState === null) return
@@ -306,10 +297,12 @@ export const useCompatibilitySession = () => {
       initialDiagnosticsCompleteRef.current = true
       commitCompatibilityDiagnosticsState(nextState)
       if (
-        nextState.status !== 'reload-required' &&
-        !isCompatibilityCoreReady(nextState.diagnostics)
+        readinessPolicy.shouldRefreshDiagnostics(nextState)
       ) {
-        refreshTimer = window.setTimeout(refreshDiagnostics, DIAGNOSTICS_REFRESH_INTERVAL_MS)
+        refreshTimer = window.setTimeout(
+          refreshDiagnostics,
+          readinessPolicy.diagnosticsRefreshIntervalMs
+        )
       }
     }
 
@@ -333,6 +326,7 @@ export const useCompatibilitySession = () => {
     pageContext.tabId,
     pageContext.loadStatus,
     requestCompatibilityDiagnostics,
+    readinessPolicy,
   ])
 
   const diagnosticsTriggerState: CompatibilityDiagnosticsTriggerState =
@@ -349,8 +343,8 @@ export const useCompatibilitySession = () => {
       void chrome.tabs.reload(pageContext.tabId)
       window.close()
     }
-    settledDiagnosticsStateRef.current = INITIAL_DIAGNOSTICS_STATE
-    setDiagnosticsState(INITIAL_DIAGNOSTICS_STATE)
+    settledDiagnosticsStateRef.current = INITIAL_COMPATIBILITY_DIAGNOSTICS_STATE
+    setDiagnosticsState(INITIAL_COMPATIBILITY_DIAGNOSTICS_STATE)
     setDiagnosticsOpen(false)
   }
 

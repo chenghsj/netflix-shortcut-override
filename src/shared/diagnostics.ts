@@ -18,14 +18,19 @@ export type CompatibilityDiagnostics = {
   error?: string
 }
 
+type CompatibilityCoreReadyOptions = {
+  requirePageBridge?: boolean
+}
+
 export const isCompatibilityCoreReady = (
-  diagnostics: CompatibilityDiagnostics | null
+  diagnostics: CompatibilityDiagnostics | null,
+  { requirePageBridge = true }: CompatibilityCoreReadyOptions = {}
 ): boolean =>
   Boolean(
     diagnostics?.contentScriptReady &&
       diagnostics.settingsLoaded &&
       diagnostics.videoFound &&
-      diagnostics.bridgeReady &&
+      (!requirePageBridge || diagnostics.bridgeReady) &&
       diagnostics.playerApiFound &&
       diagnostics.playerFound &&
       !diagnostics.error

@@ -12,8 +12,8 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import {
   formatCompatibilityDiagnosticsReport,
-  isCompatibilityCoreReady,
 } from '@/shared/diagnostics'
+import { createCompatibilityReadinessPolicy } from '@/shared/compatibility-readiness'
 import { getCopy } from '@/shared/i18n'
 import type { CompatibilityDiagnosticsState } from '@/popup/use-compatibility-session'
 
@@ -62,7 +62,9 @@ export function CompatibilityDiagnosticsCard({
 }: CompatibilityDiagnosticsCardProps) {
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle')
   const diagnostics = state.diagnostics
-  const coreReady = isCompatibilityCoreReady(diagnostics)
+  const readinessPolicy = useMemo(() => createCompatibilityReadinessPolicy(), [])
+  const isFirefox = !readinessPolicy.requirePageBridge
+  const coreReady = readinessPolicy.isCoreReady(state)
   const compatible = coreReady && diagnostics?.pipSupported === true
 
   const report = useMemo(() => {
@@ -172,15 +174,17 @@ export function CompatibilityDiagnosticsCard({
               }
               passed={diagnostics.videoFound}
             />
-            <DiagnosticsRow
-              label={copy.diagnosticsBridge}
-              value={
-                diagnostics.bridgeReady
-                  ? copy.diagnosticsReadyValue
-                  : copy.diagnosticsMissingValue
-              }
-              passed={diagnostics.bridgeReady}
-            />
+            {!isFirefox && (
+              <DiagnosticsRow
+                label={copy.diagnosticsBridge}
+                value={
+                  diagnostics.bridgeReady
+                    ? copy.diagnosticsReadyValue
+                    : copy.diagnosticsMissingValue
+                }
+                passed={diagnostics.bridgeReady}
+              />
+            )}
             <DiagnosticsRow
               label={copy.diagnosticsNetflixApi}
               value={

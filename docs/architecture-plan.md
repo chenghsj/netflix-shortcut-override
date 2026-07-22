@@ -1,6 +1,6 @@
 # Architecture plan — Netflix Shortcut Override
 
-Status: Phase 2 implemented; Phase 3 proposed
+Status: Phase 3 implemented
 Date: 2026-07-22  
 Scope: the current working tree, with extra weight on the recent PiP, compatibility-session, and playback-focus changes.
 

@@ -1,8 +1,11 @@
 import {
   COMPATIBILITY_DIAGNOSTICS_MESSAGE_TYPE,
-  isCompatibilityCoreReady,
   type CompatibilityDiagnostics,
 } from '@/shared/diagnostics'
+import {
+  createCompatibilityReadinessPolicy,
+  type CompatibilityDiagnosticsState,
+} from '@/shared/compatibility-readiness'
 import {
   isNetflixWatchUrl,
   restoreVisibleNetflixWatchPageFocus,
@@ -12,9 +15,9 @@ import {
 const PENDING_FOCUS_RESTORATIONS_KEY =
   'pendingPlaybackFocusRestorations'
 const FOCUS_RESTORATION_TTL_MS = 30_000
-const READINESS_RETRY_INTERVAL_MS = 200
 const FOCUS_RETRY_INTERVAL_MS = 100
 const FOCUS_MAX_ATTEMPTS = 3
+const readinessPolicy = createCompatibilityReadinessPolicy()
 
 type PendingFocusRestoration = PlaybackFocusTarget & {
   requestId: string
@@ -146,16 +149,19 @@ const getWindow = (
 
 const getCompatibilityDiagnostics = (
   tabId: number
-): Promise<CompatibilityDiagnostics | null> =>
+): Promise<CompatibilityDiagnosticsState> =>
   new Promise(resolve => {
     chrome.tabs.sendMessage(
       tabId,
       { type: COMPATIBILITY_DIAGNOSTICS_MESSAGE_TYPE },
       response => {
         resolve(
-          chrome.runtime.lastError || !response
-            ? null
-            : response as CompatibilityDiagnostics
+          readinessPolicy.resolveState({
+            diagnostics: response
+              ? (response as CompatibilityDiagnostics)
+              : undefined,
+            errorMessage: chrome.runtime.lastError?.message,
+          })
         )
       }
     )
@@ -197,9 +203,9 @@ const attemptFocusRestoration = async (
   }
   if (targetState === 'waiting') return
 
-  const diagnostics = await getCompatibilityDiagnostics(pending.tabId)
+  const diagnosticsState = await getCompatibilityDiagnostics(pending.tabId)
   if (!(await isCurrentPendingFocusRestoration(pending))) return
-  if (!diagnostics?.enabled || !isCompatibilityCoreReady(diagnostics)) {
+  if (!readinessPolicy.isPlaybackReady(diagnosticsState)) {
     if (!readinessRetryTimers.has(pending.tabId)) {
       readinessRetryTimers.set(
         pending.tabId,
@@ -208,7 +214,7 @@ const attemptFocusRestoration = async (
           void resumePendingFocusRestoration(pending.tabId).catch(
             () => undefined
           )
-        }, READINESS_RETRY_INTERVAL_MS)
+        }, readinessPolicy.missingReceiverRetryIntervalMs)
       )
     }
     return

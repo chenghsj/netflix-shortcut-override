@@ -417,6 +417,50 @@ describe('background playback focus restoration', () => {
     }
   })
 
+  it('waits while shortcut handling is disabled before restoring focus', async () => {
+    vi.useFakeTimers()
+    let diagnosticsAttempt = 0
+    vi.mocked(chrome.tabs.sendMessage).mockImplementation(
+      (_tabId, _message, optionsOrCallback, maybeCallback) => {
+        const callback =
+          typeof optionsOrCallback === 'function'
+            ? optionsOrCallback
+            : maybeCallback
+        diagnosticsAttempt += 1
+        callback?.(
+          diagnosticsAttempt === 1
+            ? { ...READY_DIAGNOSTICS, enabled: false }
+            : READY_DIAGNOSTICS
+        )
+      }
+    )
+    const listenerPromise = import('@/background/index').then(
+      () => vi.mocked(chrome.runtime.onMessage.addListener).mock.calls.at(-1)?.[0]
+    )
+
+    try {
+      const listener = await listenerPromise
+      listener?.(
+        {
+          type: PLAYBACK_FOCUS_RESTORATION_MESSAGE_TYPE,
+          tabId: 17,
+          windowId: 1,
+        },
+        {} as chrome.runtime.MessageSender,
+        vi.fn()
+      )
+      await vi.advanceTimersByTimeAsync(0)
+      expect(chrome.tabs.sendMessage).toHaveBeenCalledOnce()
+      expect(chrome.scripting.executeScript).not.toHaveBeenCalled()
+
+      await vi.advanceTimersByTimeAsync(200)
+      expect(chrome.tabs.sendMessage).toHaveBeenCalledTimes(2)
+      expect(chrome.scripting.executeScript).toHaveBeenCalledOnce()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('retries window focus up to three times until the page reports focus', async () => {
     vi.useFakeTimers()
     vi.mocked(chrome.scripting.executeScript)
