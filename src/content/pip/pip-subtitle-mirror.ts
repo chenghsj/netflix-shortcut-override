@@ -1,6 +1,11 @@
-const PIP_SUBTITLE_ID = 'shortcut-override-pip-subtitle'
+import { PLAYER_ROOT_SELECTOR } from './pip-selectors'
+import type {
+  PipSettings,
+  PipSubtitleBackground,
+  PipSubtitleSize,
+} from '@/shared/shortcut-types'
 
-const PLAYER_ROOT_SELECTOR = '[data-uia="player"], .watch-video, .watch-video--player-view'
+const PIP_SUBTITLE_ID = 'shortcut-override-pip-subtitle'
 
 const SUBTITLE_SELECTORS = [
   '.player-timedtext',
@@ -15,7 +20,18 @@ const SUBTITLE_SELECTORS = [
 
 const SUBTITLE_SELECTOR = SUBTITLE_SELECTORS.join(', ')
 const DEFAULT_PIP_SUBTITLE_BOTTOM = '8%'
+const CONTROLS_VISIBLE_SUBTITLE_CLEARANCE_PX = 36
 const DEFAULT_VIDEO_ASPECT_RATIO = 16 / 9
+const SUBTITLE_SIZE_SCALE: Record<PipSubtitleSize, number> = {
+  small: 0.8,
+  medium: 1,
+  large: 1.25,
+}
+const SUBTITLE_BACKGROUND_COLORS: Record<Exclude<PipSubtitleBackground, 'none'>, string> = {
+  translucent: 'rgba(0, 0, 0, 0.55)',
+  dark: 'rgba(0, 0, 0, 0.8)',
+}
+const SUBTITLE_BACKGROUND_SHAPE_ATTRIBUTE = 'data-pip-subtitle-background-shape'
 
 type Rect = {
   left: number
@@ -30,6 +46,7 @@ export type SubtitleMirrorOptions = {
   pipWindow: Window
   video: HTMLVideoElement
   videoArea: HTMLElement
+  settings?: PipSettings
 }
 
 const getSubtitleStyle = (element: HTMLElement): CSSStyleDeclaration | null =>
@@ -79,12 +96,276 @@ const copyComputedSubtitleStyles = (source: HTMLElement, target: HTMLElement): v
   }
 }
 
+const applyScaledSubtitleTypography = (
+  source: HTMLElement,
+  target: HTMLElement,
+  scale: number
+): void => {
+  if (scale === 1) return
+
+  const sourceElements = [source, ...source.querySelectorAll<HTMLElement>('*')]
+  const targetElements = [target, ...target.querySelectorAll<HTMLElement>('*')]
+
+  for (const [index, targetElement] of targetElements.entries()) {
+    const sourceElement = sourceElements[index]
+    const style = sourceElement ? getSubtitleStyle(sourceElement) : null
+    if (!style) continue
+
+    for (const property of ['font-size', 'line-height'] as const) {
+      const value = style.getPropertyValue(property).trim()
+      if (!value.endsWith('px')) continue
+      const pixels = Number.parseFloat(value)
+      if (Number.isFinite(pixels) && pixels > 0) {
+        const scaledPixels = Number((pixels * scale).toFixed(3))
+        targetElement.style.setProperty(property, `${scaledPixels}px`)
+      }
+    }
+  }
+}
+
+const applySubtitleBackground = (
+  root: HTMLElement,
+  background: PipSubtitleBackground
+): void => {
+  for (const element of [root, ...root.querySelectorAll<HTMLElement>('*')]) {
+    element.style.setProperty('background', 'transparent', 'important')
+    element.style.setProperty('background-color', 'transparent', 'important')
+  }
+  if (background === 'none') return
+
+  const textNodes: Text[] = []
+  const walker = root.ownerDocument.createTreeWalker(root, 4)
+  let node = walker.nextNode()
+  while (node) {
+    if (node.textContent?.trim()) textNodes.push(node as Text)
+    node = walker.nextNode()
+  }
+
+  for (const textNode of textNodes) {
+    const parent = textNode.parentNode
+    if (!parent) continue
+    const span = root.ownerDocument.createElement('span')
+    span.dataset.pipSubtitleBackground = background
+    span.style.setProperty('background-color', 'transparent', 'important')
+    span.style.padding = '0.1em 0.32em 0.14em'
+    span.style.borderRadius = '0.2em'
+    span.style.lineHeight = '1.35'
+    span.style.position = 'relative'
+    span.style.zIndex = '1'
+    parent.replaceChild(span, textNode)
+    span.appendChild(textNode)
+  }
+}
+
+type SubtitleBackgroundRect = {
+  left: number
+  top: number
+  width: number
+  height: number
+}
+
+const formatPathNumber = (value: number): string => Number(value.toFixed(3)).toString()
+
+const getRoundedRectPath = (rect: SubtitleBackgroundRect, radius: number): string => {
+  const left = rect.left
+  const top = rect.top
+  const right = rect.left + rect.width
+  const bottom = rect.top + rect.height
+  const corner = Math.min(radius, rect.width / 2, rect.height / 2)
+  const n = formatPathNumber
+  return [
+    `M ${n(left + corner)} ${n(top)}`,
+    `H ${n(right - corner)}`,
+    `Q ${n(right)} ${n(top)} ${n(right)} ${n(top + corner)}`,
+    `V ${n(bottom - corner)}`,
+    `Q ${n(right)} ${n(bottom)} ${n(right - corner)} ${n(bottom)}`,
+    `H ${n(left + corner)}`,
+    `Q ${n(left)} ${n(bottom)} ${n(left)} ${n(bottom - corner)}`,
+    `V ${n(top + corner)}`,
+    `Q ${n(left)} ${n(top)} ${n(left + corner)} ${n(top)}`,
+    'Z',
+  ].join(' ')
+}
+
+const getVariableRoundedRectPath = (
+  rect: SubtitleBackgroundRect,
+  radii: {
+    topLeft: number
+    topRight: number
+    bottomRight: number
+    bottomLeft: number
+  }
+): string => {
+  const n = formatPathNumber
+  const left = rect.left
+  const top = rect.top
+  const right = rect.left + rect.width
+  const bottom = rect.top + rect.height
+  const limitRadius = (radius: number): number =>
+    Math.min(radius, rect.width / 2, rect.height / 2)
+  const topLeft = limitRadius(radii.topLeft)
+  const topRight = limitRadius(radii.topRight)
+  const bottomRight = limitRadius(radii.bottomRight)
+  const bottomLeft = limitRadius(radii.bottomLeft)
+  return [
+    `M ${n(left + topLeft)} ${n(top)}`,
+    `H ${n(right - topRight)}`,
+    `Q ${n(right)} ${n(top)} ${n(right)} ${n(top + topRight)}`,
+    `V ${n(bottom - bottomRight)}`,
+    `Q ${n(right)} ${n(bottom)} ${n(right - bottomRight)} ${n(bottom)}`,
+    `H ${n(left + bottomLeft)}`,
+    `Q ${n(left)} ${n(bottom)} ${n(left)} ${n(bottom - bottomLeft)}`,
+    `V ${n(top + topLeft)}`,
+    `Q ${n(left)} ${n(top)} ${n(left + topLeft)} ${n(top)}`,
+    'Z',
+  ].join(' ')
+}
+
+const getConnectedRowsPath = (
+  rows: SubtitleBackgroundRect[],
+  outerRadius: number,
+  middleRadius: number
+): string => {
+  if (rows.length === 1 && rows[0]) return getRoundedRectPath(rows[0], outerRadius)
+
+  const pathParts = rows.map((row, index) => {
+    const previous = rows[index - 1]
+    const next = rows[index + 1]
+    const rowRight = row.left + row.width
+    const previousRight = previous ? previous.left + previous.width : 0
+    const nextRight = next ? next.left + next.width : 0
+    return getVariableRoundedRectPath(row, {
+      topLeft: index === 0 ? outerRadius : previous && row.left < previous.left ? middleRadius : 0,
+      topRight:
+        index === 0 ? outerRadius : previous && rowRight > previousRight ? middleRadius : 0,
+      bottomRight:
+        index === rows.length - 1
+          ? outerRadius
+          : next && rowRight > nextRight
+            ? middleRadius
+            : 0,
+      bottomLeft:
+        index === rows.length - 1
+          ? outerRadius
+          : next && row.left < next.left
+            ? middleRadius
+            : 0,
+    })
+  })
+  for (let index = 0; index < rows.length - 1; index += 1) {
+    const upper = rows[index]
+    const lower = rows[index + 1]
+    if (!upper || !lower) continue
+    const overlapLeft = Math.max(upper.left, lower.left)
+    const overlapRight = Math.min(upper.left + upper.width, lower.left + lower.width)
+    const inset = Math.min(middleRadius, Math.max(0, (overlapRight - overlapLeft) / 4))
+    const connectorLeft = overlapLeft + inset
+    const connectorRight = overlapRight - inset
+    if (connectorRight <= connectorLeft) continue
+    const upperBottom = upper.top + upper.height
+    const n = formatPathNumber
+    pathParts.push(
+      `M ${n(connectorLeft)} ${n(upperBottom)} H ${n(connectorRight)} V ${n(lower.top)} H ${n(connectorLeft)} Z`
+    )
+  }
+  return pathParts.join(' ')
+}
+
+const renderSubtitleBackgroundShape = (
+  root: HTMLElement,
+  background: PipSubtitleBackground,
+  scale: number
+): void => {
+  root.querySelector(`[${SUBTITLE_BACKGROUND_SHAPE_ATTRIBUTE}]`)?.remove()
+  if (background === 'none') return
+
+  const rootRect = root.getBoundingClientRect()
+  const safeScale = Math.max(scale, 0.001)
+  const rects = Array.from(
+    root.querySelectorAll<HTMLElement>('[data-pip-subtitle-background]')
+  )
+    .flatMap(element => {
+      const fragments = Array.from(element.getClientRects())
+      return fragments.length > 0 ? fragments : [element.getBoundingClientRect()]
+    })
+    .filter(rect => rect.width > 0 && rect.height > 0)
+    .map<SubtitleBackgroundRect>(rect => ({
+      left: (rect.left - rootRect.left) / safeScale,
+      top: (rect.top - rootRect.top) / safeScale,
+      width: rect.width / safeScale,
+      height: rect.height / safeScale,
+    }))
+    .sort((left, right) => left.top - right.top || left.left - right.left)
+  if (rects.length === 0) return
+
+  const groups: SubtitleBackgroundRect[][] = []
+  for (const rect of rects) {
+    const group = groups.at(-1)
+    const previous = group?.at(-1)
+    const previousRight = previous ? previous.left + previous.width : 0
+    const rectRight = rect.left + rect.width
+    const verticalGap = previous ? rect.top - (previous.top + previous.height) : Number.POSITIVE_INFINITY
+    const connectionLimit = previous ? Math.min(previous.height, rect.height) * 0.4 : 0
+    const isNextRow = previous ? rect.top - previous.top > 2 / safeScale : false
+    const horizontallyOverlaps = previous
+      ? previous.left < rectRight && previousRight > rect.left
+      : false
+
+    if (
+      group &&
+      previous &&
+      isNextRow &&
+      horizontallyOverlaps &&
+      verticalGap >= -connectionLimit &&
+      verticalGap <= connectionLimit
+    ) {
+      group.push(rect)
+    } else {
+      groups.push([rect])
+    }
+  }
+  const pathParts = groups.map(group =>
+    getConnectedRowsPath(group, 4 / safeScale, 4 / safeScale)
+  )
+
+  const svg = root.ownerDocument.createElementNS('http://www.w3.org/2000/svg', 'svg')
+  svg.setAttribute(SUBTITLE_BACKGROUND_SHAPE_ATTRIBUTE, background)
+  svg.setAttribute('aria-hidden', 'true')
+  svg.setAttribute('width', '100%')
+  svg.setAttribute('height', '100%')
+  Object.assign(svg.style, {
+    position: 'absolute',
+    inset: '0',
+    overflow: 'visible',
+    pointerEvents: 'none',
+    zIndex: '0',
+  })
+  const path = root.ownerDocument.createElementNS('http://www.w3.org/2000/svg', 'path')
+  path.setAttribute('d', pathParts.join(' '))
+  path.setAttribute('fill', SUBTITLE_BACKGROUND_COLORS[background])
+  svg.append(path)
+  root.prepend(svg)
+}
+
 const getPercentage = (value: string | undefined): number | null => {
   const match = value?.trim().match(/^(-?\d+(?:\.\d+)?)%$/)
   return match ? Number(match[1]) : null
 }
 
-const stabilizeLowerSubtitlePosition = (source: HTMLElement, inner: HTMLElement): void => {
+const getSubtitleBottom = (controlsVisible: boolean, scale: number): string => {
+  if (!controlsVisible) return DEFAULT_PIP_SUBTITLE_BOTTOM
+
+  const sourcePixels = Number(
+    (CONTROLS_VISIBLE_SUBTITLE_CLEARANCE_PX / Math.max(scale, 0.001)).toFixed(3)
+  )
+  return `calc(${DEFAULT_PIP_SUBTITLE_BOTTOM} + ${sourcePixels}px)`
+}
+
+const stabilizeSubtitlePosition = (
+  source: HTMLElement,
+  inner: HTMLElement,
+  subtitleBottom: string
+): void => {
   const sourceElements = source.querySelectorAll<HTMLElement>('*')
   const mirroredElements = inner.querySelectorAll<HTMLElement>('*')
   const sourceFrameRect = source.getBoundingClientRect()
@@ -95,6 +376,16 @@ const stabilizeLowerSubtitlePosition = (source: HTMLElement, inner: HTMLElement)
 
     const sourceStyle = getSubtitleStyle(sourceElement)
     if (sourceStyle?.position !== 'absolute' && sourceStyle?.position !== 'fixed') continue
+
+    Object.assign(mirroredElement.style, {
+      left: '0',
+      right: '0',
+      width: '100%',
+      marginLeft: '0',
+      marginRight: '0',
+      transform: 'none',
+      textAlign: 'center',
+    })
 
     const topPercentage =
       getPercentage(sourceElement.style.top || sourceStyle?.top) ??
@@ -107,7 +398,7 @@ const stabilizeLowerSubtitlePosition = (source: HTMLElement, inner: HTMLElement)
 
     Object.assign(mirroredElement.style, {
       top: 'auto',
-      bottom: DEFAULT_PIP_SUBTITLE_BOTTOM,
+      bottom: subtitleBottom,
     })
   }
 }
@@ -197,6 +488,10 @@ export class SubtitleMirror {
   private refreshFrameId: number | null = null
   private syncFrameId: number | null = null
   private resizeHandler: (() => void) | null = null
+  private controlsVisible = false
+  private subtitlesEnabled: boolean
+  private subtitleSize: PipSubtitleSize
+  private subtitleBackground: PipSubtitleBackground
   private started = false
 
   constructor(options: SubtitleMirrorOptions) {
@@ -205,6 +500,9 @@ export class SubtitleMirror {
     this.pipWindow = options.pipWindow
     this.video = options.video
     this.videoArea = options.videoArea
+    this.subtitlesEnabled = options.settings?.subtitlesEnabled ?? true
+    this.subtitleSize = options.settings?.subtitleSize ?? 'medium'
+    this.subtitleBackground = options.settings?.subtitleBackground ?? 'translucent'
   }
 
   start(): void {
@@ -259,6 +557,26 @@ export class SubtitleMirror {
     this.refreshSource()
   }
 
+  setControlsVisible(visible: boolean): void {
+    if (this.controlsVisible === visible) return
+    this.controlsVisible = visible
+    if (this.started) this.scheduleSync()
+  }
+
+  setSettings(settings: PipSettings): void {
+    if (
+      this.subtitlesEnabled === settings.subtitlesEnabled &&
+      this.subtitleSize === settings.subtitleSize &&
+      this.subtitleBackground === settings.subtitleBackground
+    ) {
+      return
+    }
+    this.subtitlesEnabled = settings.subtitlesEnabled
+    this.subtitleSize = settings.subtitleSize
+    this.subtitleBackground = settings.subtitleBackground
+    if (this.started) this.scheduleSync()
+  }
+
   destroy(): void {
     if (this.refreshFrameId !== null) {
       this.sourceDocument.defaultView?.cancelAnimationFrame(this.refreshFrameId)
@@ -282,6 +600,7 @@ export class SubtitleMirror {
     this.source = null
     this.mirror = null
     this.inner = null
+    this.controlsVisible = false
     this.started = false
   }
 
@@ -374,7 +693,7 @@ export class SubtitleMirror {
     const mirror = this.mirror
     if (!inner || !mirror) return
 
-    if (!source || !source.isConnected) {
+    if (!this.subtitlesEnabled || !source || !source.isConnected) {
       inner.replaceChildren()
       mirror.style.visibility = 'hidden'
       return
@@ -383,7 +702,7 @@ export class SubtitleMirror {
     copySubtitleAttributes(source, inner)
     copyComputedSubtitleStyles(source, inner)
     inner.replaceChildren(...Array.from(source.childNodes, node => node.cloneNode(true)))
-    stabilizeLowerSubtitlePosition(source, inner)
+    applyScaledSubtitleTypography(source, inner, SUBTITLE_SIZE_SCALE[this.subtitleSize])
 
     const { width: sourceWidth, height: sourceHeight } = getSubtitleFrameSize(
       source,
@@ -397,6 +716,8 @@ export class SubtitleMirror {
       sourceHeight
     )
     const scale = Math.min(contentRect.width / sourceWidth, contentRect.height / sourceHeight)
+    stabilizeSubtitlePosition(source, inner, getSubtitleBottom(this.controlsVisible, scale))
+    applySubtitleBackground(inner, this.subtitleBackground)
     const renderedWidth = sourceWidth * scale
     const renderedHeight = sourceHeight * scale
     const offsetLeft = contentRect.left + (contentRect.width - renderedWidth) / 2
@@ -426,6 +747,8 @@ export class SubtitleMirror {
       visibility: 'visible',
       opacity: '1',
     })
+    inner.style.isolation = 'isolate'
+    renderSubtitleBackgroundShape(inner, this.subtitleBackground, scale)
     mirror.style.visibility = hasSubtitleText(source) ? 'visible' : 'hidden'
   }
 }

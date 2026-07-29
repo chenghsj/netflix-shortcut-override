@@ -1,7 +1,11 @@
 import type { NetflixApiAction, NetflixApiResponse } from '@/shared/netflix-api'
+import {
+  clampNetflixVolume,
+  DEFAULT_NETFLIX_VOLUME,
+  normalizeAudibleNetflixVolume,
+  normalizeNetflixRestoreVolume,
+} from '@/shared/netflix-playback-values'
 import { sendNetflixApi } from './netflix-api-client'
-
-const DEFAULT_VOLUME = 0.1
 
 export type NetflixPlaybackTransport = (
   action: NetflixApiAction,
@@ -28,6 +32,7 @@ export type NetflixPlaybackSession = {
   pause: (video: HTMLVideoElement) => Promise<PlaybackCommandResult>
   seekBy: (milliseconds: number) => Promise<PlaybackCommandResult>
   seekTo: (milliseconds: number) => Promise<PlaybackCommandResult>
+  setVolume: (video: HTMLVideoElement, volume: number) => PlaybackVolumeCommand
   adjustVolume: (video: HTMLVideoElement, delta: number) => PlaybackVolumeCommand
   toggleMute: (video: HTMLVideoElement) => PlaybackVolumeCommand
   setPlaybackRate: (
@@ -36,22 +41,8 @@ export type NetflixPlaybackSession = {
   ) => Promise<PlaybackCommandResult>
 }
 
-const clampVolume = (volume: number): number => {
-  const clamped = Math.min(
-    1,
-    Math.max(0, Number.isFinite(volume) ? volume : DEFAULT_VOLUME)
-  )
-  return Number(clamped.toFixed(2))
-}
-
-const normalizeAudibleVolume = (volume: number): number | null => {
-  if (!Number.isFinite(volume)) return null
-  const normalized = clampVolume(volume)
-  return normalized > 0 ? normalized : null
-}
-
 const rememberVolumeForRestore = (video: HTMLVideoElement, volume: number): void => {
-  const normalized = normalizeAudibleVolume(volume)
+  const normalized = normalizeAudibleNetflixVolume(volume)
   if (normalized !== null) {
     video.dataset.shortcutOverrideLastVolume = normalized.toString()
   }
@@ -59,10 +50,10 @@ const rememberVolumeForRestore = (video: HTMLVideoElement, volume: number): void
 
 const getLastAudibleVolume = (video: HTMLVideoElement): number => {
   const stored = Number.parseFloat(video.dataset.shortcutOverrideLastVolume ?? '')
-  const storedVolume = normalizeAudibleVolume(stored)
+  const storedVolume = normalizeAudibleNetflixVolume(stored)
   if (storedVolume !== null) return storedVolume
 
-  return normalizeAudibleVolume(video.volume) ?? DEFAULT_VOLUME
+  return normalizeAudibleNetflixVolume(video.volume) ?? DEFAULT_NETFLIX_VOLUME
 }
 
 const mirrorAudioState = (
@@ -70,7 +61,7 @@ const mirrorAudioState = (
   state: { muted?: boolean; volume?: number }
 ): void => {
   if (state.muted === false) video.muted = false
-  if (typeof state.volume === 'number') video.volume = clampVolume(state.volume)
+  if (typeof state.volume === 'number') video.volume = clampNetflixVolume(state.volume)
   if (state.muted === true) video.muted = true
   video.dispatchEvent(new Event('volumechange', { bubbles: true }))
 }
@@ -143,11 +134,11 @@ export const createNetflixPlaybackSession = (
     return execute('pause')
   }
 
-  const setVolume = (
+  const applyVolume = (
     video: HTMLVideoElement,
     volume: number
   ): Promise<PlaybackCommandResult> => {
-    const nextVolume = clampVolume(volume)
+    const nextVolume = clampNetflixVolume(volume)
     const volumeCompletion = execute('setVolume', nextVolume)
     const completion =
       nextVolume === 0
@@ -163,7 +154,7 @@ export const createNetflixPlaybackSession = (
     video: HTMLVideoElement,
     volume: number
   ): Promise<PlaybackCommandResult> => {
-    const restoredVolume = normalizeAudibleVolume(volume) ?? DEFAULT_VOLUME
+    const restoredVolume = normalizeNetflixRestoreVolume(volume)
     const completion = execute('unmuteWithVolume', restoredVolume)
     mirrorAudioState(video, { volume: restoredVolume, muted: false })
     return completion
@@ -175,8 +166,21 @@ export const createNetflixPlaybackSession = (
     pause,
     seekBy: milliseconds => execute('seek', milliseconds),
     seekTo: milliseconds => execute('seekTo', milliseconds),
+    setVolume: (video, volume) => {
+      const nextVolume = clampNetflixVolume(volume)
+      const previousVolume = clampNetflixVolume(video.volume)
+      const completion =
+        (video.muted || previousVolume === 0) && nextVolume > 0
+          ? unmuteWithVolume(video, nextVolume)
+          : applyVolume(video, nextVolume)
+
+      if (nextVolume > 0) rememberVolumeForRestore(video, nextVolume)
+      else if (previousVolume > 0) rememberVolumeForRestore(video, previousVolume)
+
+      return { volume: nextVolume, muted: nextVolume === 0, completion }
+    },
     adjustVolume: (video, delta) => {
-      const currentVolume = clampVolume(video.volume)
+      const currentVolume = clampNetflixVolume(video.volume)
       const isSilent = video.muted || currentVolume === 0
 
       if (isSilent && delta < 0) {
@@ -189,12 +193,12 @@ export const createNetflixPlaybackSession = (
       }
 
       const baseVolume = isSilent ? 0 : currentVolume
-      const nextVolume = clampVolume(baseVolume + delta)
+      const nextVolume = clampNetflixVolume(baseVolume + delta)
 
       const completion =
         isSilent && nextVolume > 0
           ? unmuteWithVolume(video, nextVolume)
-          : setVolume(video, nextVolume)
+          : applyVolume(video, nextVolume)
 
       if (nextVolume > 0) rememberVolumeForRestore(video, nextVolume)
       else if (baseVolume > 0) rememberVolumeForRestore(video, baseVolume)
@@ -212,7 +216,7 @@ export const createNetflixPlaybackSession = (
       rememberVolumeForRestore(video, video.volume)
       const completion = execute('setMuted', 1)
       mirrorAudioState(video, { muted: true })
-      return { volume: clampVolume(video.volume), muted: true, completion }
+      return { volume: clampNetflixVolume(video.volume), muted: true, completion }
     },
     setPlaybackRate: (video, rate) => {
       video.playbackRate = rate

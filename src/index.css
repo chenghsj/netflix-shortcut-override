@@ -296,12 +296,7 @@ html.popup-page-root {
   }
 
   [data-slot='card'] {
-    background:
-      linear-gradient(
-        180deg,
-        color-mix(in oklch, var(--card) 88%, white 12%),
-        var(--card)
-      );
+    background-color: var(--card);
   }
 
   [data-slot='button'][data-variant='outline'],

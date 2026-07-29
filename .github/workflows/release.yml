@@ -115,22 +115,24 @@ jobs:
       - name: Build extension
         run: npm run build
 
+      - name: Prepare Firefox extension
+        run: npm run prepare:firefox
+
+      - name: Lint Firefox extension
+        run: npm run lint:firefox
+
       - name: Generate changelog
         run: npm run changelog -- --tag "${{ steps.release_ref.outputs.tag }}" --output release-notes.md
 
-      - name: Package extension
-        shell: bash
-        run: |
-          set -euo pipefail
-          version="${{ steps.release_version.outputs.version }}"
-          asset_name="shortcut-override-for-netflix-${version}.zip"
+      - name: Package Chromium extension
+        run: npm run package:chromium
 
-          mkdir -p release-assets
-          (cd dist && zip -r "../release-assets/${asset_name}" .)
-          sha256sum "release-assets/${asset_name}" > "release-assets/${asset_name}.sha256"
-
-      - name: Package Edge extension
-        run: node scripts/build-edge-package.mjs
+      - name: Package and sign Firefox extension
+        env:
+          AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+          AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+          RELEASE_TAG: ${{ steps.release_ref.outputs.tag }}
+        run: npm run package:firefox
 
       - name: Publish GitHub Release
         shell: bash

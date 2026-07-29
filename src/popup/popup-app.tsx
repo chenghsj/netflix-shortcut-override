@@ -18,6 +18,7 @@ import { NumericSettingField } from '@/components/numeric-setting-field'
 import { OtherProjectsSelect } from '@/components/other-projects-select'
 import { SettingLabelWithTooltip } from '@/components/setting-label-with-tooltip'
 import { SettingsSaveStatus } from '@/components/settings-save-status'
+import { ThemeCombobox } from '@/components/theme-combobox'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
@@ -26,14 +27,13 @@ import { cn } from '@/lib/utils'
 import { useCompatibilitySession } from '@/popup/use-compatibility-session'
 import { usePopupFocusRestoration } from '@/popup/use-popup-focus-restoration'
 import { EXTERNAL_LINKS } from '@/shared/external-links'
+import { resolveLocalePreference } from '@/shared/browser-locale'
+import { getBrowserCapabilities } from '@/shared/browser-capabilities'
 import { getCopy } from '@/shared/i18n'
-import {
-  SEEK_LIMITS,
-  SPACE_HOLD_LIMITS,
-  SPEED_LIMITS,
-  type ShortcutAction,
-} from '@/shared/shortcuts'
+import { SEEK_LIMITS, SPACE_HOLD_LIMITS, SPEED_LIMITS } from '@/shared/shortcut-settings'
+import type { ShortcutAction } from '@/shared/shortcut-types'
 import { useShortcutSettingsForm } from '@/shared/use-shortcut-settings-form'
+import { useTheme } from '@/shared/use-theme'
 
 const POPUP_SHORTCUT_ACTIONS: ShortcutAction[] = [
   'playPause',
@@ -56,6 +56,7 @@ const openOptionsPage = (beforeNavigate: () => void) => {
   beforeNavigate()
   if (typeof chrome !== 'undefined' && chrome.runtime?.openOptionsPage) {
     chrome.runtime.openOptionsPage()
+    if (getBrowserCapabilities().closesPopupAfterOpeningOptions) window.close()
     return
   }
 
@@ -65,21 +66,12 @@ const openOptionsPage = (beforeNavigate: () => void) => {
 export function PopupApp() {
   const {
     settings,
-    speedDraft,
-    seekDraft,
-    spaceHoldDraft,
     loaded,
     saveError,
     updateSettings,
-    setSpeedDraftField,
-    setSeekDraftSeconds,
-    setSpaceHoldDraftSpeed,
-    commitSpeedField,
-    commitSeekSeconds,
-    commitSpaceHoldSpeed,
-    handleSpeedKeyDown,
-    handleSeekKeyDown,
-    handleSpaceHoldKeyDown,
+    speed: speedForm,
+    seek: seekForm,
+    spaceHold: spaceHoldForm,
   } = useShortcutSettingsForm()
   const {
     pageStatus,
@@ -93,7 +85,9 @@ export function PopupApp() {
   } = useCompatibilitySession()
   const { suppressFocusRestoration } =
     usePopupFocusRestoration(resolvePlaybackFocusTarget)
-  const copy = getCopy(settings.locale)
+  const copy = getCopy(resolveLocalePreference(settings.locale))
+  const browserCapabilities = getBrowserCapabilities()
+  useTheme(settings.theme)
 
   const statusText = useMemo(() => {
     if (pageStatus === 'netflix') return copy.popupNetflixPage
@@ -173,6 +167,7 @@ export function PopupApp() {
               <div className="flex items-center justify-between gap-3">
                 <span className="min-w-0 text-sm font-medium">{copy.locale}</span>
                 <LanguageCombobox
+                  autoLabel={copy.localeAuto}
                   className="w-28"
                   label={copy.locale}
                   value={settings.locale}
@@ -182,6 +177,20 @@ export function PopupApp() {
                       locale,
                     }))
                   }
+                />
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="min-w-0 text-sm font-medium">{copy.theme}</span>
+                <ThemeCombobox
+                  className="w-28"
+                  label={copy.theme}
+                  labels={{
+                    auto: copy.themeAuto,
+                    light: copy.themeLight,
+                    dark: copy.themeDark,
+                  }}
+                  value={settings.theme}
+                  onChange={theme => updateSettings(current => ({ ...current, theme }))}
                 />
               </div>
               <div className="flex items-center justify-between gap-3">
@@ -211,6 +220,9 @@ export function PopupApp() {
           <div className="flex flex-col gap-1">
             {POPUP_SHORTCUT_ACTIONS.map(action => {
               const binding = settings.bindings[action]
+              const actionSupported =
+                action !== 'pictureInPicture' ||
+                browserCapabilities.supportsSubtitlePreservingPip
               return (
                 <div
                   key={action}
@@ -219,13 +231,21 @@ export function PopupApp() {
                   <span
                     className={cn(
                       'min-w-0 truncate text-xs leading-tight',
-                      !binding.enabled && 'text-muted-foreground'
+                      (!binding.enabled || !actionSupported) && 'text-muted-foreground'
                     )}
-                    title={copy.actions[action]}
+                    title={actionSupported ? copy.actions[action] : copy.pictureInPictureUnsupported}
                   >
                     {copy.actions[action]}
                   </span>
-                  {binding.enabled ? (
+                  {!actionSupported ? (
+                    <Badge
+                      variant="secondary"
+                      className="max-w-24 justify-start truncate px-1.5 text-xs"
+                      title={copy.pictureInPictureUnsupported}
+                    >
+                      {copy.diagnosticsUnsupportedValue}
+                    </Badge>
+                  ) : binding.enabled ? (
                     <KeyBindingKbd
                       binding={binding.key}
                       className="max-w-32 shrink-0 justify-end overflow-hidden"
@@ -261,12 +281,12 @@ export function PopupApp() {
                   min={SPEED_LIMITS.min.min}
                   max={SPEED_LIMITS.min.max}
                   step={SPEED_LIMITS.step.inputStep}
-                  value={speedDraft.min}
+                  value={speedForm.draft.min}
                   data-speed-field="min"
                   inputClassName={popupSpeedInputClassName}
-                  onValueChange={value => setSpeedDraftField('min', value)}
-                  onBlur={() => commitSpeedField('min')}
-                  onKeyDown={handleSpeedKeyDown}
+                  onValueChange={value => speedForm.setField('min', value)}
+                  onBlur={() => speedForm.commitField('min')}
+                  onKeyDown={speedForm.handleKeyDown}
               />
               <NumericSettingField
                   id="popup-max-speed"
@@ -278,12 +298,12 @@ export function PopupApp() {
                   min={SPEED_LIMITS.max.min}
                   max={SPEED_LIMITS.max.max}
                   step={SPEED_LIMITS.step.inputStep}
-                  value={speedDraft.max}
+                  value={speedForm.draft.max}
                   data-speed-field="max"
                   inputClassName={popupSpeedInputClassName}
-                  onValueChange={value => setSpeedDraftField('max', value)}
-                  onBlur={() => commitSpeedField('max')}
-                  onKeyDown={handleSpeedKeyDown}
+                  onValueChange={value => speedForm.setField('max', value)}
+                  onBlur={() => speedForm.commitField('max')}
+                  onKeyDown={speedForm.handleKeyDown}
               />
               <NumericSettingField
                   id="popup-speed-step"
@@ -295,12 +315,12 @@ export function PopupApp() {
                   min={SPEED_LIMITS.step.min}
                   max={SPEED_LIMITS.step.max}
                   step={SPEED_LIMITS.step.inputStep}
-                  value={speedDraft.step}
+                  value={speedForm.draft.step}
                   data-speed-field="step"
                   inputClassName={popupSpeedInputClassName}
-                  onValueChange={value => setSpeedDraftField('step', value)}
-                  onBlur={() => commitSpeedField('step')}
-                  onKeyDown={handleSpeedKeyDown}
+                  onValueChange={value => speedForm.setField('step', value)}
+                  onBlur={() => speedForm.commitField('step')}
+                  onKeyDown={speedForm.handleKeyDown}
               />
             </div>
           </section>
@@ -321,11 +341,11 @@ export function PopupApp() {
                 min={SEEK_LIMITS.seconds.min}
                 max={SEEK_LIMITS.seconds.max}
                 step={SEEK_LIMITS.seconds.inputStep}
-                value={seekDraft.seconds}
+                value={seekForm.draft.seconds}
                 inputClassName={popupSpeedInputClassName}
-                onValueChange={setSeekDraftSeconds}
-                onBlur={commitSeekSeconds}
-                onKeyDown={handleSeekKeyDown}
+                onValueChange={seekForm.setSeconds}
+                onBlur={seekForm.commit}
+                onKeyDown={seekForm.handleKeyDown}
               />
             </div>
           </section>
@@ -352,6 +372,25 @@ export function PopupApp() {
                   aria-label={`${copy.holdSpeed}: ${copy.holdSpeedEnabled}`}
                 />
               </div>
+              <div className="flex items-center justify-between gap-3">
+                <label
+                  htmlFor="popup-show-space-hold-hint"
+                  className="min-w-0 text-xs font-medium"
+                >
+                  {copy.holdSpeedHint}
+                </label>
+                <Switch
+                  id="popup-show-space-hold-hint"
+                  checked={settings.spaceHold.showHint}
+                  onCheckedChange={showHint =>
+                    updateSettings(current => ({
+                      ...current,
+                      spaceHold: { ...current.spaceHold, showHint },
+                    }))
+                  }
+                  aria-label={`${copy.holdSpeed}: ${copy.holdSpeedHint}`}
+                />
+              </div>
               <NumericSettingField
                   id="popup-hold-speed"
                   label={copy.holdSpeedRate}
@@ -362,12 +401,12 @@ export function PopupApp() {
                   min={SPACE_HOLD_LIMITS.speed.min}
                   max={SPACE_HOLD_LIMITS.speed.max}
                   step={SPACE_HOLD_LIMITS.speed.inputStep}
-                  value={spaceHoldDraft.speed}
+                  value={spaceHoldForm.draft.speed}
                   disabled={!settings.spaceHold.enabled}
                   inputClassName={popupSpeedInputClassName}
-                  onValueChange={setSpaceHoldDraftSpeed}
-                  onBlur={commitSpaceHoldSpeed}
-                  onKeyDown={handleSpaceHoldKeyDown}
+                  onValueChange={spaceHoldForm.setSpeed}
+                  onBlur={spaceHoldForm.commit}
+                  onKeyDown={spaceHoldForm.handleKeyDown}
               />
             </div>
           </section>

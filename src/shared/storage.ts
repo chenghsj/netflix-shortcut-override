@@ -1,5 +1,5 @@
-import { DEFAULT_SETTINGS, normalizeSettings, type ShortcutSettings } from '@/shared/shortcuts'
-import { getBrowserLocale } from '@/shared/browser-locale'
+import { DEFAULT_SETTINGS, normalizeSettings } from '@/shared/shortcut-settings'
+import type { ShortcutSettings } from '@/shared/shortcut-types'
 
 export const SETTINGS_STORAGE_KEY = 'shortcutSettings'
 
@@ -9,9 +9,7 @@ const hasChromeStorage = (): boolean =>
   typeof chrome !== 'undefined' && Boolean(chrome.storage?.sync)
 
 const normalizeStoredSettings = (raw: unknown): ShortcutSettings =>
-  raw === undefined
-    ? normalizeSettings({ ...DEFAULT_SETTINGS, locale: getBrowserLocale() })
-    : normalizeSettings(raw)
+  normalizeSettings(raw ?? DEFAULT_SETTINGS)
 
 export const getSettings = async (): Promise<ShortcutSettings> => {
   if (!hasChromeStorage()) {

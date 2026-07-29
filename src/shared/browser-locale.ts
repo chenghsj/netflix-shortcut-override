@@ -1,4 +1,4 @@
-import type { Locale } from '@/shared/shortcuts'
+import type { Locale, LocalePreference } from '@/shared/shortcut-types'
 
 export const resolveBrowserLocale = (language: string | undefined): Locale => {
   const normalized = language?.trim().replaceAll('_', '-').toLowerCase()
@@ -32,3 +32,6 @@ export const getBrowserLocale = (): Locale => {
 
   return resolveBrowserLocale(browserLanguage)
 }
+
+export const resolveLocalePreference = (preference: LocalePreference): Locale =>
+  preference === 'auto' ? getBrowserLocale() : preference

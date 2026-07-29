@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { DEFAULT_SETTINGS } from '@/shared/shortcuts'
+import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
 import { saveSettings } from '@/shared/storage'
 
 import { setupContentIndexTests } from './content-script.test-support'

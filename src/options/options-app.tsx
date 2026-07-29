@@ -17,6 +17,7 @@ import { NumericSettingField } from '@/components/numeric-setting-field'
 import { OtherProjectsSelect } from '@/components/other-projects-select'
 import { SettingLabelWithTooltip } from '@/components/setting-label-with-tooltip'
 import { SettingsSaveStatus } from '@/components/settings-save-status'
+import { ThemeCombobox } from '@/components/theme-combobox'
 import { Alert, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import {
@@ -56,26 +57,27 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { getCopy } from '@/shared/i18n'
+import { resolveLocalePreference } from '@/shared/browser-locale'
+import { getBrowserCapabilities } from '@/shared/browser-capabilities'
 import {
   DEFAULT_KEY_BINDINGS,
-  DEFAULT_SETTINGS,
-  SEEK_LIMITS,
-  SHORTCUT_ACTIONS,
-  SPACE_HOLD_LIMITS,
-  SPEED_LIMITS,
   findBindingConflict,
   keyBindingFromEvent,
   keyBindingsEqual,
+} from '@/shared/shortcut-bindings'
+import {
+  SEEK_LIMITS,
+  SPACE_HOLD_LIMITS,
+  SPEED_LIMITS,
+} from '@/shared/shortcut-settings'
+import {
+  SHORTCUT_ACTIONS,
   type KeyBinding,
   type ShortcutAction,
-} from '@/shared/shortcuts'
-import {
-  seekDraftFromSettings,
-  spaceHoldDraftFromSettings,
-  speedDraftFromSettings,
-  useShortcutSettingsForm,
-} from '@/shared/use-shortcut-settings-form'
+} from '@/shared/shortcut-types'
+import { useShortcutSettingsForm } from '@/shared/use-shortcut-settings-form'
 import { EXTERNAL_LINKS } from '@/shared/external-links'
+import { useTheme } from '@/shared/use-theme'
 
 const ignoredRecordKeys = new Set([
   'ShiftLeft',
@@ -97,63 +99,27 @@ type RecorderState = {
 export function OptionsApp() {
   const {
     settings,
-    speedDraft,
-    seekDraft,
-    spaceHoldDraft,
     loaded,
     saveError,
     updateSettings,
-    setSpeedDraft,
-    setSpeedDraftField,
-    setSeekDraft,
-    setSeekDraftSeconds,
-    setSpaceHoldDraft,
-    setSpaceHoldDraftSpeed,
-    commitSpeedField,
-    commitSeekSeconds,
-    commitSpaceHoldSpeed,
-    handleSpeedKeyDown,
-    handleSeekKeyDown,
-    handleSpaceHoldKeyDown,
+    resetShortcutBindings,
+    speed: speedForm,
+    seek: seekForm,
+    spaceHold: spaceHoldForm,
   } = useShortcutSettingsForm()
   const [recorder, setRecorder] = useState<RecorderState>(null)
-  const copy = getCopy(settings.locale)
-
-  const resetShortcutBindings = () => {
-    updateSettings(current => ({
-      ...current,
-      bindings: DEFAULT_SETTINGS.bindings,
-    }))
-  }
-
-  const resetSpeedSettings = () => {
-    setSpeedDraft(speedDraftFromSettings(DEFAULT_SETTINGS.speed))
-    updateSettings(current => ({
-      ...current,
-      speed: DEFAULT_SETTINGS.speed,
-    }))
-  }
-
-  const resetSeekSettings = () => {
-    setSeekDraft(seekDraftFromSettings(DEFAULT_SETTINGS.seek))
-    updateSettings(current => ({
-      ...current,
-      seek: DEFAULT_SETTINGS.seek,
-    }))
-  }
-
-  const resetSpaceHoldSettings = () => {
-    setSpaceHoldDraft(spaceHoldDraftFromSettings(DEFAULT_SETTINGS.spaceHold))
-    updateSettings(current => ({
-      ...current,
-      spaceHold: DEFAULT_SETTINGS.spaceHold,
-    }))
-  }
+  const copy = getCopy(resolveLocalePreference(settings.locale))
+  const browserCapabilities = getBrowserCapabilities()
+  useTheme(settings.theme)
 
   const activeConflict = useMemo(() => {
     if (!recorder?.draft) return null
-    return findBindingConflict(settings, recorder.action, recorder.draft)
-  }, [recorder, settings])
+    return findBindingConflict(settings, recorder.action, recorder.draft, {
+      ignoredActions: browserCapabilities.supportsSubtitlePreservingPip
+        ? []
+        : ['pictureInPicture'],
+    })
+  }, [browserCapabilities.supportsSubtitlePreservingPip, recorder, settings])
 
   const canSaveDraft = Boolean(recorder?.draft && !activeConflict)
   const canRestoreDraft = Boolean(
@@ -241,12 +207,31 @@ export function OptionsApp() {
                     <Field orientation="horizontal" className="items-center justify-between">
                       <FieldLabel>{copy.locale}</FieldLabel>
                       <LanguageCombobox
+                        autoLabel={copy.localeAuto}
                         className="w-36"
                         label={copy.locale}
                         size="default"
                         value={settings.locale}
                         onChange={locale =>
                           updateSettings(current => ({ ...current, locale }))
+                        }
+                      />
+                    </Field>
+
+                    <Field orientation="horizontal" className="items-center justify-between">
+                      <FieldLabel>{copy.theme}</FieldLabel>
+                      <ThemeCombobox
+                        className="w-36"
+                        label={copy.theme}
+                        labels={{
+                          auto: copy.themeAuto,
+                          light: copy.themeLight,
+                          dark: copy.themeDark,
+                        }}
+                        size="default"
+                        value={settings.theme}
+                        onChange={theme =>
+                          updateSettings(current => ({ ...current, theme }))
                         }
                       />
                     </Field>
@@ -285,9 +270,9 @@ export function OptionsApp() {
                   </CardAction>
                 </CardHeader>
                 <CardContent className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="hover:bg-transparent">
                         <TableHead>{copy.action}</TableHead>
                         <TableHead>{copy.key}</TableHead>
                         <TableHead>{copy.status}</TableHead>
@@ -297,6 +282,9 @@ export function OptionsApp() {
                     <TableBody>
                       {SHORTCUT_ACTIONS.map(action => {
                         const binding = settings.bindings[action]
+                        const actionSupported =
+                          action !== 'pictureInPicture' ||
+                          browserCapabilities.supportsSubtitlePreservingPip
                         return (
                           <TableRow key={action}>
                             <TableCell className="font-medium">
@@ -318,7 +306,9 @@ export function OptionsApp() {
                                       sideOffset={6}
                                       className="max-w-80 whitespace-pre-line"
                                     >
-                                      {copy.pictureInPictureTooltip}
+                                      {actionSupported
+                                        ? copy.pictureInPictureTooltip
+                                        : copy.pictureInPictureUnsupported}
                                     </TooltipContent>
                                   </Tooltip>
                                 )}
@@ -328,9 +318,10 @@ export function OptionsApp() {
                               <KeyBindingKbd binding={binding.key} />
                             </TableCell>
                             <TableCell>
-                              <Switch
-                                checked={binding.enabled}
-                                onCheckedChange={enabled =>
+                                <Switch
+                                  checked={actionSupported && binding.enabled}
+                                  disabled={!actionSupported}
+                                  onCheckedChange={enabled =>
                                   updateSettings(current => ({
                                     ...current,
                                     bindings: {
@@ -346,6 +337,7 @@ export function OptionsApp() {
                               <div className="flex justify-end gap-2">
                                 <Button
                                   variant="outline"
+                                  disabled={!actionSupported}
                                   onClick={() =>
                                     setRecorder({
                                       action,
@@ -359,6 +351,7 @@ export function OptionsApp() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
+                                  disabled={!actionSupported}
                                   onClick={() =>
                                     updateSettings(current => ({
                                       ...current,
@@ -396,7 +389,7 @@ export function OptionsApp() {
                   <CardAction className="row-span-1 self-center">
                     <Button
                       variant="outline"
-                      onClick={resetSpeedSettings}
+                      onClick={speedForm.reset}
                       aria-label={copy.resetSpeedSettings}
                     >
                       <RotateCcwIcon data-icon="inline-start" />
@@ -413,11 +406,11 @@ export function OptionsApp() {
                         min={SPEED_LIMITS.min.min}
                         max={SPEED_LIMITS.min.max}
                         step={SPEED_LIMITS.step.inputStep}
-                        value={speedDraft.min}
+                        value={speedForm.draft.min}
                         data-speed-field="min"
-                        onValueChange={value => setSpeedDraftField('min', value)}
-                        onBlur={() => commitSpeedField('min')}
-                        onKeyDown={handleSpeedKeyDown}
+                        onValueChange={value => speedForm.setField('min', value)}
+                        onBlur={() => speedForm.commitField('min')}
+                        onKeyDown={speedForm.handleKeyDown}
                     />
                     <NumericSettingField
                         id="max-speed"
@@ -426,11 +419,11 @@ export function OptionsApp() {
                         min={SPEED_LIMITS.max.min}
                         max={SPEED_LIMITS.max.max}
                         step={SPEED_LIMITS.step.inputStep}
-                        value={speedDraft.max}
+                        value={speedForm.draft.max}
                         data-speed-field="max"
-                        onValueChange={value => setSpeedDraftField('max', value)}
-                        onBlur={() => commitSpeedField('max')}
-                        onKeyDown={handleSpeedKeyDown}
+                        onValueChange={value => speedForm.setField('max', value)}
+                        onBlur={() => speedForm.commitField('max')}
+                        onKeyDown={speedForm.handleKeyDown}
                     />
                     <NumericSettingField
                         id="speed-step"
@@ -439,11 +432,11 @@ export function OptionsApp() {
                         min={SPEED_LIMITS.step.min}
                         max={SPEED_LIMITS.step.max}
                         step={SPEED_LIMITS.step.inputStep}
-                        value={speedDraft.step}
+                        value={speedForm.draft.step}
                         data-speed-field="step"
-                        onValueChange={value => setSpeedDraftField('step', value)}
-                        onBlur={() => commitSpeedField('step')}
-                        onKeyDown={handleSpeedKeyDown}
+                        onValueChange={value => speedForm.setField('step', value)}
+                        onBlur={() => speedForm.commitField('step')}
+                        onKeyDown={speedForm.handleKeyDown}
                     />
                   </FieldGroup>
                 </CardContent>
@@ -458,7 +451,7 @@ export function OptionsApp() {
                   <CardAction className="row-span-1 self-center">
                     <Button
                       variant="outline"
-                      onClick={resetSeekSettings}
+                      onClick={seekForm.reset}
                       aria-label={copy.resetSeekSettings}
                     >
                       <RotateCcwIcon data-icon="inline-start" />
@@ -475,10 +468,10 @@ export function OptionsApp() {
                       min={SEEK_LIMITS.seconds.min}
                       max={SEEK_LIMITS.seconds.max}
                       step={SEEK_LIMITS.seconds.inputStep}
-                      value={seekDraft.seconds}
-                      onValueChange={setSeekDraftSeconds}
-                      onBlur={commitSeekSeconds}
-                      onKeyDown={handleSeekKeyDown}
+                      value={seekForm.draft.seconds}
+                      onValueChange={seekForm.setSeconds}
+                      onBlur={seekForm.commit}
+                      onKeyDown={seekForm.handleKeyDown}
                     />
                   </FieldGroup>
                 </CardContent>
@@ -493,7 +486,7 @@ export function OptionsApp() {
                   <CardAction className="row-span-1 self-center">
                     <Button
                       variant="outline"
-                      onClick={resetSpaceHoldSettings}
+                      onClick={spaceHoldForm.reset}
                       aria-label={`${copy.reset} ${copy.holdSpeed}`}
                     >
                       <RotateCcwIcon data-icon="inline-start" />
@@ -517,6 +510,20 @@ export function OptionsApp() {
                         aria-label={`${copy.holdSpeed}: ${copy.holdSpeedEnabled}`}
                       />
                     </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <FieldLabel htmlFor="show-space-hold-hint">{copy.holdSpeedHint}</FieldLabel>
+                      <Switch
+                        id="show-space-hold-hint"
+                        checked={settings.spaceHold.showHint}
+                        onCheckedChange={showHint =>
+                          updateSettings(current => ({
+                            ...current,
+                            spaceHold: { ...current.spaceHold, showHint },
+                          }))
+                        }
+                        aria-label={`${copy.holdSpeed}: ${copy.holdSpeedHint}`}
+                      />
+                    </div>
                     <NumericSettingField
                         id="hold-speed"
                         label={copy.holdSpeedRate}
@@ -524,11 +531,11 @@ export function OptionsApp() {
                         min={SPACE_HOLD_LIMITS.speed.min}
                         max={SPACE_HOLD_LIMITS.speed.max}
                         step={SPACE_HOLD_LIMITS.speed.inputStep}
-                        value={spaceHoldDraft.speed}
+                        value={spaceHoldForm.draft.speed}
                         disabled={!settings.spaceHold.enabled}
-                        onValueChange={setSpaceHoldDraftSpeed}
-                        onBlur={commitSpaceHoldSpeed}
-                        onKeyDown={handleSpaceHoldKeyDown}
+                        onValueChange={spaceHoldForm.setSpeed}
+                        onBlur={spaceHoldForm.commit}
+                        onKeyDown={spaceHoldForm.handleKeyDown}
                     />
                   </FieldGroup>
                 </CardContent>

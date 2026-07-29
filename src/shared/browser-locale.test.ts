@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { getBrowserLocale, resolveBrowserLocale } from '@/shared/browser-locale'
+import {
+  getBrowserLocale,
+  resolveBrowserLocale,
+  resolveLocalePreference,
+} from '@/shared/browser-locale'
 
 describe('browser locale', () => {
   it.each([
@@ -22,5 +26,12 @@ describe('browser locale', () => {
     vi.mocked(chrome.i18n.getUILanguage).mockReturnValue('ko-KR')
 
     expect(getBrowserLocale()).toBe('ko')
+  })
+
+  it('resolves automatic preferences while preserving fixed preferences', () => {
+    vi.mocked(chrome.i18n.getUILanguage).mockReturnValue('zh-TW')
+
+    expect(resolveLocalePreference('auto')).toBe('zh-TW')
+    expect(resolveLocalePreference('ja')).toBe('ja')
   })
 })

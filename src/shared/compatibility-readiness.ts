@@ -2,7 +2,7 @@ import {
   isCompatibilityCoreReady,
   type CompatibilityDiagnostics,
 } from './diagnostics'
-import { isFirefoxBrowser } from './browser-info'
+import { getBrowserCapabilities } from './browser-capabilities'
 
 export type CompatibilityDiagnosticsState =
   | { status: 'loading'; diagnostics: null }
@@ -44,7 +44,7 @@ export const INITIAL_COMPATIBILITY_DIAGNOSTICS_STATE = {
 export const createCompatibilityReadinessPolicy = (
   userAgent = globalThis.navigator?.userAgent ?? ''
 ): CompatibilityReadinessPolicy => {
-  const requirePageBridge = !isFirefoxBrowser(userAgent)
+  const requirePageBridge = getBrowserCapabilities(userAgent).requiresNetflixPageBridge
   const missingReceiverRetryIntervalMs = 200
   const missingReceiverMaxAttempts = 3
   const diagnosticsRefreshIntervalMs = 2_000

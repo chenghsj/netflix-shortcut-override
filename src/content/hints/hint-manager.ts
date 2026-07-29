@@ -6,7 +6,6 @@ import {
 import {
   createHintIcon,
   mediaHintIcons,
-  PIP_DOCUMENT_MARKER,
   type HintIcon,
   type HintManager,
   type HintRequest,
@@ -14,7 +13,6 @@ import {
 import {
   getHintRenderDocument,
   getHintRenderHost,
-  isPipHintDocument,
   positionCenteredHint,
   positionLabeledHintLabel,
   positionSeekHint,
@@ -22,6 +20,7 @@ import {
   updateHintScale,
   type StyleMap,
 } from './hint-layout'
+import { isPipDocument } from '@/content/pip/pip-document'
 import {
   renderMediaHint,
   renderPlaybackHint,
@@ -36,7 +35,6 @@ import {
 export {
   createHintIcon,
   mediaHintIcons,
-  PIP_DOCUMENT_MARKER,
   type HintIcon,
   type HintManager,
   type HintRequest,
@@ -54,7 +52,7 @@ class DocumentHintManager implements HintManager {
 
   constructor(renderDoc: Document) {
     this.renderDoc = renderDoc
-    this.responsive = isPipHintDocument(renderDoc)
+    this.responsive = isPipDocument(renderDoc)
     this.attachResizeListener()
   }
 

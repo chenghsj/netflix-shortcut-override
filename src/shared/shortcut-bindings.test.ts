@@ -1,153 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  DEFAULT_SETTINGS,
-  SEEK_LIMITS,
-  SPACE_HOLD_LIMITS,
-  SPEED_LIMITS,
   findBindingConflict,
   findRemappedNetflixNativeActionForKey,
   formatKeyBinding,
   getKeyBindingLabels,
-  normalizeSeekSettings,
-  normalizeSpaceHoldSettings,
-  normalizeSpeedSettings,
-  normalizeSettings,
-  resolveNextPlaybackRate,
-} from '@/shared/shortcuts'
+} from '@/shared/shortcut-bindings'
+import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
 
-describe('shortcut settings', () => {
-  it('uses the planned speed defaults', () => {
-    expect(DEFAULT_SETTINGS.speed).toEqual({
-      min: 0.25,
-      max: 3,
-      step: 0.25,
-    })
-    expect(DEFAULT_SETTINGS.spaceHold).toEqual({
-      enabled: true,
-      speed: 2,
-    })
-    expect(DEFAULT_SETTINGS.seek).toEqual({
-      seconds: 10,
-    })
-  })
-
-
-  it('adds the PiP binding when normalizing settings saved before the feature existed', () => {
-    const normalized = normalizeSettings({
-      bindings: {
-        playPause: DEFAULT_SETTINGS.bindings.playPause,
-      },
-    })
-
-    expect(normalized.bindings.pictureInPicture).toEqual(
-      DEFAULT_SETTINGS.bindings.pictureInPicture
-    )
-  })
-
-  it('migrates the earlier Shift+W PiP default to Shift+P once', () => {
-    const normalized = normalizeSettings({
-      bindings: {
-        pictureInPicture: {
-          enabled: true,
-          key: {
-            code: 'KeyW',
-            key: 'W',
-            ctrl: false,
-            alt: false,
-            shift: true,
-            meta: false,
-          },
-        },
-      },
-    })
-
-    expect(normalized.bindings.pictureInPicture.key).toEqual(
-      DEFAULT_SETTINGS.bindings.pictureInPicture.key
-    )
-    expect(normalized.version).toBe(3)
-  })
-
-  it('keeps a custom Shift+W PiP binding after settings are versioned', () => {
-    const customBinding = {
-      code: 'KeyW',
-      key: 'W',
-      ctrl: false,
-      alt: false,
-      shift: true,
-      meta: false,
-    }
-
-    const normalized = normalizeSettings({
-      version: 2,
-      bindings: {
-        pictureInPicture: {
-          enabled: true,
-          key: customBinding,
-        },
-      },
-    })
-
-    expect(normalized.bindings.pictureInPicture.key).toEqual(customBinding)
-  })
-
-  it('keeps the speed input precision at 0.05 while default step is 0.25', () => {
-    expect(SPEED_LIMITS.step.inputStep).toBe(0.05)
-    expect(SPEED_LIMITS.step.max).toBe(4)
-    expect(normalizeSpeedSettings({ step: 0.35 }).step).toBe(0.35)
-    expect(normalizeSpeedSettings({ step: 3.5 }).step).toBe(3.5)
-  })
-
-  it('normalizes speed min max and step into safe bounds', () => {
-    expect(normalizeSpeedSettings({ min: 0.1, max: 8, step: 0.001 })).toEqual({
-      min: 0.25,
-      max: 4,
-      step: 0.05,
-    })
-    expect(normalizeSpeedSettings({ step: 8 }).step).toBe(4)
-  })
-
-  it('normalizes long-press Space settings independently', () => {
-    expect(SPACE_HOLD_LIMITS.speed.inputStep).toBe(0.05)
-    expect(normalizeSpaceHoldSettings({ enabled: false, speed: 2.35 })).toEqual({
-      enabled: false,
-      speed: 2.35,
-    })
-    expect(normalizeSpaceHoldSettings({ speed: 0.1 }).speed).toBe(0.25)
-    expect(normalizeSpaceHoldSettings({ speed: 8 }).speed).toBe(4)
-  })
-
-  it('migrates the legacy long-press Space speed without changing its enabled state', () => {
-    const normalized = normalizeSettings({
-      version: 2,
-      speed: { min: 0.25, max: 3, step: 0.25, hold: 2.35 },
-    })
-
-    expect(normalized.spaceHold).toEqual({ enabled: true, speed: 2.35 })
-  })
-
-  it('normalizes seek seconds into safe whole-second bounds', () => {
-    expect(SEEK_LIMITS.seconds.inputStep).toBe(1)
-    expect(normalizeSeekSettings({ seconds: 15.4 }).seconds).toBe(15)
-    expect(normalizeSeekSettings({ seconds: 0 }).seconds).toBe(1)
-    expect(normalizeSeekSettings({ seconds: 180 }).seconds).toBe(60)
-  })
-
-  it('uses the configured step and clamps playback rate', () => {
-    expect(resolveNextPlaybackRate(1, 1, { min: 0.25, max: 1.1, step: 0.05 })).toBe(1.05)
-    expect(resolveNextPlaybackRate(1.09, 1, { min: 0.25, max: 1.1, step: 0.05 })).toBe(1.1)
-    expect(resolveNextPlaybackRate(1, -1, { min: 0.25, max: 3, step: 1.5 })).toBe(0.25)
-  })
-
-  it('does not skip across 1x when the speed step is large', () => {
-    const speed = { min: 0.25, max: 3, step: 1.5 }
-
-    expect(resolveNextPlaybackRate(1, 1, speed)).toBe(2.5)
-    expect(resolveNextPlaybackRate(2.5, -1, speed)).toBe(1)
-    expect(resolveNextPlaybackRate(1.5, -1, speed)).toBe(1)
-    expect(resolveNextPlaybackRate(0.25, 1, speed)).toBe(1)
-  })
-
+describe('shortcut bindings', () => {
   it('detects duplicate keybindings', () => {
     const conflict = findBindingConflict(
       DEFAULT_SETTINGS,
@@ -175,6 +36,17 @@ describe('shortcut settings', () => {
     )
 
     expect(conflict).toBe('playPause')
+  })
+
+  it('can ignore browser-unsupported actions when checking conflicts', () => {
+    const conflict = findBindingConflict(
+      DEFAULT_SETTINGS,
+      'playPause',
+      DEFAULT_SETTINGS.bindings.pictureInPicture.key,
+      { ignoredActions: ['pictureInPicture'] }
+    )
+
+    expect(conflict).toBeNull()
   })
 
   it('identifies original Netflix keys for enabled actions that have been remapped', () => {

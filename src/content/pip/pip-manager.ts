@@ -1,6 +1,5 @@
-import { findVideo } from '@/content/dom-utils'
-import { PIP_DOCUMENT_MARKER } from '@/content/hints/hint-manager'
-import { isFirefoxBrowser } from '@/shared/browser-info'
+import { canHandlePlaybackShortcut, findVideo } from '@/content/dom-utils'
+import { getBrowserCapabilities } from '@/shared/browser-capabilities'
 import { findSubtitleSearchRoot, SubtitleMirror } from './pip-subtitle-mirror'
 import { PipControls } from './pip-controls'
 import { createPipVideoHandoff } from './pip-video-handoff'
@@ -9,6 +8,12 @@ import {
   type NetflixPlaybackSession,
 } from '@/content/netflix-playback-session'
 import { VideoPlacement } from './video-placement'
+import { markPipDocument } from './pip-document'
+import { resolveLocalePreference } from '@/shared/browser-locale'
+import { getCopy } from '@/shared/i18n'
+import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
+import type { ShortcutSettings } from '@/shared/shortcut-types'
+import type { ShortcutCommandController } from '@/content/shortcuts/shortcut-command-controller'
 
 type DocumentPictureInPictureApi = {
   requestWindow: (options?: {
@@ -25,12 +30,30 @@ type WindowWithDocumentPictureInPicture = Window & {
 
 const PIP_INITIAL_WIDTH = 640
 const DEFAULT_VIDEO_ASPECT_RATIO = 16 / 9
+const PLAYBACK_CONTEXT_CHECK_INTERVAL_MS = 250
+const WATCH_ID_CHANGE_CLASSIFICATION_MS = 500
+const SOURCE_WATCH_CHANGE_USER_INTENT_MS = 1_500
+const EPISODE_TRANSITION_PAUSE_GUARD_MS = 8_000
+
+const getNetflixWatchId = (sourceWindow: Window): string | null =>
+  sourceWindow.location.pathname.match(/^\/watch\/([^/]+)/)?.[1] ?? null
+
+const hasInitializedPlayback = (video: HTMLVideoElement): boolean =>
+  !video.paused && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
 
 export type PipKeyboardHandlers = {
   onKeydown: (event: KeyboardEvent, targetDoc: Document) => void
   onKeyup: (event: KeyboardEvent, targetDoc: Document) => void
   onBlur?: (targetDoc: Document) => void
   onClick?: (event: MouseEvent, targetDoc: Document) => void
+}
+
+type PipManagerOptions = PipKeyboardHandlers & {
+  sourceDocument?: Document
+  playbackSession?: NetflixPlaybackSession
+  commands?: Pick<ShortcutCommandController, 'execute' | 'setVolume'>
+  settings?: ShortcutSettings
+  onSettingsChange?: (settings: ShortcutSettings) => void
 }
 
 const getDocumentPictureInPicture = (sourceWindow: Window): DocumentPictureInPictureApi | null => {
@@ -59,6 +82,9 @@ export class PipManager {
   private readonly keyboardHandlers: PipKeyboardHandlers
   private readonly videoPlacement: VideoPlacement
   private readonly playbackSession: NetflixPlaybackSession
+  private readonly commands: PipManagerOptions['commands']
+  private readonly onSettingsChange: PipManagerOptions['onSettingsChange']
+  private settings: ShortcutSettings
   private pipWindow: Window | null = null
 
   private subtitleMirror: SubtitleMirror | null = null
@@ -66,25 +92,29 @@ export class PipManager {
   private videoHandoff: ReturnType<typeof createPipVideoHandoff> | null = null
   private videoArea: HTMLElement | null = null
   private keyboardCleanup: (() => void) | null = null
+  private playbackContextCleanup: (() => void) | null = null
+  private episodeTransitionPauseCleanup: (() => void) | null = null
+  private pipEntryWatchId: string | null = null
+  private sourceWatchChangeIntentDeadline = 0
   private restoring = false
   private entering = false
   private entryVersion = 0
 
-  constructor(
-    options: PipKeyboardHandlers & {
-      sourceDocument?: Document
-      playbackSession?: NetflixPlaybackSession
-    }
-  ) {
+  constructor(options: PipManagerOptions) {
     const { sourceDocument, onKeydown, onKeyup, onBlur, onClick, playbackSession } = options
     this.sourceDocument = sourceDocument ?? document
     this.videoPlacement = new VideoPlacement(this.sourceDocument)
     this.playbackSession = playbackSession ?? createNetflixPlaybackSession()
+    this.commands = options.commands
     this.keyboardHandlers = { onKeydown, onKeyup, onBlur, onClick }
+    this.onSettingsChange = options.onSettingsChange
+    this.settings = options.settings ?? DEFAULT_SETTINGS
   }
 
   static isSupported(sourceWindow: Window = window): boolean {
-    if (isFirefoxBrowser(sourceWindow.navigator.userAgent)) return false
+    if (!getBrowserCapabilities(sourceWindow.navigator.userAgent).supportsSubtitlePreservingPip) {
+      return false
+    }
     return getDocumentPictureInPicture(sourceWindow) !== null
   }
 
@@ -100,6 +130,16 @@ export class PipManager {
     return this.getPipDocument() === targetDoc
   }
 
+  updateSettings(settings: ShortcutSettings): void {
+    this.settings = settings
+    this.subtitleMirror?.setSettings(settings.pip)
+    this.pipControls?.updateSettings(this.getControlsSettings())
+  }
+
+  recordUserSeek(): void {
+    this.videoHandoff?.recordUserSeek()
+  }
+
   async toggle(): Promise<boolean> {
     if (this.isActive) {
       this.exit()
@@ -111,6 +151,7 @@ export class PipManager {
 
   async enter(): Promise<boolean> {
     if (this.entering) return false
+    this.stopEpisodeTransitionPauseGuard()
     const entryVersion = ++this.entryVersion
     this.entering = true
 
@@ -118,10 +159,13 @@ export class PipManager {
       if (this.pipWindow?.closed) this.restore()
       const sourceWindow = this.sourceDocument.defaultView
       if (!sourceWindow || !PipManager.isSupported(sourceWindow) || this.isActive) return false
+      this.pipEntryWatchId = getNetflixWatchId(sourceWindow)
+      this.sourceWatchChangeIntentDeadline = 0
 
       const video = findVideo(this.sourceDocument)
       const parent = video?.parentElement
       if (!video || !parent) return false
+      const shouldMonitorPlaybackContext = canHandlePlaybackShortcut(this.sourceDocument)
 
       this.videoPlacement.prepare(video)
 
@@ -143,6 +187,7 @@ export class PipManager {
         pipWin.document.body.appendChild(videoArea)
         this.attachPipEventListeners(pipWin)
         this.startVideoHandoffMonitoring(pipWin, video, videoArea)
+        this.startPlaybackContextMonitoring(pipWin, shouldMonitorPlaybackContext)
         return true
       } catch {
         const failedWindow = pipWin
@@ -172,6 +217,7 @@ export class PipManager {
 
   destroy(): void {
     this.cancelPendingEntry()
+    this.stopEpisodeTransitionPauseGuard()
 
     const pipWin = this.pipWindow
     this.restore()
@@ -197,7 +243,7 @@ export class PipManager {
   private initPipDocument(pipWin: Window, sourceDocument: Document): void {
     if (!pipWin.document.body) throw new Error('PiP document has no body')
 
-    pipWin.document.documentElement.dataset[PIP_DOCUMENT_MARKER] = 'true'
+    markPipDocument(pipWin.document)
 
     this.copyStyles(pipWin, sourceDocument)
 
@@ -265,13 +311,6 @@ export class PipManager {
     videoArea: HTMLElement,
     fallbackSourceParent: HTMLElement
   ): void {
-    this.pipControls = new PipControls({
-      pipWindow: pipWin,
-      video,
-      videoArea,
-      playbackSession: this.playbackSession,
-    })
-    this.pipControls.start()
     this.subtitleMirror = new SubtitleMirror({
       sourceDocument: this.sourceDocument,
       searchRoot: findSubtitleSearchRoot(
@@ -280,8 +319,75 @@ export class PipManager {
       pipWindow: pipWin,
       video,
       videoArea,
+      settings: this.settings.pip,
     })
     this.subtitleMirror.start()
+    this.pipControls = new PipControls({
+      pipWindow: pipWin,
+      video,
+      videoArea,
+      seekTo: milliseconds => {
+        this.recordUserSeek()
+        return this.playbackSession.seekTo(milliseconds)
+      },
+      resumeAfterSeek: () => this.playbackSession.play(video),
+      onVisibilityChange: visible => this.subtitleMirror?.setControlsVisible(visible),
+      settings: this.getControlsSettings(),
+      onAction: action => this.executeControlAction(action, pipWin.document, video),
+      onVolumeChange: volume => this.executeVolumeChange(volume, pipWin.document, video),
+      onPipSettingsChange: settings => {
+        const nextSettings = { ...this.settings, pip: settings }
+        this.updateSettings(nextSettings)
+        this.onSettingsChange?.(nextSettings)
+      },
+    })
+    this.pipControls.start()
+  }
+
+  private getControlsSettings() {
+    const copy = getCopy(resolveLocalePreference(this.settings.locale)).pipControls
+    return {
+      seekSeconds: this.settings.seek.seconds,
+      pip: this.settings.pip,
+      copy,
+    }
+  }
+
+  private executeControlAction(
+    action: 'playPause' | 'seekBackward' | 'seekForward' | 'mute',
+    targetDoc: Document,
+    video: HTMLVideoElement
+  ): void {
+    if (action === 'seekBackward' || action === 'seekForward') {
+      this.recordUserSeek()
+    }
+    if (this.commands) {
+      this.commands.execute(action, targetDoc)
+      return
+    }
+
+    if (action === 'playPause') {
+      void this.playbackSession.togglePlayback(video)
+      return
+    }
+    if (action === 'mute') {
+      this.playbackSession.toggleMute(video)
+      return
+    }
+    const direction = action === 'seekBackward' ? -1 : 1
+    void this.playbackSession.seekBy(direction * this.settings.seek.seconds * 1_000)
+  }
+
+  private executeVolumeChange(
+    volume: number,
+    targetDoc: Document,
+    video: HTMLVideoElement
+  ): void {
+    if (this.commands) {
+      this.commands.setVolume(volume, targetDoc)
+      return
+    }
+    this.playbackSession.setVolume(video, volume)
   }
 
   private startVideoHandoffMonitoring(
@@ -309,9 +415,142 @@ export class PipManager {
         )
         return true
       },
+      onEpisodeTransition: candidate => {
+        if (!this.isManualSourceWatchChange()) {
+          this.guardEpisodeTransitionPause(candidate)
+        }
+        this.exit()
+      },
       onTimeout: () => this.exit(),
     })
     this.videoHandoff.start()
+  }
+
+  private guardEpisodeTransitionPause(video: HTMLVideoElement): void {
+    this.stopEpisodeTransitionPauseGuard()
+
+    const sourceWindow = this.sourceDocument.defaultView
+    if (!sourceWindow) {
+      void this.playbackSession.pause(video)
+      return
+    }
+
+    const onPlaybackInitialized = (event: Event) => {
+      const candidate = event.target
+      if (!(candidate instanceof HTMLVideoElement)) return
+      void this.playbackSession.pause(candidate)
+    }
+    const onUserInteraction = () => this.stopEpisodeTransitionPauseGuard()
+    const timeoutId = sourceWindow.setTimeout(
+      () => this.stopEpisodeTransitionPauseGuard(),
+      EPISODE_TRANSITION_PAUSE_GUARD_MS
+    )
+
+    this.sourceDocument.addEventListener('playing', onPlaybackInitialized, true)
+    this.sourceDocument.addEventListener('pointerdown', onUserInteraction, true)
+    this.sourceDocument.addEventListener('keydown', onUserInteraction, true)
+    this.episodeTransitionPauseCleanup = () => {
+      sourceWindow.clearTimeout(timeoutId)
+      this.sourceDocument.removeEventListener('playing', onPlaybackInitialized, true)
+      this.sourceDocument.removeEventListener('pointerdown', onUserInteraction, true)
+      this.sourceDocument.removeEventListener('keydown', onUserInteraction, true)
+      this.episodeTransitionPauseCleanup = null
+    }
+
+    if (hasInitializedPlayback(video)) {
+      void this.playbackSession.pause(video)
+    }
+  }
+
+  private stopEpisodeTransitionPauseGuard(): void {
+    this.episodeTransitionPauseCleanup?.()
+  }
+
+  private isManualSourceWatchChange(): boolean {
+    const sourceWindow = this.sourceDocument.defaultView
+    return Boolean(
+      sourceWindow &&
+      this.pipEntryWatchId !== null &&
+      getNetflixWatchId(sourceWindow) !== this.pipEntryWatchId &&
+      Date.now() <= this.sourceWatchChangeIntentDeadline
+    )
+  }
+
+  private startPlaybackContextMonitoring(
+    pipWin: Window,
+    shouldMonitor: boolean
+  ): void {
+    this.playbackContextCleanup?.()
+    this.playbackContextCleanup = null
+    if (!shouldMonitor) return
+
+    const sourceWindow = this.sourceDocument.defaultView
+    if (!sourceWindow) return
+    const initialWatchId = this.pipEntryWatchId
+    let watchIdChangeTimeoutId: number | null = null
+
+    const recordSourceWatchChangeIntent = () => {
+      this.sourceWatchChangeIntentDeadline =
+        Date.now() + SOURCE_WATCH_CHANGE_USER_INTENT_MS
+    }
+
+    const clearWatchIdChangeTimeout = () => {
+      if (watchIdChangeTimeoutId === null) return
+      sourceWindow.clearTimeout(watchIdChangeTimeoutId)
+      watchIdChangeTimeoutId = null
+    }
+    const scheduleWatchIdChangeExit = () => {
+      if (watchIdChangeTimeoutId !== null) return
+      watchIdChangeTimeoutId = sourceWindow.setTimeout(() => {
+        watchIdChangeTimeoutId = null
+        if (this.pipWindow !== pipWin || !this.isActive) return
+        if (getNetflixWatchId(sourceWindow) === initialWatchId) return
+        if (this.videoHandoff?.isEpisodeTransitionPending()) {
+          scheduleWatchIdChangeExit()
+          return
+        }
+        this.exit()
+      }, WATCH_ID_CHANGE_CLASSIFICATION_MS)
+    }
+
+    const exitIfPlaybackContextEnded = () => {
+      if (this.pipWindow !== pipWin || !this.isActive) return
+      if (!canHandlePlaybackShortcut(this.sourceDocument)) {
+        this.exit()
+        return
+      }
+      if (getNetflixWatchId(sourceWindow) !== initialWatchId) {
+        if (this.isManualSourceWatchChange()) {
+          this.exit()
+          return
+        }
+        scheduleWatchIdChangeExit()
+      } else {
+        clearWatchIdChangeTimeout()
+      }
+    }
+    const onSourcePagehide = () => {
+      if (this.pipWindow === pipWin) this.exit()
+    }
+    const intervalId = sourceWindow.setInterval(
+      exitIfPlaybackContextEnded,
+      PLAYBACK_CONTEXT_CHECK_INTERVAL_MS
+    )
+    sourceWindow.addEventListener('popstate', exitIfPlaybackContextEnded)
+    sourceWindow.addEventListener('hashchange', exitIfPlaybackContextEnded)
+    sourceWindow.addEventListener('pagehide', onSourcePagehide)
+    this.sourceDocument.addEventListener('pointerdown', recordSourceWatchChangeIntent, true)
+    this.sourceDocument.addEventListener('keydown', recordSourceWatchChangeIntent, true)
+
+    this.playbackContextCleanup = () => {
+      clearWatchIdChangeTimeout()
+      sourceWindow.clearInterval(intervalId)
+      sourceWindow.removeEventListener('popstate', exitIfPlaybackContextEnded)
+      sourceWindow.removeEventListener('hashchange', exitIfPlaybackContextEnded)
+      sourceWindow.removeEventListener('pagehide', onSourcePagehide)
+      this.sourceDocument.removeEventListener('pointerdown', recordSourceWatchChangeIntent, true)
+      this.sourceDocument.removeEventListener('keydown', recordSourceWatchChangeIntent, true)
+    }
   }
 
   private copyStyles(pipWin: Window, sourceDocument: Document): void {
@@ -326,6 +565,8 @@ export class PipManager {
 
     this.videoHandoff?.stop()
     this.videoHandoff = null
+    this.playbackContextCleanup?.()
+    this.playbackContextCleanup = null
     this.keyboardCleanup?.()
     this.keyboardCleanup = null
     this.cleanupVideoBindings()
@@ -333,6 +574,8 @@ export class PipManager {
 
     this.videoPlacement.restore()
     this.videoArea = null
+    this.pipEntryWatchId = null
+    this.sourceWatchChangeIntentDeadline = 0
     this.restoring = false
   }
 

@@ -14,8 +14,8 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { getCopy } from '@/shared/i18n'
+import type { CompatibilityDiagnosticsState } from '@/shared/compatibility-readiness'
 import type {
-  CompatibilityDiagnosticsState,
   CompatibilityDiagnosticsTriggerState,
 } from '@/popup/use-compatibility-session'
 

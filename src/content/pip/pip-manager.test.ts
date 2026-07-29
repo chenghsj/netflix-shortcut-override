@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { createNetflixPlaybackSession } from '@/content/netflix-playback-session'
+import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
 import { PipManager } from './pip-manager'
 import { VideoPlacement } from './video-placement'
 
@@ -7,6 +9,23 @@ const flushPipFrames = async (targetWindow: Window): Promise<void> => {
   await Promise.resolve()
   await new Promise<void>(resolve => targetWindow.requestAnimationFrame(() => resolve()))
   await Promise.resolve()
+}
+
+const createRenderableVideo = (): HTMLVideoElement => {
+  const video = document.createElement('video')
+  video.getBoundingClientRect = () =>
+    ({
+      x: 0,
+      y: 0,
+      top: 0,
+      right: 640,
+      bottom: 360,
+      left: 0,
+      width: 640,
+      height: 360,
+      toJSON: () => ({}),
+    }) as DOMRect
+  return video
 }
 
 describe('PipManager', () => {
@@ -109,6 +128,166 @@ describe('PipManager', () => {
 
     manager.exit()
     expect(pipWindow.document.querySelector('[data-shortcut-override-pip-controls]')).toBeNull()
+  })
+
+  it('keeps PiP command routing and settings changes behind the manager', async () => {
+    const transport = vi.fn().mockResolvedValue({ success: true })
+    const onSettingsChange = vi.fn()
+    manager = new PipManager({
+      onKeydown: vi.fn(),
+      onKeyup: vi.fn(),
+      playbackSession: createNetflixPlaybackSession(transport),
+      onSettingsChange,
+      settings: {
+        ...DEFAULT_SETTINGS,
+        locale: 'zh-TW',
+        seek: { seconds: 5 },
+      },
+    })
+    const video = document.createElement('video')
+    video.volume = 0.7
+    const subtitle = document.createElement('div')
+    subtitle.className = 'player-timedtext'
+    subtitle.style.fontSize = '16px'
+    subtitle.textContent = '字幕'
+    document.body.append(video, subtitle)
+
+    expect(await manager.enter()).toBe(true)
+    await flushPipFrames(pipWindow)
+    const rewind = pipWindow.document.querySelector<HTMLButtonElement>(
+      '[data-pip-control="seek-backward"]'
+    )
+    const volume = pipWindow.document.querySelector<HTMLInputElement>(
+      '[data-pip-control="volume"]'
+    )
+    expect(rewind).toHaveAccessibleName('倒轉 5 秒')
+
+    rewind?.click()
+    expect(transport).toHaveBeenCalledWith('seek', -5_000)
+
+    manager.updateSettings({
+      ...DEFAULT_SETTINGS,
+      locale: 'zh-TW',
+      seek: { seconds: 25 },
+      pip: {
+        subtitlesEnabled: true,
+        subtitleSize: 'large',
+        subtitleBackground: 'translucent',
+      },
+    })
+    await flushPipFrames(pipWindow)
+    expect(rewind).toHaveAccessibleName('倒轉 25 秒')
+    expect(
+      pipWindow.document.querySelector<HTMLElement>('#shortcut-override-pip-subtitle > div')?.style
+        .fontSize
+    ).toBe('20px')
+
+    if (!volume) throw new Error('Expected volume slider')
+    volume.value = '40'
+    volume.dispatchEvent(new Event('change', { bubbles: true }))
+    expect(transport).toHaveBeenCalledWith('setVolume', 0.4)
+
+    pipWindow.document
+      .querySelector<HTMLButtonElement>('[data-pip-control="subtitles-button"]')
+      ?.click()
+    pipWindow.document
+      .querySelector<HTMLButtonElement>('[data-pip-control="subtitle-switch"]')
+      ?.click()
+    expect(onSettingsChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pip: {
+          subtitlesEnabled: false,
+          subtitleSize: 'large',
+          subtitleBackground: 'translucent',
+        },
+      })
+    )
+    await flushPipFrames(pipWindow)
+    expect(pipWindow.document.getElementById('shortcut-override-pip-subtitle')).toHaveStyle({
+      visibility: 'hidden',
+    })
+  })
+
+  it('resumes an ended Netflix episode after seeking back from PiP', async () => {
+    const transport = vi.fn().mockResolvedValue({
+      success: true,
+      result: { seekCalled: true },
+    })
+    manager = new PipManager({
+      onKeydown: vi.fn(),
+      onKeyup: vi.fn(),
+      playbackSession: createNetflixPlaybackSession(transport),
+    })
+    const video = document.createElement('video')
+    Object.defineProperties(video, {
+      currentTime: { configurable: true, value: 240 },
+      duration: { configurable: true, value: 240 },
+      ended: { configurable: true, value: true },
+      paused: { configurable: true, value: true },
+      play: { configurable: true, value: vi.fn().mockResolvedValue(undefined) },
+    })
+    document.body.appendChild(video)
+
+    expect(await manager.enter()).toBe(true)
+    expect(video.ended).toBe(true)
+    const timeline = pipWindow.document.querySelector<HTMLInputElement>(
+      '[data-pip-control="timeline"]'
+    )
+    if (!timeline) throw new Error('Expected PiP timeline')
+
+    timeline.value = '180'
+    timeline.dispatchEvent(new Event('input', { bubbles: true }))
+    timeline.dispatchEvent(new Event('change', { bubbles: true }))
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(transport.mock.calls.map(([action]) => action)).toEqual(['seekTo', 'play'])
+  })
+
+  it('cancels an ended-episode resume when PiP closes during a seek', async () => {
+    let resolveSeek: (response: { success: boolean; result?: { seekCalled: boolean } }) => void = () => undefined
+    const transport = vi.fn().mockImplementation((action: string) => {
+      if (action === 'seekTo') {
+        return new Promise<{ success: boolean; result?: { seekCalled: boolean } }>(resolve => {
+          resolveSeek = resolve
+        })
+      }
+      return Promise.resolve({ success: true, result: { action } })
+    })
+    manager = new PipManager({
+      onKeydown: vi.fn(),
+      onKeyup: vi.fn(),
+      playbackSession: createNetflixPlaybackSession(transport),
+    })
+    const video = document.createElement('video')
+    Object.defineProperties(video, {
+      currentTime: { configurable: true, value: 240 },
+      duration: { configurable: true, value: 240 },
+      ended: { configurable: true, value: true },
+      paused: { configurable: true, value: true },
+      play: { configurable: true, value: vi.fn().mockResolvedValue(undefined) },
+    })
+    document.body.appendChild(video)
+
+    expect(await manager.enter()).toBe(true)
+    const timeline = pipWindow.document.querySelector<HTMLInputElement>(
+      '[data-pip-control="timeline"]'
+    )
+    if (!timeline) throw new Error('Expected PiP timeline')
+
+    timeline.value = '180'
+    timeline.dispatchEvent(new Event('input', { bubbles: true }))
+    timeline.dispatchEvent(new Event('change', { bubbles: true }))
+    manager.exit()
+    resolveSeek({ success: true, result: { seekCalled: true } })
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(transport.mock.calls.map(([action]) => action)).toEqual(['seekTo'])
   })
 
   it('restores PiP shortcuts after the timeline is released', async () => {
@@ -302,6 +481,122 @@ describe('PipManager', () => {
     expect(video.nextElementSibling).toBeNull()
   })
 
+  it('closes PiP when the source leaves the Netflix playback context', async () => {
+    vi.useFakeTimers()
+    const originalUrl = window.location.href
+    window.history.replaceState({}, '', '/watch/123')
+    const video = document.createElement('video')
+    document.body.appendChild(video)
+
+    try {
+      expect(await manager.enter()).toBe(true)
+
+      window.history.pushState({}, '', '/browse')
+      await vi.advanceTimersByTimeAsync(300)
+
+      expect(manager.isActive).toBe(false)
+      expect(pipWindow.close).toHaveBeenCalledOnce()
+      expect(video.ownerDocument).toBe(document)
+      expect(video.parentElement).toBe(document.body)
+    } finally {
+      window.history.replaceState({}, '', originalUrl)
+    }
+  })
+
+  it('closes PiP when the source tab switches to a different watch title', async () => {
+    vi.useFakeTimers()
+    const transport = vi.fn().mockResolvedValue({ success: true })
+    manager = new PipManager({
+      onKeydown: vi.fn(),
+      onKeyup: vi.fn(),
+      playbackSession: createNetflixPlaybackSession(transport),
+    })
+    const originalUrl = window.location.href
+    window.history.replaceState({}, '', '/watch/123?trackId=old')
+    const video = document.createElement('video')
+    document.body.appendChild(video)
+
+    try {
+      expect(await manager.enter()).toBe(true)
+
+      document.dispatchEvent(new Event('pointerdown'))
+      window.history.pushState({}, '', '/watch/456?trackId=new')
+      video.dispatchEvent(new Event('emptied'))
+      const nextVideo = createRenderableVideo()
+      document.body.appendChild(nextVideo)
+      await Promise.resolve()
+      await Promise.resolve()
+      await vi.advanceTimersByTimeAsync(300)
+
+      expect(manager.isActive).toBe(false)
+      expect(pipWindow.close).toHaveBeenCalledOnce()
+      expect(video.ownerDocument).toBe(document)
+      expect(video.parentElement).toBe(document.body)
+      expect(transport).not.toHaveBeenCalledWith('pause')
+    } finally {
+      window.history.replaceState({}, '', originalUrl)
+    }
+  })
+
+  it('pauses an automatic episode transition when the watch ID changes first', async () => {
+    vi.useFakeTimers()
+    const transport = vi.fn().mockResolvedValue({ success: true })
+    manager = new PipManager({
+      onKeydown: vi.fn(),
+      onKeyup: vi.fn(),
+      playbackSession: createNetflixPlaybackSession(transport),
+    })
+    const originalUrl = window.location.href
+    window.history.replaceState({}, '', '/watch/123')
+    const video = document.createElement('video')
+    document.body.appendChild(video)
+
+    try {
+      expect(await manager.enter()).toBe(true)
+
+      window.history.pushState({}, '', '/watch/456')
+      await vi.advanceTimersByTimeAsync(300)
+      video.dispatchEvent(new Event('ended'))
+      await vi.advanceTimersByTimeAsync(500)
+
+      expect(manager.isActive).toBe(true)
+
+      const nextVideo = createRenderableVideo()
+      document.body.appendChild(nextVideo)
+      await Promise.resolve()
+      await Promise.resolve()
+      await vi.advanceTimersByTimeAsync(300)
+      nextVideo.dispatchEvent(new Event('playing'))
+      await Promise.resolve()
+
+      expect(transport).toHaveBeenCalledWith('pause')
+      expect(manager.isActive).toBe(false)
+      expect(pipWindow.close).toHaveBeenCalledOnce()
+    } finally {
+      window.history.replaceState({}, '', originalUrl)
+    }
+  })
+
+  it('keeps PiP open when only the current watch URL query changes', async () => {
+    vi.useFakeTimers()
+    const originalUrl = window.location.href
+    window.history.replaceState({}, '', '/watch/123?trackId=old')
+    const video = document.createElement('video')
+    document.body.appendChild(video)
+
+    try {
+      expect(await manager.enter()).toBe(true)
+
+      window.history.pushState({}, '', '/watch/123?trackId=new')
+      await vi.advanceTimersByTimeAsync(300)
+
+      expect(manager.isActive).toBe(true)
+      expect(pipWindow.close).not.toHaveBeenCalled()
+    } finally {
+      window.history.replaceState({}, '', originalUrl)
+    }
+  })
+
   it('keeps PiP open and adopts the next Netflix video element', async () => {
     vi.useFakeTimers()
     const firstVideo = document.createElement('video')
@@ -310,7 +605,7 @@ describe('PipManager', () => {
     expect(await manager.enter()).toBe(true)
 
     document.body.appendChild(firstVideo)
-    const nextVideo = document.createElement('video')
+    const nextVideo = createRenderableVideo()
     Object.defineProperty(nextVideo, 'currentTime', { configurable: true, value: 4 })
     Object.defineProperty(nextVideo, 'duration', { configurable: true, value: 1_800 })
     document.body.appendChild(nextVideo)
@@ -336,7 +631,7 @@ describe('PipManager', () => {
 
   it('keeps PiP open when Netflix reuses the same video element for the next episode', async () => {
     vi.useFakeTimers()
-    const video = document.createElement('video')
+    const video = createRenderableVideo()
     document.body.appendChild(video)
 
     expect(await manager.enter()).toBe(true)
@@ -353,7 +648,7 @@ describe('PipManager', () => {
 
   it('adopts a replacement video that appears after the old video was reattached', async () => {
     vi.useFakeTimers()
-    const firstVideo = document.createElement('video')
+    const firstVideo = createRenderableVideo()
     document.body.appendChild(firstVideo)
 
     expect(await manager.enter()).toBe(true)
@@ -364,7 +659,7 @@ describe('PipManager', () => {
     await vi.advanceTimersByTimeAsync(300)
     expect(pipWindow.document.querySelector('video')).toBe(firstVideo)
 
-    const nextVideo = document.createElement('video')
+    const nextVideo = createRenderableVideo()
     document.body.appendChild(nextVideo)
     await Promise.resolve()
     await Promise.resolve()
@@ -376,6 +671,67 @@ describe('PipManager', () => {
     firstVideo.dispatchEvent(new Event('ended'))
     await vi.advanceTimersByTimeAsync(300)
     expect(pipWindow.document.querySelector('video')).toBe(nextVideo)
+  })
+
+  it('adopts the most presentation-ready replacement instead of the first video', async () => {
+    vi.useFakeTimers()
+    const player = document.createElement('div')
+    player.className = 'watch-video'
+    const firstVideo = document.createElement('video')
+    player.appendChild(firstVideo)
+    document.body.appendChild(player)
+
+    expect(await manager.enter()).toBe(true)
+
+    firstVideo.dispatchEvent(new Event('error'))
+    const staleVideo = document.createElement('video')
+    Object.defineProperty(staleVideo, 'readyState', { configurable: true, value: 0 })
+    const readyVideo = document.createElement('video')
+    Object.defineProperties(readyVideo, {
+      readyState: { configurable: true, value: HTMLMediaElement.HAVE_CURRENT_DATA },
+      videoWidth: { configurable: true, value: 1920 },
+      videoHeight: { configurable: true, value: 1080 },
+    })
+    player.append(staleVideo, readyVideo)
+    await Promise.resolve()
+    await Promise.resolve()
+    await vi.advanceTimersByTimeAsync(300)
+
+    expect(manager.isActive).toBe(true)
+    expect(pipWindow.document.querySelector('video')).toBe(readyVideo)
+    expect(staleVideo.ownerDocument).toBe(document)
+  })
+
+  it('ranks replacement candidates globally across Netflix player roots', async () => {
+    vi.useFakeTimers()
+    const rememberedPlayer = document.createElement('div')
+    rememberedPlayer.className = 'watch-video'
+    const otherPlayer = document.createElement('div')
+    otherPlayer.className = 'watch-video--player-view'
+    const firstVideo = document.createElement('video')
+    rememberedPlayer.appendChild(firstVideo)
+    document.body.append(rememberedPlayer, otherPlayer)
+
+    expect(await manager.enter()).toBe(true)
+
+    firstVideo.dispatchEvent(new Event('error'))
+    const staleVideo = document.createElement('video')
+    Object.defineProperty(staleVideo, 'readyState', { configurable: true, value: 0 })
+    const readyVideo = document.createElement('video')
+    Object.defineProperties(readyVideo, {
+      readyState: { configurable: true, value: HTMLMediaElement.HAVE_CURRENT_DATA },
+      videoWidth: { configurable: true, value: 1920 },
+      videoHeight: { configurable: true, value: 1080 },
+    })
+    rememberedPlayer.appendChild(staleVideo)
+    otherPlayer.appendChild(readyVideo)
+    await Promise.resolve()
+    await Promise.resolve()
+    await vi.advanceTimersByTimeAsync(300)
+
+    expect(manager.isActive).toBe(true)
+    expect(pipWindow.document.querySelector('video')).toBe(readyVideo)
+    expect(staleVideo.ownerDocument).toBe(document)
   })
 
   it('ignores unrelated source videos when the PiP video never detached', async () => {
@@ -396,26 +752,277 @@ describe('PipManager', () => {
     expect(unrelatedVideo.ownerDocument).toBe(document)
   })
 
-  it('adopts the next episode when Netflix ends the PiP video without detaching it', async () => {
+  it('does not treat a sibling video observed before the boundary as the next episode', async () => {
     vi.useFakeTimers()
+    const transport = vi.fn().mockResolvedValue({ success: true })
+    manager = new PipManager({
+      onKeydown: vi.fn(),
+      onKeyup: vi.fn(),
+      playbackSession: createNetflixPlaybackSession(transport),
+    })
+    const player = document.createElement('div')
+    player.className = 'watch-video'
+    const currentVideo = document.createElement('video')
+    const staleSibling = createRenderableVideo()
+    player.append(currentVideo, staleSibling)
+    document.body.appendChild(player)
+
+    expect(await manager.enter()).toBe(true)
+
+    currentVideo.dispatchEvent(new Event('ended'))
+    await Promise.resolve()
+    await Promise.resolve()
+    await vi.advanceTimersByTimeAsync(300)
+
+    expect(manager.isActive).toBe(true)
+    expect(pipWindow.document.querySelector('video')).toBe(staleSibling)
+    expect(transport).not.toHaveBeenCalledWith('pause')
+    expect(pipWindow.close).not.toHaveBeenCalled()
+  })
+
+  it('pauses the next episode and closes PiP without focusing the Netflix page', async () => {
+    vi.useFakeTimers()
+    const replaceVideo = vi.spyOn(VideoPlacement.prototype, 'replaceVideo')
+    const transport = vi.fn().mockResolvedValue({ success: true })
+    manager = new PipManager({
+      onKeydown: vi.fn(),
+      onKeyup: vi.fn(),
+      playbackSession: createNetflixPlaybackSession(transport),
+    })
+    const focus = vi.spyOn(window, 'focus')
     const firstVideo = document.createElement('video')
     document.body.appendChild(firstVideo)
 
     expect(await manager.enter()).toBe(true)
 
     firstVideo.dispatchEvent(new Event('ended'))
+    const nextVideo = createRenderableVideo()
+    const pause = vi.spyOn(nextVideo, 'pause')
+    document.body.appendChild(nextVideo)
+    await Promise.resolve()
+    await Promise.resolve()
+    await vi.advanceTimersByTimeAsync(300)
+    nextVideo.dispatchEvent(new Event('playing'))
+    await Promise.resolve()
+
+    expect(pause).toHaveBeenCalledOnce()
+    expect(transport).toHaveBeenCalledWith('pause')
+    expect(manager.isActive).toBe(false)
+    expect(pipWindow.close).toHaveBeenCalledOnce()
+    expect(replaceVideo).toHaveBeenCalledWith(nextVideo, expect.anything())
+    expect(nextVideo.ownerDocument).toBe(document)
+    expect(focus).not.toHaveBeenCalled()
+  })
+
+  it('does not detach the next episode after Netflix binds its metadata and controls', async () => {
+    vi.useFakeTimers()
+    const player = document.createElement('div')
+    player.className = 'watch-video'
+    const firstVideo = document.createElement('video')
+    player.appendChild(firstVideo)
+    document.body.appendChild(player)
+
+    expect(await manager.enter()).toBe(true)
+
+    let nextReadyState: number = HTMLMediaElement.HAVE_NOTHING
+    let netflixSessionBound = false
+    let netflixSessionValid = true
     const nextVideo = document.createElement('video')
+    Object.defineProperty(nextVideo, 'readyState', {
+      configurable: true,
+      get: () => nextReadyState,
+    })
+    const netflixPlayerObserver = new MutationObserver(records => {
+      const removedAfterBinding = records.some(record =>
+        Array.from(record.removedNodes).includes(nextVideo)
+      )
+      if (netflixSessionBound && removedAfterBinding) netflixSessionValid = false
+    })
+    netflixPlayerObserver.observe(player, { childList: true, subtree: true })
+
+    try {
+      firstVideo.dispatchEvent(new Event('ended'))
+      player.appendChild(nextVideo)
+      await Promise.resolve()
+      await Promise.resolve()
+      await vi.advanceTimersByTimeAsync(250)
+
+      netflixSessionBound = true
+      nextReadyState = HTMLMediaElement.HAVE_CURRENT_DATA
+      await vi.advanceTimersByTimeAsync(300)
+      await Promise.resolve()
+
+      expect(manager.isActive).toBe(false)
+      expect(netflixSessionValid).toBe(true)
+      expect(nextVideo.parentElement).toBe(player)
+    } finally {
+      netflixPlayerObserver.disconnect()
+    }
+  })
+
+  it('reasserts pause when the next Netflix session starts after PiP closes', async () => {
+    vi.useFakeTimers()
+    const transport = vi.fn().mockResolvedValue({
+      success: true,
+      result: {
+        playerApiFound: true,
+        playerFound: true,
+        sessionIds: ['episode-session'],
+        sessionId: 'episode-session',
+      },
+    })
+    manager = new PipManager({
+      onKeydown: vi.fn(),
+      onKeyup: vi.fn(),
+      playbackSession: createNetflixPlaybackSession(transport),
+    })
+    const firstVideo = document.createElement('video')
+    document.body.appendChild(firstVideo)
+
+    expect(await manager.enter()).toBe(true)
+
+    firstVideo.dispatchEvent(new Event('ended'))
+    const nextVideo = createRenderableVideo()
+    const pause = vi.spyOn(nextVideo, 'pause')
     document.body.appendChild(nextVideo)
     await Promise.resolve()
     await Promise.resolve()
     await vi.advanceTimersByTimeAsync(300)
 
-    expect(manager.isActive).toBe(true)
-    expect(pipWindow.close).not.toHaveBeenCalled()
-    expect(pipWindow.document.querySelector('video')).toBe(nextVideo)
+    expect(pause).not.toHaveBeenCalled()
+    expect(manager.isActive).toBe(false)
+    expect(pipWindow.close).toHaveBeenCalledOnce()
+
+    nextVideo.dispatchEvent(new Event('playing'))
+    await Promise.resolve()
+
+    expect(pause).toHaveBeenCalledOnce()
+    expect(transport).toHaveBeenCalledOnce()
+
+    await vi.advanceTimersByTimeAsync(2_001)
+    nextVideo.dispatchEvent(new Event('playing'))
+    await Promise.resolve()
+
+    expect(pause).toHaveBeenCalledTimes(2)
+    expect(transport).toHaveBeenCalledTimes(2)
+
+    await vi.advanceTimersByTimeAsync(6_000)
+    nextVideo.dispatchEvent(new Event('playing'))
+    await Promise.resolve()
+
+    expect(pause).toHaveBeenCalledTimes(2)
+    expect(transport).toHaveBeenCalledTimes(2)
   })
 
-  it('uses the previous video size while the next episode metadata is still unavailable', async () => {
+  it('waits for replacement playback initialization before pausing the next episode', async () => {
+    vi.useFakeTimers()
+    const transport = vi.fn().mockResolvedValue({ success: true })
+    manager = new PipManager({
+      onKeydown: vi.fn(),
+      onKeyup: vi.fn(),
+      playbackSession: createNetflixPlaybackSession(transport),
+    })
+    const firstVideo = document.createElement('video')
+    document.body.appendChild(firstVideo)
+
+    expect(await manager.enter()).toBe(true)
+
+    firstVideo.dispatchEvent(new Event('ended'))
+    const nextVideo = createRenderableVideo()
+    const pause = vi.spyOn(nextVideo, 'pause')
+    document.body.appendChild(nextVideo)
+    await Promise.resolve()
+    await Promise.resolve()
+    await vi.advanceTimersByTimeAsync(300)
+
+    expect(manager.isActive).toBe(false)
+    expect(pause).not.toHaveBeenCalled()
+    expect(transport).not.toHaveBeenCalledWith('pause')
+
+    nextVideo.dispatchEvent(new Event('play'))
+    await Promise.resolve()
+
+    expect(pause).not.toHaveBeenCalled()
+    expect(transport).not.toHaveBeenCalledWith('pause')
+
+    nextVideo.dispatchEvent(new Event('playing'))
+    await Promise.resolve()
+
+    expect(pause).toHaveBeenCalledOnce()
+    expect(transport).toHaveBeenCalledOnce()
+  })
+
+  it('releases the episode-transition pause guard when the user takes over', async () => {
+    vi.useFakeTimers()
+    const transport = vi.fn().mockResolvedValue({ success: true })
+    manager = new PipManager({
+      onKeydown: vi.fn(),
+      onKeyup: vi.fn(),
+      playbackSession: createNetflixPlaybackSession(transport),
+    })
+    const firstVideo = document.createElement('video')
+    document.body.appendChild(firstVideo)
+
+    expect(await manager.enter()).toBe(true)
+
+    firstVideo.dispatchEvent(new Event('ended'))
+    const nextVideo = createRenderableVideo()
+    const pause = vi.spyOn(nextVideo, 'pause')
+    document.body.appendChild(nextVideo)
+    await Promise.resolve()
+    await Promise.resolve()
+    await vi.advanceTimersByTimeAsync(300)
+
+    expect(pause).not.toHaveBeenCalled()
+    document.dispatchEvent(new Event('pointerdown'))
+    nextVideo.dispatchEvent(new Event('playing'))
+    await Promise.resolve()
+
+    expect(pause).not.toHaveBeenCalled()
+    expect(transport).not.toHaveBeenCalled()
+  })
+
+  it('reopens PiP with the ready previous-episode video instead of a stale black video', async () => {
+    vi.useFakeTimers()
+    const transport = vi.fn().mockResolvedValue({ success: true })
+    manager = new PipManager({
+      onKeydown: vi.fn(),
+      onKeyup: vi.fn(),
+      playbackSession: createNetflixPlaybackSession(transport),
+    })
+    const player = document.createElement('div')
+    player.className = 'watch-video'
+    const endingVideo = document.createElement('video')
+    player.appendChild(endingVideo)
+    document.body.appendChild(player)
+
+    expect(await manager.enter()).toBe(true)
+
+    endingVideo.dispatchEvent(new Event('ended'))
+    const pausedNextVideo = document.createElement('video')
+    Object.defineProperty(pausedNextVideo, 'readyState', { configurable: true, value: 0 })
+    player.appendChild(pausedNextVideo)
+    await Promise.resolve()
+    await Promise.resolve()
+    await vi.advanceTimersByTimeAsync(300)
+
+    expect(manager.isActive).toBe(false)
+    endingVideo.remove()
+
+    const readyPreviousVideo = document.createElement('video')
+    Object.defineProperties(readyPreviousVideo, {
+      readyState: { configurable: true, value: HTMLMediaElement.HAVE_CURRENT_DATA },
+      videoWidth: { configurable: true, value: 1920 },
+      videoHeight: { configurable: true, value: 1080 },
+    })
+    player.appendChild(readyPreviousVideo)
+
+    expect(await manager.enter()).toBe(true)
+    expect(pipWindow.document.querySelector('video')).toBe(readyPreviousVideo)
+    expect(pausedNextVideo.ownerDocument).toBe(document)
+  })
+
+  it('uses the previous video size while replacement metadata is still unavailable', async () => {
     vi.useFakeTimers()
     const firstVideo = document.createElement('video')
     Object.defineProperty(firstVideo, 'videoWidth', { configurable: true, value: 1920 })
@@ -424,15 +1031,15 @@ describe('PipManager', () => {
 
     expect(await manager.enter()).toBe(true)
 
-    firstVideo.dispatchEvent(new Event('ended'))
-    const nextVideo = document.createElement('video')
+    firstVideo.dispatchEvent(new Event('error'))
+    const nextVideo = createRenderableVideo()
     document.body.appendChild(nextVideo)
     await Promise.resolve()
     await Promise.resolve()
     await vi.advanceTimersByTimeAsync(300)
 
     expect(nextVideo.style.aspectRatio).toBe('1920 / 1080')
-    expect(nextVideo.style.objectFit).toBe('fill')
+    expect(nextVideo.style.objectFit).toBe('contain')
 
     Object.defineProperty(nextVideo, 'videoWidth', { configurable: true, value: 1920 })
     Object.defineProperty(nextVideo, 'videoHeight', { configurable: true, value: 1080 })
@@ -442,8 +1049,14 @@ describe('PipManager', () => {
     expect(nextVideo.style.objectFit).toBe('contain')
   })
 
-  it('finds the next episode video when a stale Netflix player is still first in the DOM', async () => {
+  it('pauses the next episode found beside a stale Netflix player and closes PiP', async () => {
     vi.useFakeTimers()
+    const transport = vi.fn().mockResolvedValue({ success: true })
+    manager = new PipManager({
+      onKeydown: vi.fn(),
+      onKeyup: vi.fn(),
+      playbackSession: createNetflixPlaybackSession(transport),
+    })
     const stalePlayer = document.createElement('div')
     stalePlayer.className = 'watch-video'
     const activePlayer = document.createElement('div')
@@ -455,17 +1068,23 @@ describe('PipManager', () => {
     expect(await manager.enter()).toBe(true)
 
     firstVideo.dispatchEvent(new Event('emptied'))
-    const nextVideo = document.createElement('video')
+    const nextVideo = createRenderableVideo()
+    const pause = vi.spyOn(nextVideo, 'pause')
     activePlayer.appendChild(nextVideo)
     await Promise.resolve()
     await Promise.resolve()
     await vi.advanceTimersByTimeAsync(300)
+    nextVideo.dispatchEvent(new Event('playing'))
+    await Promise.resolve()
 
-    expect(manager.isActive).toBe(true)
-    expect(pipWindow.document.querySelector('video')).toBe(nextVideo)
+    expect(pause).toHaveBeenCalledOnce()
+    expect(transport).toHaveBeenCalledWith('pause')
+    expect(manager.isActive).toBe(false)
+    expect(pipWindow.close).toHaveBeenCalledOnce()
+    expect(nextVideo.parentElement).toBe(activePlayer)
   })
 
-  it('tracks a replacement Netflix player root during handoff', async () => {
+  it('tracks a replacement Netflix player root during recovery', async () => {
     vi.useFakeTimers()
     const firstPlayer = document.createElement('div')
     firstPlayer.className = 'watch-video'
@@ -475,10 +1094,10 @@ describe('PipManager', () => {
 
     expect(await manager.enter()).toBe(true)
 
-    firstVideo.dispatchEvent(new Event('ended'))
+    firstVideo.dispatchEvent(new Event('error'))
     const nextPlayer = document.createElement('div')
     nextPlayer.className = 'watch-video--player-view'
-    const nextVideo = document.createElement('video')
+    const nextVideo = createRenderableVideo()
     nextPlayer.appendChild(nextVideo)
     firstPlayer.replaceWith(nextPlayer)
     await Promise.resolve()
@@ -493,7 +1112,7 @@ describe('PipManager', () => {
     vi.useFakeTimers()
     const firstPlayer = document.createElement('div')
     firstPlayer.className = 'watch-video'
-    const video = document.createElement('video')
+    const video = createRenderableVideo()
     firstPlayer.appendChild(video)
     document.body.appendChild(firstPlayer)
 
@@ -531,6 +1150,59 @@ describe('PipManager', () => {
     expect(document.querySelector('[data-shortcut-override-pip-placeholder]')).toBeNull()
   })
 
+  it('waits for an unusable replacement placeholder and closes on timeout', async () => {
+    vi.useFakeTimers()
+    const video = document.createElement('video')
+    document.body.appendChild(video)
+
+    expect(await manager.enter()).toBe(true)
+
+    video.dispatchEvent(new Event('error'))
+    const placeholderVideo = document.createElement('video')
+    Object.defineProperties(placeholderVideo, {
+      readyState: { configurable: true, value: HTMLMediaElement.HAVE_NOTHING },
+      videoWidth: { configurable: true, value: 0 },
+      videoHeight: { configurable: true, value: 0 },
+    })
+    document.body.appendChild(placeholderVideo)
+    await Promise.resolve()
+    await Promise.resolve()
+    await vi.advanceTimersByTimeAsync(300)
+
+    expect(manager.isActive).toBe(true)
+    expect(pipWindow.document.querySelector('video')).toBe(video)
+    expect(placeholderVideo.ownerDocument).toBe(document)
+
+    await vi.advanceTimersByTimeAsync(8_000)
+
+    expect(manager.isActive).toBe(false)
+    expect(pipWindow.close).toHaveBeenCalledOnce()
+  })
+
+  it('adopts a replacement placeholder after it becomes renderable', async () => {
+    vi.useFakeTimers()
+    const video = document.createElement('video')
+    document.body.appendChild(video)
+
+    expect(await manager.enter()).toBe(true)
+
+    video.dispatchEvent(new Event('error'))
+    const replacementVideo = document.createElement('video')
+    document.body.appendChild(replacementVideo)
+    await Promise.resolve()
+    await Promise.resolve()
+    await vi.advanceTimersByTimeAsync(300)
+
+    expect(pipWindow.document.querySelector('video')).toBe(video)
+
+    replacementVideo.getBoundingClientRect = createRenderableVideo().getBoundingClientRect
+    await vi.advanceTimersByTimeAsync(300)
+
+    expect(manager.isActive).toBe(true)
+    expect(pipWindow.document.querySelector('video')).toBe(replacementVideo)
+    expect(pipWindow.close).not.toHaveBeenCalled()
+  })
+
   it('closes a black PiP when the ended video remains attached and no replacement appears', async () => {
     vi.useFakeTimers()
     const video = document.createElement('video')
@@ -543,6 +1215,44 @@ describe('PipManager', () => {
 
     expect(manager.isActive).toBe(false)
     expect(pipWindow.close).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the final-episode video area pinned to the PiP viewport while awaiting timeout', async () => {
+    vi.useFakeTimers()
+    const video = document.createElement('video')
+    document.body.appendChild(video)
+
+    expect(await manager.enter()).toBe(true)
+    video.dispatchEvent(new Event('ended'))
+    await vi.advanceTimersByTimeAsync(300)
+
+    const videoArea = pipWindow.document.querySelector<HTMLElement>(
+      '[data-shortcut-override-pip-controls]'
+    )?.parentElement
+    expect(videoArea).not.toBeNull()
+    expect(videoArea).toHaveStyle({ position: 'fixed', inset: '0' })
+  })
+
+  it('restores full-size PiP video styles when Netflix shrinks the video at final credits', async () => {
+    vi.useFakeTimers()
+    const video = document.createElement('video')
+    document.body.appendChild(video)
+
+    expect(await manager.enter()).toBe(true)
+    video.dispatchEvent(new Event('ended'))
+    video.style.width = '360px'
+    video.style.height = '203px'
+    video.style.maxWidth = '360px'
+    video.style.maxHeight = '203px'
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(video.style.getPropertyValue('width')).toBe('100%')
+    expect(video.style.getPropertyPriority('width')).toBe('important')
+    expect(video.style.getPropertyValue('height')).toBe('100%')
+    expect(video.style.getPropertyPriority('height')).toBe('important')
+    expect(video.style.getPropertyValue('max-width')).toBe('100%')
+    expect(video.style.getPropertyValue('max-height')).toBe('100%')
   })
 
   it('closes PiP after repeated video handoff failures', async () => {
@@ -558,8 +1268,8 @@ describe('PipManager', () => {
     try {
       expect(await manager.enter()).toBe(true)
 
-      video.dispatchEvent(new Event('ended'))
-      document.body.appendChild(document.createElement('video'))
+      video.dispatchEvent(new Event('error'))
+      document.body.appendChild(createRenderableVideo())
       await Promise.resolve()
       await Promise.resolve()
       await vi.advanceTimersByTimeAsync(1_000)
@@ -572,50 +1282,234 @@ describe('PipManager', () => {
     }
   })
 
-  it('keeps PiP open across repeated successful video adoptions', async () => {
+  it('closes PiP on the third recovery cycle even when every adoption succeeds', async () => {
     vi.useFakeTimers()
     const initialVideo = document.createElement('video')
     document.body.appendChild(initialVideo)
 
     expect(await manager.enter()).toBe(true)
 
-    for (let attempt = 0; attempt < 4; attempt += 1) {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
       const currentVideo = pipWindow.document.querySelector('video')
       expect(currentVideo).not.toBeNull()
-      currentVideo?.dispatchEvent(new Event('ended'))
-      const nextVideo = document.createElement('video')
+      currentVideo?.dispatchEvent(new Event('error'))
+      const nextVideo = createRenderableVideo()
       document.body.appendChild(nextVideo)
       await Promise.resolve()
       await Promise.resolve()
       await vi.advanceTimersByTimeAsync(300)
 
-      expect(manager.isActive).toBe(true)
+      if (attempt < 2) {
+        expect(manager.isActive).toBe(true)
+        expect(pipWindow.document.querySelector('video')).toBe(nextVideo)
+      }
+      document.querySelectorAll('video').forEach(video => {
+        if (video !== nextVideo) video.remove()
+      })
+    }
+
+    expect(manager.isActive).toBe(false)
+    expect(pipWindow.close).toHaveBeenCalledOnce()
+  })
+
+  it('forgets recovery cycles after five stable seconds', async () => {
+    vi.useFakeTimers()
+    const initialVideo = document.createElement('video')
+    document.body.appendChild(initialVideo)
+
+    expect(await manager.enter()).toBe(true)
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const currentVideo = pipWindow.document.querySelector('video')
+      currentVideo?.dispatchEvent(new Event('error'))
+      const nextVideo = createRenderableVideo()
+      document.body.appendChild(nextVideo)
+      await Promise.resolve()
+      await Promise.resolve()
+      await vi.advanceTimersByTimeAsync(300)
       expect(pipWindow.document.querySelector('video')).toBe(nextVideo)
       document.querySelectorAll('video').forEach(video => {
         if (video !== nextVideo) video.remove()
       })
     }
 
+    await vi.advanceTimersByTimeAsync(5_000)
+    const currentVideo = pipWindow.document.querySelector('video')
+    currentVideo?.dispatchEvent(new Event('error'))
+    const recoveredVideo = createRenderableVideo()
+    document.body.appendChild(recoveredVideo)
+    await Promise.resolve()
+    await Promise.resolve()
+    await vi.advanceTimersByTimeAsync(300)
+
+    expect(manager.isActive).toBe(true)
+    expect(pipWindow.document.querySelector('video')).toBe(recoveredVideo)
     expect(pipWindow.close).not.toHaveBeenCalled()
   })
 
-  it('keeps PiP open when Netflix loads the next episode into the same attached video', async () => {
+  it('treats emptied as a new boundary that supersedes earlier user-seek evidence', async () => {
     vi.useFakeTimers()
+    const transport = vi.fn().mockResolvedValue({ success: true })
+    manager = new PipManager({
+      onKeydown: vi.fn(),
+      onKeyup: vi.fn(),
+      playbackSession: createNetflixPlaybackSession(transport),
+    })
     const video = document.createElement('video')
+    let currentTime = 1_400
+    Object.defineProperty(video, 'currentTime', {
+      configurable: true,
+      get: () => currentTime,
+    })
+    const pause = vi.spyOn(video, 'pause')
     document.body.appendChild(video)
 
     expect(await manager.enter()).toBe(true)
 
     video.dispatchEvent(new Event('ended'))
+    manager.recordUserSeek()
+    currentTime = 0
+    video.dispatchEvent(new Event('emptied'))
     video.dispatchEvent(new Event('loadedmetadata'))
-    await vi.advanceTimersByTimeAsync(8_100)
+    video.dispatchEvent(new Event('playing'))
+    await Promise.resolve()
 
-    expect(manager.isActive).toBe(true)
-    expect(pipWindow.close).not.toHaveBeenCalled()
-    expect(pipWindow.document.querySelector('video')).toBe(video)
+    expect(pause).toHaveBeenCalledOnce()
+    expect(transport).toHaveBeenCalledWith('pause')
+    expect(manager.isActive).toBe(false)
+    expect(pipWindow.close).toHaveBeenCalledOnce()
+    expect(video.ownerDocument).toBe(document)
   })
 
-  it('does not send video clicks to playback while the next episode is being handed off', async () => {
+  it('keeps PiP open when a seek occurs after an emptied boundary', async () => {
+    vi.useFakeTimers()
+    const transport = vi.fn().mockResolvedValue({ success: true })
+    manager = new PipManager({
+      onKeydown: vi.fn(),
+      onKeyup: vi.fn(),
+      playbackSession: createNetflixPlaybackSession(transport),
+    })
+    const video = document.createElement('video')
+    let currentTime = 1_400
+    Object.defineProperty(video, 'currentTime', {
+      configurable: true,
+      get: () => currentTime,
+    })
+    const pause = vi.spyOn(video, 'pause')
+    document.body.appendChild(video)
+
+    expect(await manager.enter()).toBe(true)
+
+    video.dispatchEvent(new Event('emptied'))
+    manager.recordUserSeek()
+    currentTime = 10
+    video.dispatchEvent(new Event('seeking'))
+    video.dispatchEvent(new Event('loadedmetadata'))
+    await Promise.resolve()
+
+    expect(pause).not.toHaveBeenCalled()
+    expect(transport).not.toHaveBeenCalled()
+    expect(manager.isActive).toBe(true)
+    expect(pipWindow.close).not.toHaveBeenCalled()
+  })
+
+  it('does not treat an automatic media seek as user intent during an episode transition', async () => {
+    vi.useFakeTimers()
+    const transport = vi.fn().mockResolvedValue({ success: true })
+    manager = new PipManager({
+      onKeydown: vi.fn(),
+      onKeyup: vi.fn(),
+      playbackSession: createNetflixPlaybackSession(transport),
+    })
+    const video = document.createElement('video')
+    let currentTime = 1_400
+    Object.defineProperty(video, 'currentTime', {
+      configurable: true,
+      get: () => currentTime,
+    })
+    const pause = vi.spyOn(video, 'pause')
+    document.body.appendChild(video)
+
+    expect(await manager.enter()).toBe(true)
+
+    video.dispatchEvent(new Event('ended'))
+    currentTime = 10
+    video.dispatchEvent(new Event('seeking'))
+    video.dispatchEvent(new Event('playing'))
+    video.dispatchEvent(new Event('playing'))
+    await Promise.resolve()
+
+    expect(pause).toHaveBeenCalledOnce()
+    expect(transport).toHaveBeenCalledWith('pause')
+    expect(manager.isActive).toBe(false)
+    expect(pipWindow.close).toHaveBeenCalledOnce()
+  })
+
+  it('keeps episode-transition evidence when playing fires before the reused video time resets', async () => {
+    vi.useFakeTimers()
+    const transport = vi.fn().mockResolvedValue({ success: true })
+    manager = new PipManager({
+      onKeydown: vi.fn(),
+      onKeyup: vi.fn(),
+      playbackSession: createNetflixPlaybackSession(transport),
+    })
+    const video = document.createElement('video')
+    let currentTime = 1_400
+    Object.defineProperty(video, 'currentTime', {
+      configurable: true,
+      get: () => currentTime,
+    })
+    const pause = vi.spyOn(video, 'pause')
+    document.body.appendChild(video)
+
+    expect(await manager.enter()).toBe(true)
+
+    video.dispatchEvent(new Event('ended'))
+    video.dispatchEvent(new Event('playing'))
+    currentTime = 10
+    video.dispatchEvent(new Event('timeupdate'))
+    video.dispatchEvent(new Event('loadedmetadata'))
+    video.dispatchEvent(new Event('playing'))
+    await Promise.resolve()
+
+    expect(pause).toHaveBeenCalledOnce()
+    expect(transport).toHaveBeenCalledWith('pause')
+    expect(manager.isActive).toBe(false)
+    expect(pipWindow.close).toHaveBeenCalledOnce()
+  })
+
+  it('recovers the same video when playback continues beyond the episode boundary', async () => {
+    vi.useFakeTimers()
+    const transport = vi.fn().mockResolvedValue({ success: true })
+    manager = new PipManager({
+      onKeydown: vi.fn(),
+      onKeyup: vi.fn(),
+      playbackSession: createNetflixPlaybackSession(transport),
+    })
+    const video = document.createElement('video')
+    let currentTime = 1_400
+    Object.defineProperty(video, 'currentTime', {
+      configurable: true,
+      get: () => currentTime,
+    })
+    const pause = vi.spyOn(video, 'pause')
+    document.body.appendChild(video)
+
+    expect(await manager.enter()).toBe(true)
+
+    video.dispatchEvent(new Event('ended'))
+    video.dispatchEvent(new Event('playing'))
+    currentTime = 1_401
+    video.dispatchEvent(new Event('timeupdate'))
+    await Promise.resolve()
+
+    expect(pause).not.toHaveBeenCalled()
+    expect(transport).not.toHaveBeenCalledWith('pause')
+    expect(manager.isActive).toBe(true)
+    expect(pipWindow.close).not.toHaveBeenCalled()
+  })
+
+  it('does not send video clicks to playback while a replacement is being handed off', async () => {
     vi.useFakeTimers()
     const onClick = vi.fn()
     manager = new PipManager({
@@ -627,7 +1521,7 @@ describe('PipManager', () => {
     document.body.appendChild(video)
 
     expect(await manager.enter()).toBe(true)
-    video.dispatchEvent(new Event('ended'))
+    video.dispatchEvent(new Event('error'))
 
     const timeline = pipWindow.document.querySelector<HTMLInputElement>(
       '[data-pip-control="timeline"]'

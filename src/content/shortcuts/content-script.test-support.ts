@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, beforeEach, vi } from 'vitest'
 
-import { DEFAULT_SETTINGS } from '@/shared/shortcuts'
+import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
 import { saveSettings } from '@/shared/storage'
 
 export function setupContentIndexTests() {

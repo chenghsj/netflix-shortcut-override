@@ -53,13 +53,11 @@ Skip this section only when intentionally testing the Chrome Web Store version t
 /Users/cheng/Desktop/netflix-shortcut-override/dist
 ```
 
-Expected extension ID from the manifest key:
+Chrome assigns an ID to this unpacked extension. It may differ from the Chrome Web Store ID:
 
-```text
-jebnhiecgnchnioahfagmnebdknddbom
-```
+Check the ID shown for the loaded extension at `chrome://extensions`.
 
-If Chrome already has the Chrome Web Store extension installed with the same ID, confirm the intended test target before changing it. Loading, disabling, or replacing extensions changes the user's real browser profile and should not be done silently.
+If Chrome already has the Chrome Web Store extension installed, confirm the intended test target before changing it. Loading, disabling, or replacing extensions changes the user's real browser profile and should not be done silently.
 
 ## 3. Prepare Netflix
 

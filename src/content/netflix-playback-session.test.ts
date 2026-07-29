@@ -75,6 +75,28 @@ describe('Netflix playback session', () => {
     expect(transport).toHaveBeenNthCalledWith(3, 'unmuteWithVolume', 0.55)
   })
 
+  it('sets an absolute volume and treats zero as mute', async () => {
+    const transport = createTransport()
+    const video = document.createElement('video')
+    video.volume = 0.5
+    const session = createNetflixPlaybackSession(transport)
+
+    const muted = session.setVolume(video, 0)
+    expect(muted).toMatchObject({ volume: 0, muted: true })
+    expect(video.volume).toBe(0)
+    expect(video.muted).toBe(true)
+
+    const restored = session.setVolume(video, 0.35)
+    expect(restored).toMatchObject({ volume: 0.35, muted: false })
+    expect(video.volume).toBe(0.35)
+    expect(video.muted).toBe(false)
+
+    await Promise.all([muted.completion, restored.completion])
+    expect(transport).toHaveBeenNthCalledWith(1, 'setVolume', 0)
+    expect(transport).toHaveBeenNthCalledWith(2, 'setMuted', 1)
+    expect(transport).toHaveBeenNthCalledWith(3, 'unmuteWithVolume', 0.35)
+  })
+
   it('keeps relative and absolute seeks distinct and normalizes seek failures', async () => {
     const transport = vi
       .fn()

@@ -9,14 +9,15 @@ export type HintIcon = {
 
 export const createHintIcon = (html: string): HintIcon => ({ html })
 
-export const PIP_DOCUMENT_MARKER = 'shortcutOverridePip'
-
 const createSeekIcon = (path: string, seconds: number): string => {
   const label = Math.round(Math.abs(seconds)).toString()
-  const fontSize = label.length >= 3 ? 5.5 : 7
+  const fontSize = label.length >= 3 ? 6.5 : 8.5
 
-  return `<svg viewBox="0 0 24 24" width="36" height="36" fill="white"><path d="${path}"/><text x="12" y="16.5" font-size="${fontSize}" font-family="sans-serif" font-weight="900" text-anchor="middle">${label}</text></svg>`
+  return `<svg viewBox="0 0 24 24" width="36" height="36" fill="white"><path d="${path}"/><text data-seek-label="true" x="12" y="16.5" font-size="${fontSize}" font-family="Arial Black, Arial, sans-serif" font-weight="900" text-anchor="middle" fill="white" stroke="rgba(0, 0, 0, .9)" stroke-width="0.9" stroke-linejoin="round" paint-order="stroke fill">${label}</text></svg>`
 }
+
+const createSeekDirectionIcon = (path: string, direction: 'backward' | 'forward'): string =>
+  `<svg data-pip-icon="seek-${direction}" viewBox="0 0 24 24" width="36" height="36" fill="white" aria-hidden="true"><path d="${path}"/></svg>`
 
 export const mediaHintIcons = {
   play: '<svg viewBox="0 0 24 24" width="36" height="36" fill="white"><path d="M8 5v14l11-7z"/></svg>',
@@ -28,6 +29,8 @@ export const mediaHintIcons = {
     '<svg data-hint-icon="playback-pause" viewBox="0 0 24 24" width="56" height="56" fill="white"><rect x="5" y="3" width="5" height="18" rx="1.25"/><rect x="14" y="3" width="5" height="18" rx="1.25"/></svg>',
   rewind: (seconds: number) => createSeekIcon(rewindPath, seconds),
   forward: (seconds: number) => createSeekIcon(forwardPath, seconds),
+  rewindDirection: createSeekDirectionIcon(rewindPath, 'backward'),
+  forwardDirection: createSeekDirectionIcon(forwardPath, 'forward'),
   volume:
     '<svg data-hint-icon="volume-up" viewBox="0 0 24 24" width="48" height="48" fill="white"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>',
   volumeDown:

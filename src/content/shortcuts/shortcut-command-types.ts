@@ -1,4 +1,4 @@
-import type { ShortcutSettings } from '@/shared/shortcuts'
+import type { ShortcutSettings } from '@/shared/shortcut-types'
 
 export type CommandContext = {
   settings: ShortcutSettings

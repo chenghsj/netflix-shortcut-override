@@ -13,8 +13,8 @@ import {
   normalizeSettings,
   normalizeSpaceHoldSettings,
   normalizeSpeedSettings,
-  type ShortcutSettings,
-} from '@/shared/shortcuts'
+} from '@/shared/shortcut-settings'
+import type { ShortcutSettings } from '@/shared/shortcut-types'
 import { getSettings, saveSettings, subscribeSettings } from '@/shared/storage'
 
 export type SpeedField = keyof ShortcutSettings['speed']
@@ -26,17 +26,17 @@ export type SpaceHoldDraft = { speed: string }
 const formatSpeedValue = (value: number): string => value.toString()
 const formatSeekValue = (value: number): string => value.toString()
 
-export const speedDraftFromSettings = (speed: ShortcutSettings['speed']): SpeedDraft => ({
+const speedDraftFromSettings = (speed: ShortcutSettings['speed']): SpeedDraft => ({
   min: formatSpeedValue(speed.min),
   max: formatSpeedValue(speed.max),
   step: formatSpeedValue(speed.step),
 })
 
-export const spaceHoldDraftFromSettings = (
+const spaceHoldDraftFromSettings = (
   spaceHold: ShortcutSettings['spaceHold']
 ): SpaceHoldDraft => ({ speed: formatSpeedValue(spaceHold.speed) })
 
-export const seekDraftFromSettings = (seek: ShortcutSettings['seek']): SeekDraft => ({
+const seekDraftFromSettings = (seek: ShortcutSettings['seek']): SeekDraft => ({
   seconds: formatSeekValue(seek.seconds),
 })
 
@@ -244,25 +244,51 @@ export const useShortcutSettingsForm = () => {
     }
   }
 
+  const resetShortcutBindings = () => {
+    updateSettings(current => ({ ...current, bindings: DEFAULT_SETTINGS.bindings }))
+  }
+
+  const resetSpeed = () => {
+    setSpeedDraft(speedDraftFromSettings(DEFAULT_SETTINGS.speed))
+    updateSettings(current => ({ ...current, speed: DEFAULT_SETTINGS.speed }))
+  }
+
+  const resetSeek = () => {
+    setSeekDraft(seekDraftFromSettings(DEFAULT_SETTINGS.seek))
+    updateSettings(current => ({ ...current, seek: DEFAULT_SETTINGS.seek }))
+  }
+
+  const resetSpaceHold = () => {
+    setSpaceHoldDraft(spaceHoldDraftFromSettings(DEFAULT_SETTINGS.spaceHold))
+    updateSettings(current => ({ ...current, spaceHold: DEFAULT_SETTINGS.spaceHold }))
+  }
+
   return {
     settings,
-    speedDraft,
-    seekDraft,
-    spaceHoldDraft,
     loaded,
     saveError,
     updateSettings,
-    setSpeedDraft,
-    setSpeedDraftField,
-    setSeekDraft,
-    setSeekDraftSeconds,
-    setSpaceHoldDraft,
-    setSpaceHoldDraftSpeed,
-    commitSpeedField,
-    commitSeekSeconds,
-    commitSpaceHoldSpeed,
-    handleSpeedKeyDown,
-    handleSeekKeyDown,
-    handleSpaceHoldKeyDown,
+    resetShortcutBindings,
+    speed: {
+      draft: speedDraft,
+      setField: setSpeedDraftField,
+      commitField: commitSpeedField,
+      handleKeyDown: handleSpeedKeyDown,
+      reset: resetSpeed,
+    },
+    seek: {
+      draft: seekDraft,
+      setSeconds: setSeekDraftSeconds,
+      commit: commitSeekSeconds,
+      handleKeyDown: handleSeekKeyDown,
+      reset: resetSeek,
+    },
+    spaceHold: {
+      draft: spaceHoldDraft,
+      setSpeed: setSpaceHoldDraftSpeed,
+      commit: commitSpaceHoldSpeed,
+      handleKeyDown: handleSpaceHoldKeyDown,
+      reset: resetSpaceHold,
+    },
   }
 }

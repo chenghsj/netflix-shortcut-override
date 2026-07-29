@@ -1,0 +1,64 @@
+name: Feature request
+description: Suggest an idea or improvement for Shortcut Override for Netflix.
+title: "[Feature]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement. Please avoid including private Netflix account, title, or viewing-history information.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of the extension would this request affect?
+      options:
+        - Keyboard shortcuts
+        - Playback and seeking
+        - Picture-in-Picture
+        - Popup or options page
+        - Localization
+        - Compatibility diagnostics
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What problem would this feature solve, and who would benefit from it?
+      placeholder: Describe the workflow or limitation that prompted this request.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What would you like the extension to do?
+      placeholder: Describe the behavior or user experience you are requesting.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What other approaches or workarounds have you tried?
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Add screenshots, examples, or other details that help explain the request. Remove private account and title information.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I have searched existing issues and could not find an equivalent request.
+          required: true
+        - label: I removed private account and viewing-history information from this request.
+          required: true

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getHintManager } from '@/content/hints/hint-manager'
 import { createNetflixPlaybackSession } from '@/content/netflix-playback-session'
 import { createShortcutCommandController } from './shortcut-command-controller'
-import { DEFAULT_SETTINGS } from '@/shared/shortcuts'
+import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
 import { PipControls } from '@/content/pip/pip-controls'
 
 describe('ShortcutCommandController', () => {
@@ -48,7 +48,7 @@ describe('ShortcutCommandController', () => {
       pipWindow: window,
       video,
       videoArea,
-      playbackSession,
+      seekTo: milliseconds => playbackSession.seekTo(milliseconds),
     })
     pipControls.start()
     const timeline = videoArea.querySelector<HTMLInputElement>('[data-pip-control="timeline"]')
@@ -144,6 +144,27 @@ describe('ShortcutCommandController', () => {
     expect(document.getElementById('shortcut-override-space-hold-hint')).toBeNull()
   })
 
+  it('does not show the Space hold rate hint when it is disabled', () => {
+    vi.useFakeTimers()
+    const video = document.createElement('video')
+    Object.defineProperty(video, 'paused', { value: false, configurable: true })
+    video.playbackRate = 1
+    document.body.append(video)
+    const settings = {
+      ...DEFAULT_SETTINGS,
+      spaceHold: { ...DEFAULT_SETTINGS.spaceHold, showHint: false },
+    }
+    const controller = createShortcutCommandController(() => settings)
+
+    controller.beginSpaceInteraction(document, video, true)
+    vi.advanceTimersByTime(250)
+
+    expect(video.playbackRate).toBe(2)
+    expect(document.getElementById('shortcut-override-space-hold-hint')).toBeNull()
+
+    controller.completeSpaceInteraction()
+  })
+
   it('does not restore the hold hint after a seek hint while Space remains pressed', () => {
     vi.useFakeTimers()
     const video = document.createElement('video')
@@ -234,14 +255,67 @@ describe('ShortcutCommandController', () => {
     expect(document.querySelectorAll('[id^="shortcut-override-"]').length).toBeGreaterThan(0)
   })
 
+  it('renders muted volume feedback as zero percent', () => {
+    const video = document.createElement('video')
+    video.volume = 0.05
+    document.body.append(video)
+    const controller = createShortcutCommandController(() => DEFAULT_SETTINGS)
+
+    expect(controller.execute('mute', document)).toBe(true)
+
+    expect(document.getElementById('shortcut-override-volume-hint-label')?.textContent).toBe('0%')
+    expect(document.querySelector('[data-hint-icon="volume-mute"]')).toBeInTheDocument()
+  })
+
+  it('uses directional icons for volume shortcuts regardless of the resulting level', () => {
+    const video = document.createElement('video')
+    video.volume = 0.2
+    document.body.append(video)
+    const controller = createShortcutCommandController(() => DEFAULT_SETTINGS)
+
+    expect(controller.execute('volumeUp', document)).toBe(true)
+    expect(document.getElementById('shortcut-override-volume-hint-label')?.textContent).toBe('25%')
+    expect(document.querySelector('[data-hint-icon="volume-up"]')).toBeInTheDocument()
+    expect(document.querySelector('[data-hint-icon="volume-down"]')).toBeNull()
+
+    expect(controller.execute('volumeDown', document)).toBe(true)
+    expect(document.getElementById('shortcut-override-volume-hint-label')?.textContent).toBe('20%')
+    expect(document.querySelector('[data-hint-icon="volume-down"]')).toBeInTheDocument()
+    expect(document.querySelector('[data-hint-icon="volume-up"]')).toBeNull()
+  })
+
+  it('shows the volume slider direction with shared feedback', () => {
+    const video = document.createElement('video')
+    video.volume = 0.2
+    document.body.append(video)
+    const controller = createShortcutCommandController(() => DEFAULT_SETTINGS)
+
+    expect(controller.setVolume(0.45, document)).toBe(true)
+
+    expect(video.volume).toBe(0.45)
+    expect(document.getElementById('shortcut-override-volume-hint-label')?.textContent).toBe('45%')
+    expect(document.querySelector('[data-hint-icon="volume-up"]')).toBeInTheDocument()
+    expect(document.querySelector('[data-hint-icon="volume-down"]')).toBeNull()
+
+    expect(controller.setVolume(0.15, document)).toBe(true)
+    expect(document.getElementById('shortcut-override-volume-hint-label')?.textContent).toBe('15%')
+    expect(document.querySelector('[data-hint-icon="volume-down"]')).toBeInTheDocument()
+    expect(document.querySelector('[data-hint-icon="volume-up"]')).toBeNull()
+  })
+
   it('uses the configured seek interval for both directions', () => {
     const video = document.createElement('video')
     document.body.append(video)
+    const onSeekRequested = vi.fn()
     const settings = {
       ...DEFAULT_SETTINGS,
       seek: { seconds: 7 },
     }
-    const controller = createShortcutCommandController(() => settings)
+    const controller = createShortcutCommandController(
+      () => settings,
+      undefined,
+      { onSeekRequested }
+    )
 
     expect(controller.execute('seekForward', document)).toBe(true)
     expect(controller.execute('seekBackward', document)).toBe(true)
@@ -256,6 +330,7 @@ describe('ShortcutCommandController', () => {
       expect.objectContaining({ action: 'seek', value: -7000 }),
       expect.any(Function)
     )
+    expect(onSeekRequested).toHaveBeenCalledTimes(2)
   })
 
   it('accumulates feedback for consecutive seeks in the same direction', () => {

@@ -16,12 +16,54 @@ export const getTargetDocument = (event: KeyboardEvent): Document => event.view?
 export const isVideoElement = (element: Element | null): element is HTMLVideoElement =>
   element?.tagName.toLowerCase() === 'video'
 
-export const findVideo = (targetDoc: Document): HTMLVideoElement | null => {
-  const localVideo = targetDoc.querySelector('video')
-  if (isVideoElement(localVideo)) return localVideo
+// Shortcut and PiP entry need the video that is most usable for presentation.
+// This intentionally differs from the MAIN-world player-session correlation
+// policy, which compares a video's playback time with Netflix session state.
+const getVisibleVideoArea = (video: HTMLVideoElement): number => {
+  const rect = video.getBoundingClientRect()
+  return Math.max(0, rect.width) * Math.max(0, rect.height)
+}
 
-  const rootVideo = document.querySelector('video')
-  return isVideoElement(rootVideo) ? rootVideo : null
+const preferPresentationReadyVideo = (
+  current: HTMLVideoElement,
+  candidate: HTMLVideoElement
+): HTMLVideoElement => {
+  const currentHasFrame = current.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
+  const candidateHasFrame = candidate.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
+  if (currentHasFrame !== candidateHasFrame) return candidateHasFrame ? candidate : current
+
+  const currentPlaying = !current.paused && !current.ended
+  const candidatePlaying = !candidate.paused && !candidate.ended
+  if (currentPlaying !== candidatePlaying) return candidatePlaying ? candidate : current
+
+  const currentHasDimensions = current.videoWidth > 0 && current.videoHeight > 0
+  const candidateHasDimensions = candidate.videoWidth > 0 && candidate.videoHeight > 0
+  if (currentHasDimensions !== candidateHasDimensions) {
+    return candidateHasDimensions ? candidate : current
+  }
+
+  return getVisibleVideoArea(candidate) > getVisibleVideoArea(current)
+    ? candidate
+    : current
+}
+
+export const selectPresentationReadyVideo = (
+  videos: Iterable<HTMLVideoElement>
+): HTMLVideoElement | null =>
+  Array.from(videos).reduce<HTMLVideoElement | null>(
+    (preferred, candidate) =>
+      preferred ? preferPresentationReadyVideo(preferred, candidate) : candidate,
+    null
+  )
+
+const findVisiblePlaybackVideo = (targetDoc: Document): HTMLVideoElement | null =>
+  selectPresentationReadyVideo(targetDoc.querySelectorAll<HTMLVideoElement>('video'))
+
+export const findVideo = (targetDoc: Document): HTMLVideoElement | null => {
+  const localVideo = findVisiblePlaybackVideo(targetDoc)
+  if (localVideo) return localVideo
+
+  return targetDoc === document ? null : findVisiblePlaybackVideo(document)
 }
 
 const skipIntroSelector = [

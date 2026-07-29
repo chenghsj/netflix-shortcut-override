@@ -44,6 +44,12 @@ jobs:
       - name: Build extension
         run: npm run build
 
+      - name: Prepare Firefox extension
+        run: npm run prepare:firefox
+
+      - name: Lint Firefox extension
+        run: npm run lint:firefox
+
       - name: Upload extension build
         uses: actions/upload-artifact@v7
         with:

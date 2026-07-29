@@ -102,4 +102,30 @@ describe('background Netflix API bridge', () => {
     expect(seek).toHaveBeenCalledWith(40000)
     expect(video.currentTime).toBe(30)
   })
+
+  it('keeps the injected MAIN-world function self-contained after serialization', async () => {
+    await import('@/background/index')
+    const listener = vi.mocked(chrome.runtime.onMessage.addListener).mock.calls.at(-1)?.[0]
+
+    listener?.(
+      { type: 'EXECUTE_NETFLIX_API', action: 'diagnose' },
+      { tab: { id: 42 } } as chrome.runtime.MessageSender,
+      vi.fn()
+    )
+
+    await vi.waitFor(() => expect(chrome.scripting.executeScript).toHaveBeenCalled())
+    const injection = vi.mocked(chrome.scripting.executeScript).mock.calls.at(-1)?.[0] as
+      | { func?: (action: 'diagnose') => unknown }
+      | undefined
+    const serializedFunction = injection?.func?.toString()
+    if (!serializedFunction) throw new Error('Expected an injected function')
+
+    const isolatedFunction = Function(`return (${serializedFunction})`)() as (
+      action: 'diagnose'
+    ) => { playerApiFound?: boolean }
+
+    expect(isolatedFunction('diagnose')).toEqual(
+      expect.objectContaining({ playerApiFound: false })
+    )
+  })
 })

@@ -1,10 +1,42 @@
-export const PLAYER_ROOT_SELECTOR =
-  '[data-uia="player"], .watch-video, .watch-video--player-view'
+import { PLAYER_ROOT_SELECTOR } from './pip-selectors'
 const DEFAULT_VIDEO_SIZE = { width: 16, height: 9 }
 
 type VideoSize = {
   width: number
   height: number
+}
+
+const setImportantStyle = (
+  style: CSSStyleDeclaration,
+  property: string,
+  value: string
+): void => {
+  if (style.getPropertyValue(property) === value && style.getPropertyPriority(property) === 'important') {
+    return
+  }
+  style.setProperty(property, value, 'important')
+}
+
+const applyPipVideoLayout = (
+  video: HTMLVideoElement,
+  size: VideoSize
+): void => {
+  const styles: Record<string, string> = {
+    position: 'relative',
+    inset: 'auto',
+    margin: '0px',
+    transform: 'none',
+    display: 'block',
+    width: '100%',
+    height: '100%',
+    'max-width': '100%',
+    'max-height': '100%',
+    'aspect-ratio': `${size.width} / ${size.height}`,
+    'object-fit': 'contain',
+  }
+  for (const [property, value] of Object.entries(styles)) {
+    setImportantStyle(video.style, property, value)
+  }
 }
 
 const getIntrinsicVideoSize = (video: HTMLVideoElement): VideoSize | null =>
@@ -43,6 +75,7 @@ export class VideoPlacement {
   private placeholder: HTMLElement | null = null
   private lastVideoSize: VideoSize | null = null
   private metadataCleanup: (() => void) | null = null
+  private styleObserver: MutationObserver | null = null
 
   constructor(sourceDocument: Document) {
     this.sourceDocument = sourceDocument
@@ -76,7 +109,8 @@ export class VideoPlacement {
   createPipVideoArea(pipWindow: Window): HTMLElement {
     const videoArea = pipWindow.document.createElement('div')
     Object.assign(videoArea.style, {
-      position: 'relative',
+      position: 'fixed',
+      inset: '0',
       width: '100%',
       height: '100%',
       overflow: 'hidden',
@@ -108,28 +142,28 @@ export class VideoPlacement {
     if (intrinsicSize) this.lastVideoSize = intrinsicSize
     const displaySize = this.lastVideoSize ?? DEFAULT_VIDEO_SIZE
 
-    Object.assign(video.style, {
-      position: 'relative',
-      inset: 'auto',
-      margin: '0',
-      transform: 'none',
-      display: 'block',
-      width: '100%',
-      height: '100%',
-      maxWidth: '100%',
-      maxHeight: '100%',
-      aspectRatio: `${displaySize.width} / ${displaySize.height}`,
-      objectFit: intrinsicSize ? 'contain' : 'fill',
-    })
+    applyPipVideoLayout(video, displaySize)
     video.controls = false
     videoArea.appendChild(video)
+
+    const VideoMutationObserver = video.ownerDocument.defaultView?.MutationObserver
+    if (VideoMutationObserver) {
+      this.styleObserver = new VideoMutationObserver(() => {
+        const currentIntrinsicSize = getIntrinsicVideoSize(video)
+        if (currentIntrinsicSize) this.lastVideoSize = currentIntrinsicSize
+        applyPipVideoLayout(video, this.lastVideoSize ?? DEFAULT_VIDEO_SIZE)
+      })
+      this.styleObserver.observe(video, {
+        attributes: true,
+        attributeFilter: ['style'],
+      })
+    }
 
     const onLoadedMetadata = () => {
       const loadedSize = getIntrinsicVideoSize(video)
       if (!loadedSize) return
       this.lastVideoSize = loadedSize
-      video.style.aspectRatio = `${loadedSize.width} / ${loadedSize.height}`
-      video.style.objectFit = 'contain'
+      applyPipVideoLayout(video, loadedSize)
     }
     video.addEventListener('loadedmetadata', onLoadedMetadata)
     this.metadataCleanup = () => video.removeEventListener('loadedmetadata', onLoadedMetadata)
@@ -143,6 +177,8 @@ export class VideoPlacement {
 
     this.metadataCleanup?.()
     this.metadataCleanup = null
+    this.styleObserver?.disconnect()
+    this.styleObserver = null
 
     const restoreParent = parent?.isConnected
       ? parent

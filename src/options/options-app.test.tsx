@@ -1,12 +1,16 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { OptionsApp } from '@/options/options-app'
 import { EXTERNAL_LINKS } from '@/shared/external-links'
-import { DEFAULT_SETTINGS } from '@/shared/shortcuts'
+import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
 import { saveSettings } from '@/shared/storage'
 
 describe('OptionsApp', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('renders the extension name and speed step input defaults', async () => {
     render(<OptionsApp />)
 
@@ -18,10 +22,15 @@ describe('OptionsApp', () => {
     expect(screen.getByRole('combobox', { name: 'Other products' })).toBeInTheDocument()
     expect(screen.getByText('General settings')).toBeInTheDocument()
     const localeCombobox = screen.getByRole('combobox', { name: 'Language' })
+    const themeCombobox = screen.getByRole('combobox', { name: 'Theme' })
     const enabledSwitch = screen.getByRole('switch', { name: 'Enable shortcut override' })
     expect(localeCombobox.compareDocumentPosition(enabledSwitch)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
     )
+    expect(themeCombobox.compareDocumentPosition(enabledSwitch)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    )
+    expect(themeCombobox).toHaveTextContent('Auto')
     const enabledInfo = screen.getByRole('button', { name: 'Enable shortcut override info' })
     expect(enabledInfo).toBeInTheDocument()
     fireEvent.focus(enabledInfo)
@@ -56,6 +65,9 @@ describe('OptionsApp', () => {
       'aria-checked',
       'true'
     )
+    expect(
+      screen.getByRole('switch', { name: 'Space hold speed: Show speed hint' })
+    ).toHaveAttribute('aria-checked', 'true')
     expect(screen.queryByRole('button', { name: 'Enabled info' })).not.toBeInTheDocument()
     expect(seekInput).toHaveAttribute('min', '1')
     expect(seekInput).toHaveAttribute('max', '60')
@@ -68,6 +80,41 @@ describe('OptionsApp', () => {
     expect(within(seekCard as HTMLElement).getByLabelText('Seconds per seek')).toBe(
       seekInput
     )
+  })
+
+  it('shows Picture-in-Picture as off and disabled on Firefox', async () => {
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:141.0) Gecko/20100101 Firefox/141.0'
+    )
+    render(<OptionsApp />)
+
+    const pipSwitch = await screen.findByRole('switch', { name: 'Picture-in-Picture Enabled' })
+    expect(pipSwitch).toBeDisabled()
+    expect(pipSwitch).toHaveAttribute('aria-checked', 'false')
+
+    const pictureInPictureInfo = screen.getByRole('button', { name: 'Picture-in-Picture info' })
+    fireEvent.focus(pictureInPictureInfo)
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      'Firefox does not support the subtitle-preserving Picture-in-Picture window used by this extension.'
+    )
+  })
+
+  it('does not reserve the Firefox PiP key when recording another shortcut', async () => {
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:141.0) Gecko/20100101 Firefox/141.0'
+    )
+    render(<OptionsApp />)
+
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Edit' }))[0])
+    const dialog = screen.getByRole('dialog')
+    fireEvent.keyDown(dialog, {
+      code: 'KeyP',
+      key: 'P',
+      shiftKey: true,
+    })
+
+    expect(dialog).toHaveTextContent('No conflict detected.')
+    expect(within(dialog).getByRole('button', { name: 'Save' })).not.toBeDisabled()
   })
 
   it('persists step changes using 0.05 increments', async () => {
@@ -112,17 +159,41 @@ describe('OptionsApp', () => {
     })
   })
 
+  it('persists the Space hold rate hint setting', async () => {
+    render(<OptionsApp />)
+
+    const hintSwitch = await screen.findByRole('switch', {
+      name: 'Space hold speed: Show speed hint',
+    })
+    fireEvent.click(hintSwitch)
+
+    await waitFor(() => expect(hintSwitch).toHaveAttribute('aria-checked', 'false'))
+  })
+
+  it('persists theme changes from the combobox', async () => {
+    render(<OptionsApp />)
+
+    const themeCombobox = await screen.findByRole('combobox', { name: 'Theme' })
+    fireEvent.click(themeCombobox)
+    fireEvent.click(await screen.findByText('Dark'))
+
+    await waitFor(() => {
+      expect(screen.getByRole('combobox', { name: 'Theme' })).toHaveTextContent('Dark')
+      expect(document.documentElement).toHaveClass('dark')
+    })
+  })
+
   it('uses the detected browser language when no settings exist yet', async () => {
     vi.mocked(chrome.i18n.getUILanguage).mockReturnValue('zh-TW')
     render(<OptionsApp />)
 
-    expect(await screen.findByRole('combobox', { name: '語言' })).toHaveTextContent('繁中')
+    expect(await screen.findByRole('combobox', { name: '語言' })).toHaveTextContent('自動')
   })
 
   it('syncs external settings changes while open', async () => {
     render(<OptionsApp />)
 
-    expect(await screen.findByRole('combobox', { name: 'Language' })).toHaveTextContent('EN')
+    expect(await screen.findByRole('combobox', { name: 'Language' })).toHaveTextContent('Auto')
 
     await act(async () => {
       await saveSettings({

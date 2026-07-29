@@ -5,8 +5,8 @@ import { cn } from '@/lib/utils'
 import {
   formatKeyBinding,
   getKeyBindingLabels,
-  type KeyBinding,
-} from '@/shared/shortcuts'
+} from '@/shared/shortcut-bindings'
+import type { KeyBinding } from '@/shared/shortcut-types'
 
 type KeyBindingKbdProps = ComponentProps<typeof KbdGroup> & {
   binding: KeyBinding

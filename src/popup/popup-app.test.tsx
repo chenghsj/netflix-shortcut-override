@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { PopupApp } from '@/popup/popup-app'
 import { EXTERNAL_LINKS } from '@/shared/external-links'
@@ -10,6 +10,10 @@ const openCompatibilityDiagnostics = async () => {
 }
 
 describe('PopupApp', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('explains prolonged Netflix loading without reporting compatibility ready', async () => {
     vi.useFakeTimers()
     vi.mocked(chrome.tabs.query).mockImplementation((_query, callback) => {
@@ -72,8 +76,12 @@ describe('PopupApp', () => {
     expect(screen.getByText('Space')).toBeInTheDocument()
     expect(screen.getByText('Space').closest('[data-slot="kbd"]')).toBeInTheDocument()
     const localeCombobox = screen.getByRole('combobox', { name: 'Language' })
+    const themeCombobox = screen.getByRole('combobox', { name: 'Theme' })
     const enabledSwitch = screen.getByRole('switch', { name: 'Enable shortcut override' })
     expect(localeCombobox.compareDocumentPosition(enabledSwitch)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    )
+    expect(themeCombobox.compareDocumentPosition(enabledSwitch)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
     )
     expect(screen.getByLabelText('Lowest speed')).toHaveValue(0.25)
@@ -84,6 +92,9 @@ describe('PopupApp', () => {
       'aria-checked',
       'true'
     )
+    expect(
+      screen.getByRole('switch', { name: 'Space hold speed: Show speed hint' })
+    ).toHaveAttribute('aria-checked', 'true')
     expect(screen.queryByRole('button', { name: 'Enabled info' })).not.toBeInTheDocument()
     const seekInput = screen.getByLabelText('Seconds per seek')
     expect(seekInput).toHaveValue(10)
@@ -102,7 +113,8 @@ describe('PopupApp', () => {
     expect(screen.getByRole('button', { name: 'Speed change info' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Hold speed info' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Seconds per seek info' })).toBeInTheDocument()
-    expect(localeCombobox).toHaveTextContent('EN')
+    expect(localeCombobox).toHaveTextContent('Auto')
+    expect(themeCombobox).toHaveTextContent('Auto')
 
     await openCompatibilityDiagnostics()
     expect(await screen.findByText('Netflix playback features are ready.')).toBeInTheDocument()
@@ -123,6 +135,19 @@ describe('PopupApp', () => {
 
     await waitFor(() => {
       expect(enabledSwitch).toHaveAttribute('aria-checked', 'false')
+    })
+  })
+
+  it('persists popup theme changes', async () => {
+    render(<PopupApp />)
+
+    const themeCombobox = await screen.findByRole('combobox', { name: 'Theme' })
+    fireEvent.click(themeCombobox)
+    fireEvent.click(await screen.findByText('Dark'))
+
+    await waitFor(() => {
+      expect(screen.getByRole('combobox', { name: 'Theme' })).toHaveTextContent('Dark')
+      expect(document.documentElement).toHaveClass('dark')
     })
   })
 
@@ -169,6 +194,20 @@ describe('PopupApp', () => {
 
     expect(chrome.runtime.openOptionsPage).toHaveBeenCalledOnce()
     expect(chrome.runtime.sendMessage).not.toHaveBeenCalled()
+  })
+
+  it('closes the Firefox popup after opening the full options page', async () => {
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:141.0) Gecko/20100101 Firefox/141.0'
+    )
+    const closePopup = vi.spyOn(window, 'close').mockImplementation(() => undefined)
+
+    render(<PopupApp />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open options' }))
+
+    expect(chrome.runtime.openOptionsPage).toHaveBeenCalledOnce()
+    expect(closePopup).toHaveBeenCalledOnce()
   })
 
   it('requests Netflix focus restoration when the popup closes', async () => {
@@ -307,6 +346,35 @@ describe('PopupApp', () => {
     expect(screen.queryByText(/Retrying automatically/)).not.toBeInTheDocument()
   })
 
+  it('hides the page bridge row for Firefox fallback diagnostics', async () => {
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:141.0) Gecko/20100101 Firefox/141.0'
+    )
+    vi.mocked(chrome.tabs.sendMessage).mockImplementation(
+      (_tabId, _message, _optionsOrCallback, maybeCallback) => {
+        const callback =
+          typeof _optionsOrCallback === 'function' ? _optionsOrCallback : maybeCallback
+        callback?.({
+          contentScriptReady: true,
+          settingsLoaded: true,
+          enabled: true,
+          videoFound: true,
+          bridgeReady: false,
+          playerApiFound: true,
+          playerFound: true,
+          pipSupported: false,
+          pipActive: false,
+        })
+      }
+    )
+
+    render(<PopupApp />)
+
+    await openCompatibilityDiagnostics()
+    expect(await screen.findByText('Netflix player API')).toBeInTheDocument()
+    expect(screen.queryByText('Page bridge')).not.toBeInTheDocument()
+  })
+
   it('keeps a disabled animated compatibility control visible while checking', async () => {
     let resolveDiagnostics:
       | ((response: Record<string, unknown>) => void)
@@ -410,7 +478,7 @@ describe('PopupApp', () => {
 
     await waitFor(() => {
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-        expect.stringContaining('Extension version: 0.4.0')
+        expect.stringContaining('Extension version: 0.4.1')
       )
     })
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith(

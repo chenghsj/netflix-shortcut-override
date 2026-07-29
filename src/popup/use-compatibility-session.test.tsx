@@ -23,6 +23,12 @@ const PENDING_DIAGNOSTICS = {
   playerFound: false,
 } satisfies CompatibilityDiagnostics
 
+const FIREFOX_FALLBACK_DIAGNOSTICS = {
+  ...READY_DIAGNOSTICS,
+  bridgeReady: false,
+  pipSupported: false,
+} satisfies CompatibilityDiagnostics
+
 type DiagnosticsCallback = (response: CompatibilityDiagnostics | undefined) => void
 
 const getDiagnosticsCallback = (
@@ -367,6 +373,45 @@ describe('useCompatibilitySession', () => {
       })
       expect(chrome.tabs.sendMessage).toHaveBeenCalledTimes(2)
     } finally {
+      unmount()
+      vi.useRealTimers()
+    }
+  })
+
+  it('stops polling Firefox diagnostics when only the page bridge is unavailable', async () => {
+    vi.useFakeTimers()
+    const userAgent = vi
+      .spyOn(navigator, 'userAgent', 'get')
+      .mockReturnValue(
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:141.0) Gecko/20100101 Firefox/141.0'
+      )
+    vi.mocked(chrome.tabs.sendMessage).mockImplementation(
+      (_tabId, _message, optionsOrCallback, maybeCallback) => {
+        getDiagnosticsCallback(optionsOrCallback, maybeCallback)?.(FIREFOX_FALLBACK_DIAGNOSTICS)
+      }
+    )
+
+    const { result, unmount } = renderHook(() => useCompatibilitySession())
+
+    try {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0)
+      })
+      expect(result.current.diagnosticsState.status).toBe('ready')
+
+      act(() => result.current.setDiagnosticsOpen(true))
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0)
+      })
+      expect(chrome.tabs.sendMessage).toHaveBeenCalledTimes(2)
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2_000)
+      })
+      expect(chrome.tabs.sendMessage).toHaveBeenCalledTimes(2)
+      expect(result.current.diagnosticsTriggerState).toBe('default')
+    } finally {
+      userAgent.mockRestore()
       unmount()
       vi.useRealTimers()
     }

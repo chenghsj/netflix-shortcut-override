@@ -9,6 +9,7 @@ lerna-debug.log*
 
 node_modules
 dist
+firefox-dist
 dist-ssr
 coverage
 release-assets

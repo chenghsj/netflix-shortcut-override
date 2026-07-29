@@ -1,4 +1,48 @@
-import type { Locale, ShortcutAction } from '@/shared/shortcuts'
+import type { Locale, ShortcutAction } from '@/shared/shortcut-types'
+
+export type PipControlsCopy = {
+  timeline: string
+  rewind: string
+  forward: string
+  play: string
+  pause: string
+  mute: string
+  unmute: string
+  volume: string
+  subtitles: string
+  subtitlesEnabled: string
+  back: string
+  subtitleFontSize: string
+  subtitleSmall: string
+  subtitleMedium: string
+  subtitleLarge: string
+  subtitleBackground: string
+  subtitleBackgroundNone: string
+  subtitleBackgroundTranslucent: string
+  subtitleBackgroundDark: string
+}
+
+export const EN_PIP_CONTROLS_COPY: PipControlsCopy = {
+  timeline: 'Seek timeline',
+  rewind: 'Rewind {seconds} seconds',
+  forward: 'Forward {seconds} seconds',
+  play: 'Play',
+  pause: 'Pause',
+  mute: 'Mute',
+  unmute: 'Unmute',
+  volume: 'Volume',
+  subtitles: 'Subtitles',
+  subtitlesEnabled: 'Subtitles',
+  back: 'Back',
+  subtitleFontSize: 'Font size',
+  subtitleSmall: 'Small',
+  subtitleMedium: 'Medium',
+  subtitleLarge: 'Large',
+  subtitleBackground: 'Subtitle background',
+  subtitleBackgroundNone: 'None',
+  subtitleBackgroundTranslucent: 'Translucent',
+  subtitleBackgroundDark: 'Dark',
+}
 
 export const LOCALE_LABELS: Record<Locale, string> = {
   en: 'English',
@@ -58,6 +102,11 @@ type Copy = {
   diagnosticsCopied: string
   diagnosticsCopyFailed: string
   locale: string
+  localeAuto: string
+  theme: string
+  themeAuto: string
+  themeLight: string
+  themeDark: string
   speed: string
   speedDesc: string
   minSpeed: string
@@ -72,6 +121,7 @@ type Copy = {
   holdSpeedTooltip: string
   holdSpeedEnabled: string
   holdSpeedRate: string
+  holdSpeedHint: string
   seek: string
   seekDesc: string
   seekSeconds: string
@@ -80,6 +130,8 @@ type Copy = {
   shortcuts: string
   shortcutsDesc: string
   pictureInPictureTooltip: string
+  pictureInPictureUnsupported: string
+  pipControls: PipControlsCopy
   action: string
   key: string
   status: string
@@ -146,6 +198,11 @@ export const COPY: Record<Locale, Copy> = {
     diagnosticsCopied: 'Copied',
     diagnosticsCopyFailed: 'Copy failed',
     locale: 'Language',
+    localeAuto: 'Auto',
+    theme: 'Theme',
+    themeAuto: 'Auto',
+    themeLight: 'Light',
+    themeDark: 'Dark',
     speed: 'Speed shortcuts',
     speedDesc: 'Set the range and step size for speed up/down shortcuts.',
     minSpeed: 'Lowest speed',
@@ -160,6 +217,7 @@ export const COPY: Record<Locale, Copy> = {
     holdSpeedTooltip: 'Temporary speed while holding Space.\nRange 0.25x-4.0x.',
     holdSpeedEnabled: 'Enabled',
     holdSpeedRate: 'Hold speed',
+    holdSpeedHint: 'Show speed hint',
     seek: 'Seek shortcuts',
     seekDesc: 'Set how far the rewind and forward shortcuts move playback.',
     seekSeconds: 'Seconds per seek',
@@ -170,6 +228,9 @@ export const COPY: Record<Locale, Copy> = {
       'Record keys, disable individual actions, or reset defaults. In Picture-in-Picture, Space is handled by the extension.',
     pictureInPictureTooltip:
       'Picture-in-Picture is a separate window, so Netflix native shortcuts cannot run there. Space remains available through this extension; other disabled shortcuts are unavailable in Picture-in-Picture.',
+    pictureInPictureUnsupported:
+      'Firefox does not support the subtitle-preserving Picture-in-Picture window used by this extension.',
+    pipControls: EN_PIP_CONTROLS_COPY,
     action: 'Action',
     key: 'Key',
     status: 'Enabled',
@@ -246,6 +307,11 @@ export const COPY: Record<Locale, Copy> = {
     diagnosticsCopied: '已複製',
     diagnosticsCopyFailed: '複製失敗',
     locale: '語言',
+    localeAuto: '自動',
+    theme: '主題',
+    themeAuto: '自動',
+    themeLight: '淺色',
+    themeDark: '深色',
     speed: '播放速度快捷鍵',
     speedDesc: '設定「加快 / 降低播放速度」快捷鍵的可用範圍與每次增減。',
     minSpeed: '最低倍速',
@@ -260,6 +326,7 @@ export const COPY: Record<Locale, Copy> = {
     holdSpeedTooltip: '按住 Space 時暫時切換的倍速。\n範圍 0.25x-4.0x。',
     holdSpeedEnabled: '啟用',
     holdSpeedRate: '長按倍速',
+    holdSpeedHint: '顯示倍速提示',
     seek: '快轉 / 倒轉快捷鍵',
     seekDesc: '設定快轉與倒轉快捷鍵每次要移動的播放時間。',
     seekSeconds: '每次跳轉秒數',
@@ -269,6 +336,28 @@ export const COPY: Record<Locale, Copy> = {
     shortcutsDesc: '錄製按鍵、停用單項功能，或還原預設值。子母畫面中的 Space 會由擴充功能處理。',
     pictureInPictureTooltip:
       '子母畫面是獨立視窗，Netflix 原生快捷鍵無法在其中使用。Space 仍由本擴充功能處理；其他快捷鍵若已關閉，則無法在子母畫面中使用。',
+    pictureInPictureUnsupported: 'Firefox 不支援本擴充功能使用的字幕保留子母畫面視窗。',
+    pipControls: {
+      timeline: '播放時間軸',
+      rewind: '倒轉 {seconds} 秒',
+      forward: '快轉 {seconds} 秒',
+      play: '播放',
+      pause: '暫停',
+      mute: '靜音',
+      unmute: '解除靜音',
+      volume: '音量',
+      subtitles: '字幕',
+      subtitlesEnabled: '字幕',
+      back: '返回',
+      subtitleFontSize: '字型大小',
+      subtitleSmall: '小',
+      subtitleMedium: '中',
+      subtitleLarge: '大',
+      subtitleBackground: '字幕背景',
+      subtitleBackgroundNone: '無',
+      subtitleBackgroundTranslucent: '半透明',
+      subtitleBackgroundDark: '深色',
+    },
     action: '功能',
     key: '按鍵',
     status: '啟用',
@@ -345,6 +434,11 @@ export const COPY: Record<Locale, Copy> = {
     diagnosticsCopied: '已复制',
     diagnosticsCopyFailed: '复制失败',
     locale: '语言',
+    localeAuto: '自动',
+    theme: '主题',
+    themeAuto: '自动',
+    themeLight: '浅色',
+    themeDark: '深色',
     speed: '播放速度快捷键',
     speedDesc: '设置“加快 / 降低播放速度”快捷键的可用范围与每次增减。',
     minSpeed: '最低倍速',
@@ -359,6 +453,7 @@ export const COPY: Record<Locale, Copy> = {
     holdSpeedTooltip: '按住 Space 时暂时切换的倍速。\n范围 0.25x-4.0x。',
     holdSpeedEnabled: '启用',
     holdSpeedRate: '长按倍速',
+    holdSpeedHint: '显示倍速提示',
     seek: '快进 / 倒退快捷键',
     seekDesc: '设置快进与倒退快捷键每次要移动的播放时间。',
     seekSeconds: '每次跳转秒数',
@@ -368,6 +463,28 @@ export const COPY: Record<Locale, Copy> = {
     shortcutsDesc: '录制按键、停用单项功能，或还原默认值。画中画中的 Space 会由扩展程序处理。',
     pictureInPictureTooltip:
       '画中画是独立窗口，Netflix 原生快捷键无法在其中使用。Space 仍由本扩展程序处理；其他快捷键若已关闭，则无法在画中画中使用。',
+    pictureInPictureUnsupported: 'Firefox 不支持本扩展程序使用的保留字幕画中画窗口。',
+    pipControls: {
+      timeline: '播放时间轴',
+      rewind: '倒退 {seconds} 秒',
+      forward: '快进 {seconds} 秒',
+      play: '播放',
+      pause: '暂停',
+      mute: '静音',
+      unmute: '取消静音',
+      volume: '音量',
+      subtitles: '字幕',
+      subtitlesEnabled: '字幕',
+      back: '返回',
+      subtitleFontSize: '字体大小',
+      subtitleSmall: '小',
+      subtitleMedium: '中',
+      subtitleLarge: '大',
+      subtitleBackground: '字幕背景',
+      subtitleBackgroundNone: '无',
+      subtitleBackgroundTranslucent: '半透明',
+      subtitleBackgroundDark: '深色',
+    },
     action: '功能',
     key: '按键',
     status: '启用',
@@ -446,6 +563,11 @@ export const COPY: Record<Locale, Copy> = {
     diagnosticsCopied: 'コピーしました',
     diagnosticsCopyFailed: 'コピー失敗',
     locale: '言語',
+    localeAuto: '自動',
+    theme: 'テーマ',
+    themeAuto: '自動',
+    themeLight: 'ライト',
+    themeDark: 'ダーク',
     speed: '速度ショートカット',
     speedDesc: '速度を上げる/下げるショートカットの範囲と増減幅を設定します。',
     minSpeed: '最低速度',
@@ -460,6 +582,7 @@ export const COPY: Record<Locale, Copy> = {
     holdSpeedTooltip: 'Space 長押し中の一時速度です。\n範囲 0.25x-4.0x。',
     holdSpeedEnabled: '有効',
     holdSpeedRate: '長押し時の速度',
+    holdSpeedHint: '速度ヒントを表示',
     seek: 'シークショートカット',
     seekDesc: '戻る/進むショートカットで移動する時間を設定します。',
     seekSeconds: '1回の移動秒数',
@@ -470,6 +593,29 @@ export const COPY: Record<Locale, Copy> = {
       'キーの記録、個別無効化、既定値へのリセットができます。ピクチャー イン ピクチャー内の Space は拡張機能が処理します。',
     pictureInPictureTooltip:
       'ピクチャー イン ピクチャーは独立したウィンドウのため、Netflix 本来のショートカットは使えません。Space はこの拡張機能が処理しますが、無効にした他のショートカットは使えません。',
+    pictureInPictureUnsupported:
+      'Firefox はこの拡張機能が使用する字幕を保持したピクチャー イン ピクチャー ウィンドウに対応していません。',
+    pipControls: {
+      timeline: '再生タイムライン',
+      rewind: '{seconds} 秒戻る',
+      forward: '{seconds} 秒進む',
+      play: '再生',
+      pause: '一時停止',
+      mute: 'ミュート',
+      unmute: 'ミュート解除',
+      volume: '音量',
+      subtitles: '字幕',
+      subtitlesEnabled: '字幕',
+      back: '戻る',
+      subtitleFontSize: '文字サイズ',
+      subtitleSmall: '小',
+      subtitleMedium: '中',
+      subtitleLarge: '大',
+      subtitleBackground: '字幕の背景',
+      subtitleBackgroundNone: 'なし',
+      subtitleBackgroundTranslucent: '半透明',
+      subtitleBackgroundDark: '濃い',
+    },
     action: '操作',
     key: 'キー',
     status: '有効',
@@ -547,6 +693,11 @@ export const COPY: Record<Locale, Copy> = {
     diagnosticsCopied: '복사됨',
     diagnosticsCopyFailed: '복사 실패',
     locale: '언어',
+    localeAuto: '자동',
+    theme: '테마',
+    themeAuto: '자동',
+    themeLight: '라이트',
+    themeDark: '다크',
     speed: '속도 단축키',
     speedDesc: '속도 올리기/내리기 단축키의 범위와 한 번에 바뀌는 값을 설정합니다.',
     minSpeed: '최저 배속',
@@ -561,6 +712,7 @@ export const COPY: Record<Locale, Copy> = {
     holdSpeedTooltip: 'Space를 누르는 동안의 임시 배속입니다.\n범위 0.25x-4.0x.',
     holdSpeedEnabled: '사용',
     holdSpeedRate: '길게 누르기 배속',
+    holdSpeedHint: '배속 힌트 표시',
     seek: '탐색 단축키',
     seekDesc: '되감기/빨리감기 단축키가 이동할 시간을 설정합니다.',
     seekSeconds: '1회 이동 시간(초)',
@@ -570,6 +722,29 @@ export const COPY: Record<Locale, Copy> = {
     shortcutsDesc: '키 기록, 개별 비활성화, 기본값 복원이 가능합니다. 화면 속 화면의 Space는 확장 프로그램이 처리합니다.',
     pictureInPictureTooltip:
       '화면 속 화면은 별도 창이므로 Netflix 기본 단축키를 사용할 수 없습니다. Space는 이 확장 프로그램이 처리하지만, 다른 단축키를 끄면 화면 속 화면에서도 사용할 수 없습니다.',
+    pictureInPictureUnsupported:
+      'Firefox는 이 확장 프로그램이 사용하는 자막 보존 화면 속 화면 창을 지원하지 않습니다.',
+    pipControls: {
+      timeline: '재생 타임라인',
+      rewind: '{seconds}초 되감기',
+      forward: '{seconds}초 빨리감기',
+      play: '재생',
+      pause: '일시정지',
+      mute: '음소거',
+      unmute: '음소거 해제',
+      volume: '볼륨',
+      subtitles: '자막',
+      subtitlesEnabled: '자막',
+      back: '뒤로',
+      subtitleFontSize: '글자 크기',
+      subtitleSmall: '작게',
+      subtitleMedium: '보통',
+      subtitleLarge: '크게',
+      subtitleBackground: '자막 배경',
+      subtitleBackgroundNone: '없음',
+      subtitleBackgroundTranslucent: '반투명',
+      subtitleBackgroundDark: '어둡게',
+    },
     action: '동작',
     key: '키',
     status: '활성화',

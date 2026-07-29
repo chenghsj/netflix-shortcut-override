@@ -132,7 +132,7 @@ const chromeMock = {
   },
   runtime: {
     id: 'test-extension-id',
-    getManifest: vi.fn(() => ({ version: '0.4.0' })),
+    getManifest: vi.fn(() => ({ version: '0.4.1' })),
     openOptionsPage: vi.fn(),
     sendMessage: vi.fn().mockResolvedValue(undefined),
     onMessage: {
@@ -141,6 +141,9 @@ const chromeMock = {
   },
   tabs: {
     create: vi.fn(),
+    update: vi.fn((_tabId: number, _updateProperties: unknown, callback?: () => void) => {
+      callback?.()
+    }),
     get: vi.fn(defaultTabsGet),
     reload: vi.fn(),
     query: vi.fn(defaultTabsQuery),
@@ -161,6 +164,9 @@ const chromeMock = {
   windows: {
     WINDOW_ID_NONE: -1,
     get: vi.fn(defaultWindowsGet),
+    update: vi.fn((_windowId: number, _updateInfo: unknown, callback?: () => void) => {
+      callback?.()
+    }),
     onFocusChanged: {
       addListener: vi.fn(),
       removeListener: vi.fn(),
@@ -210,9 +216,15 @@ beforeEach(() => {
   chromeMock.i18n.getUILanguage.mockReturnValue('en-US')
   chromeMock.runtime.sendMessage.mockReset().mockResolvedValue(undefined)
   chromeMock.tabs.get.mockReset().mockImplementation(defaultTabsGet)
+  chromeMock.tabs.update.mockReset().mockImplementation(
+    (_tabId: number, _updateProperties: unknown, callback?: () => void) => callback?.()
+  )
   chromeMock.tabs.query.mockImplementation(defaultTabsQuery)
   chromeMock.tabs.sendMessage.mockImplementation(defaultTabsSendMessage)
   chromeMock.windows.get.mockReset().mockImplementation(defaultWindowsGet)
+  chromeMock.windows.update.mockReset().mockImplementation(
+    (_windowId: number, _updateInfo: unknown, callback?: () => void) => callback?.()
+  )
   chromeMock.scripting.executeScript
     .mockReset()
     .mockResolvedValue([{ frameId: 0, result: true }])

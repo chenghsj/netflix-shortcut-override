@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import {
-  COMPATIBILITY_DIAGNOSTICS_MESSAGE_TYPE,
-  type CompatibilityDiagnostics,
-} from '@/shared/diagnostics'
+import { requestCompatibilityDiagnostics as requestDiagnostics } from '@/shared/compatibility-diagnostics-client'
 import {
   createCompatibilityReadinessPolicy,
   createCompatibilityRequestGeneration,
@@ -16,8 +13,6 @@ import {
 } from '@/shared/playback-focus-restoration'
 
 export type PageStatus = 'watch' | 'netflix' | 'external' | 'unknown'
-
-export type { CompatibilityDiagnosticsState } from '@/shared/compatibility-readiness'
 
 export type CompatibilityDiagnosticsTriggerState =
   | 'checking'
@@ -81,28 +76,6 @@ const getPlaybackFocusTarget = (
     ? { tabId: pageContext.tabId, windowId: pageContext.windowId }
     : undefined
 
-const getCompatibilityDiagnostics = async (
-  tabId: number,
-  readinessPolicy: ReturnType<typeof createCompatibilityReadinessPolicy>
-): Promise<CompatibilityDiagnosticsState> =>
-  new Promise(resolve => {
-    chrome.tabs.sendMessage(
-      tabId,
-      { type: COMPATIBILITY_DIAGNOSTICS_MESSAGE_TYPE },
-      response => {
-        const errorMessage = chrome.runtime.lastError?.message
-        resolve(
-          readinessPolicy.resolveState({
-            diagnostics: response
-              ? (response as CompatibilityDiagnostics)
-              : undefined,
-            errorMessage,
-          })
-        )
-      }
-    )
-  })
-
 export const useCompatibilitySession = () => {
   const readinessPolicy = useMemo(() => createCompatibilityReadinessPolicy(), [])
   const diagnosticsRequestGenerationRef = useRef(createCompatibilityRequestGeneration())
@@ -124,7 +97,7 @@ export const useCompatibilitySession = () => {
 
   const requestCompatibilityDiagnostics = useCallback(async (tabId: number) => {
     const requestGeneration = diagnosticsRequestGenerationRef.current.start()
-    const nextState = await getCompatibilityDiagnostics(tabId, readinessPolicy)
+    const nextState = await requestDiagnostics(tabId, readinessPolicy)
     return diagnosticsRequestGenerationRef.current.isCurrent(requestGeneration)
       ? nextState
       : null
@@ -219,6 +192,64 @@ export const useCompatibilitySession = () => {
     pageContext.loadStatus === 'loading' &&
     longLoadingGeneration === pageContext.generation
 
+  const startDiagnosticsCycle = useCallback(
+    (tabId: number, mode: 'initial' | 'refresh'): (() => void) => {
+      let active = true
+      let timer: number | undefined
+      let attempt = 0
+      let hasDiagnosticsResult = false
+
+      const schedule = (callback: () => void, delay: number) => {
+        timer = window.setTimeout(callback, delay)
+      }
+
+      const run = async (): Promise<void> => {
+        if (!active) return
+        if (mode === 'refresh' && !hasDiagnosticsResult) {
+          setDiagnosticsState(INITIAL_COMPATIBILITY_DIAGNOSTICS_STATE)
+        }
+
+        attempt += 1
+        const nextState = await requestCompatibilityDiagnostics(tabId)
+        if (!active || nextState === null) return
+
+        hasDiagnosticsResult = true
+        if (mode === 'initial' && readinessPolicy.shouldRetryMissingReceiver(nextState, attempt)) {
+          schedule(() => void run(), readinessPolicy.missingReceiverRetryIntervalMs)
+          return
+        }
+
+        initialDiagnosticsCompleteRef.current = true
+        commitCompatibilityDiagnosticsState(nextState)
+
+        if (mode === 'refresh' && readinessPolicy.shouldRefreshDiagnostics(nextState)) {
+          schedule(() => void run(), readinessPolicy.diagnosticsRefreshIntervalMs)
+        }
+      }
+
+      void run()
+
+      return () => {
+        active = false
+        cancelCompatibilityDiagnosticsRequest()
+        if (timer !== undefined) window.clearTimeout(timer)
+        if (mode === 'refresh') {
+          setDiagnosticsState(currentState =>
+            currentState.status === 'loading'
+              ? settledDiagnosticsStateRef.current
+              : currentState
+          )
+        }
+      }
+    },
+    [
+      cancelCompatibilityDiagnosticsRequest,
+      commitCompatibilityDiagnosticsState,
+      readinessPolicy,
+      requestCompatibilityDiagnostics,
+    ]
+  )
+
   useEffect(() => {
     if (
       diagnosticsOpen ||
@@ -230,46 +261,13 @@ export const useCompatibilitySession = () => {
       return
     }
 
-    let active = true
-    let retryTimer: number | undefined
-    let attempt = 0
-    const tabId = pageContext.tabId
-
-    const checkDiagnosticsConnection = async () => {
-      attempt += 1
-      const nextState = await requestCompatibilityDiagnostics(tabId)
-      if (!active || nextState === null) return
-
-      if (
-        readinessPolicy.shouldRetryMissingReceiver(nextState, attempt)
-      ) {
-        retryTimer = window.setTimeout(
-          () => void checkDiagnosticsConnection(),
-          readinessPolicy.missingReceiverRetryIntervalMs
-        )
-        return
-      }
-
-      initialDiagnosticsCompleteRef.current = true
-      commitCompatibilityDiagnosticsState(nextState)
-    }
-
-    void checkDiagnosticsConnection()
-
-    return () => {
-      active = false
-      cancelCompatibilityDiagnosticsRequest()
-      if (retryTimer !== undefined) window.clearTimeout(retryTimer)
-    }
+    return startDiagnosticsCycle(pageContext.tabId, 'initial')
   }, [
-    cancelCompatibilityDiagnosticsRequest,
-    commitCompatibilityDiagnosticsState,
     diagnosticsOpen,
+    pageContext.loadStatus,
     pageContext.status,
     pageContext.tabId,
-    pageContext.loadStatus,
-    requestCompatibilityDiagnostics,
-    readinessPolicy,
+    startDiagnosticsCycle,
   ])
 
   useEffect(() => {
@@ -282,51 +280,13 @@ export const useCompatibilitySession = () => {
       return
     }
 
-    let active = true
-    let refreshTimer: number | undefined
-    let hasDiagnosticsResult = false
-    const tabId = pageContext.tabId
-
-    const refreshDiagnostics = async () => {
-      if (!hasDiagnosticsResult) {
-        setDiagnosticsState(INITIAL_COMPATIBILITY_DIAGNOSTICS_STATE)
-      }
-      const nextState = await requestCompatibilityDiagnostics(tabId)
-      if (!active || nextState === null) return
-      hasDiagnosticsResult = true
-      initialDiagnosticsCompleteRef.current = true
-      commitCompatibilityDiagnosticsState(nextState)
-      if (
-        readinessPolicy.shouldRefreshDiagnostics(nextState)
-      ) {
-        refreshTimer = window.setTimeout(
-          refreshDiagnostics,
-          readinessPolicy.diagnosticsRefreshIntervalMs
-        )
-      }
-    }
-
-    void refreshDiagnostics()
-
-    return () => {
-      active = false
-      cancelCompatibilityDiagnosticsRequest()
-      if (refreshTimer !== undefined) window.clearTimeout(refreshTimer)
-      setDiagnosticsState(currentState =>
-        currentState.status === 'loading'
-          ? settledDiagnosticsStateRef.current
-          : currentState
-      )
-    }
+    return startDiagnosticsCycle(pageContext.tabId, 'refresh')
   }, [
-    cancelCompatibilityDiagnosticsRequest,
-    commitCompatibilityDiagnosticsState,
     diagnosticsOpen,
+    pageContext.loadStatus,
     pageContext.status,
     pageContext.tabId,
-    pageContext.loadStatus,
-    requestCompatibilityDiagnostics,
-    readinessPolicy,
+    startDiagnosticsCycle,
   ])
 
   const diagnosticsTriggerState: CompatibilityDiagnosticsTriggerState =

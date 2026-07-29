@@ -203,8 +203,10 @@ const renderLabeledHint = (
   context: HintRendererContext,
   request: { icon: HintIcon; label: string },
   hintId: string,
-  labelId: string
+  labelId: string,
+  zIndex = '2147483647'
 ): void => {
+  const compactPipSpeedHint = context.responsive && hintId === SPEED_HINT_ID
   const root = context.getRoot()
   const visibleRoot = root?.isConnected && root.id === hintId && root.style.opacity === '1' ? root : null
   const existingCircle = visibleRoot?.firstElementChild ?? null
@@ -235,7 +237,7 @@ const renderLabeledHint = (
     background: 'transparent',
     color: 'white',
     pointerEvents: 'none',
-    zIndex: '2147483647',
+    zIndex,
     opacity: '0',
     transition: PLAYBACK_HINT_ENTER_TRANSITION,
     willChange: 'opacity,transform',
@@ -249,8 +251,8 @@ const renderLabeledHint = (
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    width: '100px',
-    height: '100px',
+    width: compactPipSpeedHint ? '86px' : '100px',
+    height: compactPipSpeedHint ? '86px' : '100px',
     boxSizing: 'border-box',
     borderRadius: '50%',
     background: 'rgba(0,0,0,0.68)',
@@ -268,6 +270,8 @@ const renderLabeledHint = (
     alignItems: 'center',
     justifyContent: 'center',
     lineHeight: '0',
+    transform: compactPipSpeedHint ? 'scale(0.82)' : 'none',
+    transformOrigin: 'center',
   })
   circle.append(icon)
 
@@ -284,16 +288,16 @@ const renderLabeledHint = (
     alignItems: 'center',
     justifyContent: 'center',
     boxSizing: 'border-box',
-    minWidth: '74px',
-    minHeight: '44px',
-    padding: '8px 12px',
+    minWidth: compactPipSpeedHint ? '64px' : '74px',
+    minHeight: compactPipSpeedHint ? '38px' : '44px',
+    padding: compactPipSpeedHint ? '6px 10px' : '8px 12px',
     borderRadius: '4px',
     background: 'rgba(33,33,33,0.92)',
     color: 'white',
     fontFamily: 'Arial,sans-serif',
-    fontSize: '18px',
+    fontSize: compactPipSpeedHint ? '16px' : '18px',
     fontWeight: '400',
-    lineHeight: '24px',
+    lineHeight: compactPipSpeedHint ? '22px' : '24px',
     whiteSpace: 'nowrap',
     pointerEvents: 'none',
     zIndex: '2147483647',
@@ -326,7 +330,14 @@ export const renderVolumeHint = (
 export const renderSpeedHint = (
   context: HintRendererContext,
   request: Extract<HintRequest, { type: 'speed' }>
-): void => renderLabeledHint(context, request, SPEED_HINT_ID, SPEED_HINT_LABEL_ID)
+): void =>
+  renderLabeledHint(
+    context,
+    request,
+    SPEED_HINT_ID,
+    SPEED_HINT_LABEL_ID,
+    context.responsive ? '9' : '2147483647'
+  )
 
 const updateSeekLabel = (
   renderDoc: Document,
@@ -463,6 +474,7 @@ export const renderSpaceHoldHint = (
   context: HintRendererContext,
   request: Extract<HintRequest, { type: 'spaceHold' }>
 ): void => {
+  const compactPipHint = context.responsive
   const root = context.createRoot(SPACE_HOLD_HINT_ID, {
     position: 'fixed',
     top: '0',
@@ -472,17 +484,17 @@ export const renderSpaceHoldHint = (
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '6px',
+    gap: compactPipHint ? '4px' : '6px',
     boxSizing: 'border-box',
-    minHeight: '32px',
-    padding: '6px 12px 6px 14px',
+    minHeight: compactPipHint ? '28px' : '32px',
+    padding: compactPipHint ? '4px 9px 4px 10px' : '6px 12px 6px 14px',
     borderRadius: '999px',
     background: 'rgba(33,33,33,0.92)',
     color: 'white',
     fontFamily: 'Arial,sans-serif',
-    fontSize: '14px',
+    fontSize: compactPipHint ? '12px' : '14px',
     fontWeight: '600',
-    lineHeight: '20px',
+    lineHeight: compactPipHint ? '16px' : '20px',
     whiteSpace: 'nowrap',
     pointerEvents: 'none',
     zIndex: context.responsive ? '9' : '2147483647',
@@ -494,7 +506,13 @@ export const renderSpaceHoldHint = (
   label.textContent = request.label
   const icon = context.renderDoc.createElement('div')
   icon.innerHTML = mediaHintIcons.holdSpeed
-  setStyles(icon, { display: 'flex', alignItems: 'center', lineHeight: '0' })
+  setStyles(icon, {
+    display: 'flex',
+    alignItems: 'center',
+    lineHeight: '0',
+    transform: compactPipHint ? 'scale(0.82)' : 'none',
+    transformOrigin: 'center',
+  })
   root.replaceChildren(label, icon)
   positionSpaceHoldHint(root, context.renderDoc)
   root.style.visibility = 'visible'

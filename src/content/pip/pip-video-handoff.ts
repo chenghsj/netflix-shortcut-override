@@ -1,10 +1,23 @@
-import { PLAYER_ROOT_SELECTOR } from './video-placement'
+import { selectPresentationReadyVideo } from '../dom-utils'
+import { PLAYER_ROOT_SELECTOR } from './pip-selectors'
 
 const VIDEO_HANDOFF_SETTLE_MS = 200
 const VIDEO_HANDOFF_TIMEOUT_MS = 8_000
 const VIDEO_HANDOFF_ATTEMPT_WINDOW_MS = 5_000
 const VIDEO_HANDOFF_MAX_ATTEMPTS = 3
 const VIDEO_HANDOFF_REPLACEMENT_WINDOW_MS = 2_000
+const SAME_VIDEO_RECOVERY_PROGRESS_SECONDS = 0.75
+
+type EpisodeTransitionState =
+  | { status: 'idle' }
+  | {
+      status: 'pending'
+      boundaryTime: number
+      seekObservedAfterBoundary: boolean
+      candidatesBeforeBoundary: Set<HTMLVideoElement>
+    }
+
+const IDLE_EPISODE_TRANSITION: EpisodeTransitionState = { status: 'idle' }
 
 type WindowWithMutationObserver = Window & {
   MutationObserver?: typeof MutationObserver
@@ -17,6 +30,7 @@ type PipVideoHandoffOptions = {
   initialVideo: HTMLVideoElement
   isActive: () => boolean
   onVideoHandoff: (candidate: HTMLVideoElement) => boolean
+  onEpisodeTransition: (video: HTMLVideoElement) => void
   onTimeout: () => void
 }
 
@@ -25,12 +39,22 @@ const getMutationObserver = (targetWindow: Window | null): typeof MutationObserv
     ? ((targetWindow as WindowWithMutationObserver).MutationObserver ?? null)
     : null
 
+const isUsablePresentationVideo = (video: HTMLVideoElement): boolean => {
+  if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) return true
+  if (!video.paused && !video.ended) return true
+  if (video.videoWidth > 0 && video.videoHeight > 0) return true
+
+  const rect = video.getBoundingClientRect()
+  return rect.width > 0 && rect.height > 0
+}
+
 class PipVideoHandoffImplementation {
   private readonly sourceDocument: Document
   private readonly pipWindow: Window
   private readonly videoArea: HTMLElement
   private readonly isActive: () => boolean
   private readonly onVideoHandoff: (candidate: HTMLVideoElement) => boolean
+  private readonly onEpisodeTransition: (video: HTMLVideoElement) => void
   private readonly onTimeout: () => void
   private currentVideo: HTMLVideoElement | null = null
   private sourceVideoObserver: MutationObserver | null = null
@@ -40,9 +64,13 @@ class PipVideoHandoffImplementation {
   private handoffCheckTimer: number | null = null
   private handoffTimeoutTimer: number | null = null
   private handoffAttemptTimes: number[] = []
+  private recoveryCycleStartTimes: number[] = []
+  private recoveryCycleActive = false
   private replacementGraceDeadline: number | null = null
   private replacementObservationDeadline: number | null = null
   private preferredPlayerRoot: HTMLElement | null = null
+  private episodeTransition: EpisodeTransitionState = IDLE_EPISODE_TRANSITION
+  private lastPlaybackTime = 0
   private started = false
 
   constructor(options: PipVideoHandoffOptions) {
@@ -51,6 +79,7 @@ class PipVideoHandoffImplementation {
     this.videoArea = options.videoArea
     this.isActive = options.isActive
     this.onVideoHandoff = options.onVideoHandoff
+    this.onEpisodeTransition = options.onEpisodeTransition
     this.onTimeout = options.onTimeout
     this.currentVideo = options.initialVideo
     this.preferredPlayerRoot = this.getPlayerRoot(options.initialVideo.parentElement)
@@ -76,9 +105,13 @@ class PipVideoHandoffImplementation {
     this.cleanupVideoLifecycle()
     this.clearHandoffTimers()
     this.handoffAttemptTimes = []
+    this.recoveryCycleStartTimes = []
+    this.recoveryCycleActive = false
     this.replacementGraceDeadline = null
     this.replacementObservationDeadline = null
     this.preferredPlayerRoot = null
+    this.episodeTransition = IDLE_EPISODE_TRANSITION
+    this.lastPlaybackTime = 0
     this.currentVideo = null
   }
 
@@ -89,13 +122,42 @@ class PipVideoHandoffImplementation {
     )
   }
 
+  isEpisodeTransitionPending(): boolean {
+    return this.episodeTransition.status === 'pending'
+  }
+
+  recordUserSeek(): void {
+    const transition = this.episodeTransition
+    if (transition.status !== 'pending') return
+    this.episodeTransition = {
+      ...transition,
+      seekObservedAfterBoundary: true,
+    }
+  }
+
   private bindVideoLifecycle(video: HTMLVideoElement | null): void {
     this.cleanupVideoLifecycle()
     this.currentVideo = video
     if (!video) return
+    this.lastPlaybackTime = Number.isFinite(video.currentTime) ? video.currentTime : 0
 
+    const onEpisodeBoundary = () => {
+      if (this.currentVideo !== video || !this.isActive()) return
+      this.episodeTransition = {
+        status: 'pending',
+        boundaryTime: Math.max(
+          this.lastPlaybackTime,
+          Number.isFinite(video.currentTime) ? video.currentTime : 0
+        ),
+        seekObservedAfterBoundary: false,
+        candidatesBeforeBoundary: new Set(this.getVideoHandoffCandidates(video)),
+      }
+      this.beginReplacementGrace()
+      this.scheduleHandoffCheck()
+    }
     const onReplacementNeeded = () => {
       if (this.currentVideo !== video || !this.isActive()) return
+      if (!this.beginRecoveryCycle()) return
       this.beginReplacementGrace()
       this.scheduleHandoffCheck()
     }
@@ -106,23 +168,54 @@ class PipVideoHandoffImplementation {
       ) {
         return
       }
+      const transition = this.episodeTransition
+      if (transition.status === 'pending' && this.started && this.isActive()) {
+        const restartedNearBeginning =
+          transition.boundaryTime > 30 &&
+          video.currentTime <= 30
+        if (restartedNearBeginning && !transition.seekObservedAfterBoundary) {
+          this.episodeTransition = IDLE_EPISODE_TRANSITION
+          this.onEpisodeTransition(video)
+          return
+        }
+        const recoveredWithoutEpisodeTransition =
+          transition.seekObservedAfterBoundary ||
+          transition.boundaryTime <= 30 ||
+          video.currentTime >
+            transition.boundaryTime + SAME_VIDEO_RECOVERY_PROGRESS_SECONDS
+        if (!recoveredWithoutEpisodeTransition) {
+          return
+        }
+        this.episodeTransition = IDLE_EPISODE_TRANSITION
+      }
       this.replacementGraceDeadline = null
       this.replacementObservationDeadline = null
+      this.recoveryCycleActive = false
       this.clearHandoffTimers()
     }
+    const onTimeUpdate = () => {
+      if (this.currentVideo === video && Number.isFinite(video.currentTime)) {
+        this.lastPlaybackTime = video.currentTime
+        onPlaybackRecovered()
+      }
+    }
 
-    video.addEventListener('ended', onReplacementNeeded)
-    video.addEventListener('emptied', onReplacementNeeded)
+    const onEnded = () => onEpisodeBoundary()
+    const onEmptied = () => onEpisodeBoundary()
+    video.addEventListener('ended', onEnded)
+    video.addEventListener('emptied', onEmptied)
     video.addEventListener('error', onReplacementNeeded)
     video.addEventListener('loadedmetadata', onPlaybackRecovered)
     video.addEventListener('playing', onPlaybackRecovered)
+    video.addEventListener('timeupdate', onTimeUpdate)
 
     this.videoLifecycleCleanup = () => {
-      video.removeEventListener('ended', onReplacementNeeded)
-      video.removeEventListener('emptied', onReplacementNeeded)
+      video.removeEventListener('ended', onEnded)
+      video.removeEventListener('emptied', onEmptied)
       video.removeEventListener('error', onReplacementNeeded)
       video.removeEventListener('loadedmetadata', onPlaybackRecovered)
       video.removeEventListener('playing', onPlaybackRecovered)
+      video.removeEventListener('timeupdate', onTimeUpdate)
     }
   }
 
@@ -164,6 +257,7 @@ class PipVideoHandoffImplementation {
       !replacementGraceActive &&
       this.replacementGraceDeadline === null
     ) {
+      if (!this.beginRecoveryCycle()) return
       this.beginReplacementGrace()
       replacementGraceActive = true
     }
@@ -202,7 +296,11 @@ class PipVideoHandoffImplementation {
       }, VIDEO_HANDOFF_TIMEOUT_MS)
     }
 
-    if (!candidate || this.handoffCheckTimer !== null) return
+    if (!candidate) {
+      this.scheduleHandoffRetry()
+      return
+    }
+    if (this.handoffCheckTimer !== null) return
     this.handoffCheckTimer = timerWindow.setTimeout(() => {
       this.handoffCheckTimer = null
       this.tryVideoHandoff()
@@ -231,12 +329,18 @@ class PipVideoHandoffImplementation {
       if (currentVideoAttached && this.replacementGraceDeadline === null) {
         this.clearHandoffTimers()
       }
+      if (!candidate && this.replacementGraceDeadline !== null) {
+        this.scheduleHandoffRetry()
+      }
       return
     }
     if (!candidate.parentElement) {
       this.clearHandoffTimers()
       return
     }
+
+    if (candidate !== currentVideo && !this.beginRecoveryCycle()) return
+    const candidatePlayerRoot = this.getPlayerRoot(candidate.parentElement)
 
     const didHandoff = (() => {
       try {
@@ -261,14 +365,26 @@ class PipVideoHandoffImplementation {
     }
 
     this.handoffAttemptTimes = []
+    this.recoveryCycleActive = false
+    const transition = this.episodeTransition
     this.bindVideoLifecycle(candidate)
-    this.preferredPlayerRoot = this.getPlayerRoot(candidate.parentElement)
+    this.preferredPlayerRoot = candidatePlayerRoot ?? this.preferredPlayerRoot
     this.replacementGraceDeadline = null
     this.replacementObservationDeadline =
       candidate === currentVideo
         ? Date.now() + VIDEO_HANDOFF_REPLACEMENT_WINDOW_MS
         : null
     this.clearHandoffTimers()
+    if (transition.status === 'pending' && candidate !== currentVideo) {
+      this.episodeTransition = IDLE_EPISODE_TRANSITION
+      if (
+        !transition.candidatesBeforeBoundary.has(candidate) &&
+        this.started &&
+        this.isActive()
+      ) {
+        this.onEpisodeTransition(candidate)
+      }
+    }
   }
 
   private isReplacementGraceActive(): boolean {
@@ -288,9 +404,47 @@ class PipVideoHandoffImplementation {
     this.replacementGraceDeadline = Date.now() + VIDEO_HANDOFF_TIMEOUT_MS
   }
 
+  private beginRecoveryCycle(): boolean {
+    if (this.recoveryCycleActive) return true
+    const now = Date.now()
+    this.recoveryCycleStartTimes = this.recoveryCycleStartTimes.filter(
+      startedAt => now - startedAt < VIDEO_HANDOFF_ATTEMPT_WINDOW_MS
+    )
+    this.recoveryCycleStartTimes.push(now)
+    this.recoveryCycleActive = true
+    if (this.recoveryCycleStartTimes.length < VIDEO_HANDOFF_MAX_ATTEMPTS) return true
+    this.onTimeout()
+    return false
+  }
+
   private findVideoHandoffCandidate(
     currentVideo: HTMLVideoElement | null
   ): HTMLVideoElement | null {
+    const candidates = this.getVideoHandoffCandidates(currentVideo)
+    const transition = this.episodeTransition
+    if (transition.status === 'pending') {
+      const nextEpisodeVideo = selectPresentationReadyVideo(
+        candidates.filter(video => !transition.candidatesBeforeBoundary.has(video))
+      )
+      if (nextEpisodeVideo) return nextEpisodeVideo
+    }
+
+    const replacementVideo = selectPresentationReadyVideo(
+      candidates.filter(isUsablePresentationVideo)
+    )
+    if (replacementVideo) return replacementVideo
+
+    return currentVideo &&
+      currentVideo.parentElement !== this.videoArea &&
+      currentVideo.parentElement &&
+      isUsablePresentationVideo(currentVideo)
+      ? currentVideo
+      : null
+  }
+
+  private getVideoHandoffCandidates(
+    currentVideo: HTMLVideoElement | null
+  ): HTMLVideoElement[] {
     const playerRoots = this.getPlayerRoots()
     const currentVideoRoot =
       currentVideo?.ownerDocument === this.sourceDocument
@@ -309,22 +463,13 @@ class PipVideoHandoffImplementation {
       : playerRoots.length > 0
         ? playerRoots
         : [this.sourceDocument]
-    const sourceVideos = Array.from(
-      new Set(
-        searchRoots.flatMap(root =>
-          Array.from(root.querySelectorAll<HTMLVideoElement>('video'))
-        )
-      )
-    ).filter(video => video.parentElement !== null)
-
-    const replacementVideo = sourceVideos.find(video => video !== currentVideo)
-    if (replacementVideo) return replacementVideo
-
-    return currentVideo &&
-      currentVideo.parentElement !== this.videoArea &&
-      currentVideo.parentElement
-      ? currentVideo
-      : null
+    const candidates = new Set<HTMLVideoElement>()
+    for (const root of searchRoots) {
+      for (const video of root.querySelectorAll<HTMLVideoElement>('video')) {
+        if (video !== currentVideo && video.parentElement !== null) candidates.add(video)
+      }
+    }
+    return Array.from(candidates)
   }
 
   private clearHandoffTimers(): void {

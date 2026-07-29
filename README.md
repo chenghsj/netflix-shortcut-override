@@ -32,14 +32,16 @@ This project is not affiliated with, endorsed by, or sponsored by Netflix.
 - Enable or disable each shortcut independently.
 - Reset shortcut bindings without resetting global or speed settings.
 - Show compact media hints for shortcut actions.
-- Use the browser UI language as the initial default when supported, then choose the options UI language manually.
+- Follow the browser UI language automatically when supported, or choose the options UI language manually.
 - Rewind and fast-forward by a configurable interval.
 - Configure the rewind and fast-forward interval.
 - Control play/pause, volume, mute, fullscreen, skip intro, and playback speed.
-- Toggle a Document Picture-in-Picture player with Netflix subtitle mirroring.
-- Use the same configurable shortcut to enter or exit Picture-in-Picture.
-- The first click focuses the Picture-in-Picture window; later clicks play or pause the video.
-- In subtitle-mirrored Picture-in-Picture, Space is handled by the extension because Netflix cannot receive the focused window's native key event.
+- Toggle a Document Picture-in-Picture player with Netflix subtitle mirroring on Chrome and Edge Chromium.
+- Use the same configurable shortcut to enter or exit Picture-in-Picture on supported Chromium browsers.
+- Firefox supports the shortcut, popup, and options features; the subtitle-preserving Picture-in-Picture setting is disabled because Firefox is not supported.
+- In Chromium's subtitle-mirrored Picture-in-Picture window, the first primary click immediately plays or pauses the video while allowing the browser to focus the window.
+- Use the PiP overlay for timeline seeking, playback transport, volume, mute, and subtitle appearance settings; it hides after three seconds of pointer idle.
+- In Chromium's subtitle-mirrored Picture-in-Picture, Space is handled by the extension because Netflix cannot receive the focused window's native key event.
 - Hold Space to temporarily switch to a configurable playback speed, then restore on release.
 - Persist settings with `chrome.storage`.
 - Build as a Manifest V3 browser extension.
@@ -101,14 +103,16 @@ The options UI currently includes:
 
 - Node.js 22 or newer. CI uses Node.js 24.
 - npm
-- Google Chrome or a Chromium-based browser that supports Manifest V3 extensions.
-- Chrome or Edge Chromium is required for the subtitle-preserving Document Picture-in-Picture feature.
+- Google Chrome, Microsoft Edge, or Firefox Desktop.
+- Chrome or Edge Chromium is required for the subtitle-preserving Document Picture-in-Picture feature; Firefox displays it as unsupported.
 
 ## Install From Release
 
 Use this path if you just want to install the extension without building it from source.
 
-1. Download the latest release zip from the [GitHub Releases page](https://github.com/chenghsj/netflix-shortcut-override/releases/latest).
+### Chrome or Edge Chromium
+
+1. Download the latest Chromium zip from the [GitHub Releases page](https://github.com/chenghsj/netflix-shortcut-override/releases/latest).
 
 2. Extract the zip file.
 
@@ -125,6 +129,18 @@ Use this path if you just want to install the extension without building it from
 6. Select the extracted folder that contains `manifest.json`.
 
 7. Open the extension options page and configure shortcuts.
+
+### Firefox Desktop
+
+1. Download the signed Firefox `.xpi` from the [GitHub Releases page](https://github.com/chenghsj/netflix-shortcut-override/releases/latest).
+
+2. Open Firefox Add-ons and Themes with `about:addons`.
+
+3. Open the gear menu and choose "Install Add-on From File…".
+
+4. Select the downloaded `.xpi` file and confirm the installation.
+
+Firefox receives updates through the release's update manifest. The Firefox Picture-in-Picture setting is disabled and marked unsupported; `Shift+P` passes through without being intercepted.
 
 ## Install From Source
 
@@ -156,6 +172,14 @@ Use this path if you just want to install the extension without building it from
 
 Do not load the repository root. Chrome should load `dist`.
 
+To test Firefox locally, build its browser-specific directory:
+
+```sh
+npm run build:firefox
+```
+
+Then open `about:debugging#/runtime/this-firefox`, choose "Load Temporary Add-on…", and select `firefox-dist/manifest.json`. See [the Firefox browser test guide](docs/firefox-real-browser-test.md) for the smoke-test checklist.
+
 ## Development
 
 Install dependencies once:
@@ -176,13 +200,19 @@ Keep this terminal running while testing the unpacked extension. If the dev serv
 
 Reload the extension in `chrome://extensions` after changes that affect the manifest, service worker startup, or content script registration. UI-only changes should usually update through CRXJS HMR.
 
+For Firefox, run `npm run build:firefox` and load the generated `firefox-dist/manifest.json` as a temporary add-on from `about:debugging`. Firefox uses the same source code and settings; the Picture-in-Picture shortcut is disabled and passes through.
+
 ## Scripts
 
 | Command | Description |
 | --- | --- |
 | `npm run dev` | Remove `dist` and start the CRXJS/Vite dev server with HMR. |
 | `npm run build` | Type-check, build, and patch the production extension output. |
-| `npm run build:edge` | Build the production extension and create an Edge-compatible release package. |
+| `npm run build:firefox` | Build the production extension and prepare the Firefox-specific output. |
+| `npm run prepare:firefox` | Convert the Chromium build output into a Firefox-compatible manifest. |
+| `npm run lint:firefox` | Run `web-ext lint` against `firefox-dist`. |
+| `npm run package:chromium` | Create the keyless Chromium ZIP and checksum. |
+| `npm run package:firefox` | Submit source and sign the Firefox XPI through AMO, then create update metadata and checksums. |
 | `npm run lint` | Run ESLint. |
 | `npm test` | Run Vitest tests. |
 | `npm run test:coverage` | Run the complete test suite with enforced coverage thresholds. |
@@ -202,8 +232,12 @@ Reload the extension in `chrome://extensions` after changes that affect the mani
 |   `-- icons
 |-- scripts
 |   |-- fix-extension-build.mjs
+|   |-- build-chromium-package.mjs
+|   |-- build-firefox-package.mjs
+|   |-- firefox-config.mjs
 |   |-- generate-icons.mjs
-|   `-- generate-release-notes.mjs
+|   |-- generate-release-notes.mjs
+|   `-- prepare-firefox-dist.mjs
 |-- src
 |   |-- background
 |   |-- components
@@ -218,6 +252,8 @@ Reload the extension in `chrome://extensions` after changes that affect the mani
 
 Key areas:
 
+- `CONTEXT.md`: canonical domain terminology for playback, compatibility, and PiP behavior.
+- `docs/behavior-spec.md`: observable product requirements and recovery policies.
 - `src/content/index.ts`: keyboard interception and routing between the shortcut, PiP, and hint domains.
 - `src/content/shortcuts/`: media command handling and Space hold interaction state.
 - `src/content/hints/`: hint overlay rendering, layout, icons, and timing.
@@ -226,7 +262,9 @@ Key areas:
 - `src/background/index.ts`: background-side Netflix API execution fallback and popup focus handoff coordination.
 - `src/popup/popup-app.tsx`: toolbar popup for quick status, toggles, shortcut summary, and options entry.
 - `src/options/options-app.tsx`: extension options UI.
-- `src/shared/shortcuts.ts`: shortcut defaults, normalization, conflict checks, and speed helpers.
+- `src/shared/shortcut-bindings.ts`: shortcut actions, default key bindings, normalization, and conflict checks.
+- `src/shared/shortcut-settings.ts`: default settings, validation, and settings normalization.
+- `src/shared/playback-speed.ts`: playback-speed stepping and speed normalization helpers.
 - `src/shared/i18n.ts`: localized options copy and media hint labels.
 - `scripts/fix-extension-build.mjs`: patches and validates the CRXJS production build output.
 
@@ -276,7 +314,7 @@ The coverage check enforces minimum global thresholds of 80% statements, 65% bra
 80% functions, and 85% lines. The test suite covers shortcut normalization, options behavior,
 content shortcut handling, Netflix API bridge behavior, and background execution behavior.
 
-The real-Chrome regression flow, including the reload-in-progress popup case, is documented in [docs/chrome-real-browser-test.md](docs/chrome-real-browser-test.md).
+The real-Chrome regression flow, including the reload-in-progress popup case, is documented in [docs/chrome-real-browser-test.md](docs/chrome-real-browser-test.md). The Firefox smoke-test flow is documented in [docs/firefox-real-browser-test.md](docs/firefox-real-browser-test.md).
 
 ## Release
 
@@ -303,17 +341,27 @@ The release workflow will:
 3. Validate that the tag matches `manifest.json`.
 4. Run lint and tests with coverage thresholds.
 5. Build the extension.
-6. Generate release notes.
-7. Package `dist` as a zip file.
-8. Package the Microsoft Edge-specific zip file.
-9. Publish or update the GitHub Release.
+6. Prepare and lint the Firefox build.
+7. Generate release notes.
+8. Package a Chromium zip file without the manifest `key` field.
+9. Submit the Firefox source package to AMO, sign the Firefox XPI, and generate its update manifest and checksums.
+10. Publish or update the GitHub Release.
 
 The generated release assets are:
 
-- `shortcut-override-for-netflix-<version>.zip`
-- `shortcut-override-for-netflix-<version>.zip.sha256`
-- `shortcut-override-for-netflix-edge-<version>.zip`
-- `shortcut-override-for-netflix-edge-<version>.zip.sha256`
+- `shortcut-override-for-netflix-chromium-<version>.zip`
+- `shortcut-override-for-netflix-chromium-<version>.zip.sha256`
+- `shortcut-override-for-netflix-firefox-<version>.xpi`
+- `shortcut-override-for-netflix-firefox-<version>.xpi.sha256`
+- `shortcut-override-for-netflix-firefox-updates.json`
+- `shortcut-override-for-netflix-firefox-updates.json.sha256`
+
+The Firefox signing step requires these repository secrets:
+
+- `AMO_JWT_ISSUER`
+- `AMO_JWT_SECRET`
+
+If AMO signing fails, the release stops before publishing so that a release cannot contain only a partially generated browser set.
 
 ## Changelog
 
@@ -431,15 +479,15 @@ Create a zip from the contents of `dist`:
 
 The zip root should contain `manifest.json`, not a nested `dist` folder.
 
-For Microsoft Edge Partner Center, build the Edge-specific package:
+To create the keyless release package for Chrome Web Store or Microsoft Edge Partner Center:
 
 ```sh
-npm run build:edge
+npm run package:chromium
 ```
 
-That package is written to `release-assets/shortcut-override-for-netflix-edge-<version>.zip`.
-It is generated from `dist`, but removes the Chrome extension `key` field and shortens
-`short_name` to satisfy Edge validation.
+That package is written to `release-assets/shortcut-override-for-netflix-chromium-<version>.zip`.
+The same ZIP is used for both stores. Its manifest omits `key`, and the shared
+`short_name` already satisfies Edge validation.
 
 ## License
 

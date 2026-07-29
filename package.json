@@ -1,7 +1,7 @@
 {
   "name": "netflix-shortcut-override",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.4.1",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -12,7 +12,11 @@
     "changelog": "node scripts/generate-release-notes.mjs",
     "icons": "node scripts/generate-icons.mjs",
     "build": "tsc -b && vite build && node scripts/fix-extension-build.mjs",
-    "build:edge": "npm run build && node scripts/build-edge-package.mjs",
+    "build:firefox": "npm run build && npm run prepare:firefox",
+    "package:chromium": "node scripts/build-chromium-package.mjs",
+    "package:firefox": "node scripts/build-firefox-package.mjs",
+    "prepare:firefox": "node scripts/prepare-firefox-dist.mjs",
+    "lint:firefox": "web-ext lint --source-dir firefox-dist --self-hosted",
     "lint": "eslint .",
     "preview": "vite preview",
     "typecheck": "tsc -b",
@@ -62,7 +66,8 @@
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",
     "vite": "^8.1.5",
-    "vitest": "^4.1.6"
+    "vitest": "^4.1.6",
+    "web-ext": "10.5.0"
   },
   "overrides": {
     "@babel/core": "^7.29.7",

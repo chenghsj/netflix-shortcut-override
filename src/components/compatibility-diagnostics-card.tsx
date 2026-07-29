@@ -14,8 +14,8 @@ import {
   formatCompatibilityDiagnosticsReport,
 } from '@/shared/diagnostics'
 import { createCompatibilityReadinessPolicy } from '@/shared/compatibility-readiness'
+import type { CompatibilityDiagnosticsState } from '@/shared/compatibility-readiness'
 import { getCopy } from '@/shared/i18n'
-import type { CompatibilityDiagnosticsState } from '@/popup/use-compatibility-session'
 
 type CompatibilityDiagnosticsCardProps = {
   className?: string
@@ -63,7 +63,7 @@ export function CompatibilityDiagnosticsCard({
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle')
   const diagnostics = state.diagnostics
   const readinessPolicy = useMemo(() => createCompatibilityReadinessPolicy(), [])
-  const isFirefox = !readinessPolicy.requirePageBridge
+  const showPageBridgeDiagnostic = readinessPolicy.requirePageBridge
   const coreReady = readinessPolicy.isCoreReady(state)
   const compatible = coreReady && diagnostics?.pipSupported === true
 
@@ -174,7 +174,7 @@ export function CompatibilityDiagnosticsCard({
               }
               passed={diagnostics.videoFound}
             />
-            {!isFirefox && (
+            {showPageBridgeDiagnostic && (
               <DiagnosticsRow
                 label={copy.diagnosticsBridge}
                 value={

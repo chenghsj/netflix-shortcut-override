@@ -1,23 +1,49 @@
 # Netflix Shortcut Override
 
-This context describes how the extension recognizes Netflix playback readiness and coordinates shortcut behavior.
+This context defines the language used to describe Netflix playback readiness, shortcut routing, and the extension-managed Picture-in-Picture experience. Product behavior and timing requirements live in [docs/behavior-spec.md](docs/behavior-spec.md).
 
 ## Language
 
+**Playback context**:
+A Netflix watch experience in which the extension can route configured playback shortcuts to the active Netflix player.
+_Avoid_: Watch page state, player page
+
 **Compatibility session**:
-The period in which the extension observes one active Netflix watch tab and determines whether shortcut playback capabilities are ready or require a page reload.
+The period in which the extension observes one active Netflix watch tab and determines whether its playback context is ready for shortcut handling.
 _Avoid_: Diagnostics flow, compatibility check
 
-- A tab whose load status is `loading` remains in the checking state and does not publish diagnostics.
-- After ten seconds of continuous loading, the popup explains that compatibility will be checked automatically when loading finishes; it never reloads the page automatically.
-- Each `loading`/`complete` transition starts a new diagnostics generation so an older response cannot overwrite the current state.
-
 **Playback focus restoration**:
-A best-effort handoff of keyboard focus from a dismissed toolbar popup to the still-visible Netflix watch page.
+A best-effort handoff of keyboard focus from a dismissed toolbar popup to the same still-visible Netflix playback context.
 _Avoid_: Tab activation, video focus
 
-- The popup delegates the handoff to the background service worker when it is passively dismissed.
-- The request remains pending for at most 30 seconds while the same active, visible watch tab finishes loading and reports fresh playback readiness.
-- The request is cancelled when the user changes tab or window, closes the tab, or leaves the watch page.
-- Once eligible, the page receives up to three `window.focus()` attempts, 100 ms apart, and reports whether focus was acquired. The extension does not focus Netflix's video, player, or document body.
-- Pending state in `chrome.storage.session` contains only the tab ID, window ID, an opaque request ID, and deadline so a restarted service worker can continue the same handoff.
+**Netflix playback session**:
+The active Netflix player state that owns playback position and transport actions for one watch experience.
+_Avoid_: HTML video session, PiP player
+
+**PiP session**:
+The interaction lifecycle that presents one Netflix playback session in an extension-managed Picture-in-Picture window until it exits or is closed.
+_Avoid_: Native Video PiP, second playback session
+
+**Adopted video**:
+The HTML video element currently presented by the PiP session as the visual mirror of its Netflix playback session.
+_Avoid_: PiP player, playback owner
+
+**Presentation-ready video**:
+The video element in the current playback context most likely to provide a current, visible frame for shortcut handling or PiP presentation.
+_Avoid_: First video, active session
+
+**Recoverable video replacement**:
+A change to the adopted video that does not provide sufficient evidence that the Netflix playback session moved to another episode.
+_Avoid_: Episode transition, video reload
+
+**Episode transition**:
+A confirmed change from the current episode's Netflix playback session to the next episode's playback session.
+_Avoid_: Video replacement, ended event
+
+**PiP timeline**:
+The playback-position control that displays the Netflix playback session's position and submits seek intent without becoming a separate source of playback truth.
+_Avoid_: Native video timeline, playback clock
+
+**PiP transport controls**:
+The extension-managed playback, seek, volume, and subtitle controls presented within a PiP session.
+_Avoid_: Netflix controls, native video controls

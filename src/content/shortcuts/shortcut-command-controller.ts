@@ -16,14 +16,16 @@ import {
   type SpaceInteractionController,
 } from './space-interaction-controller'
 import type { CommandContext, ShortcutCommand } from './shortcut-command-types'
-import {
-  resolveNextPlaybackRate,
-  type ShortcutAction,
-  type ShortcutSettings,
-} from '@/shared/shortcuts'
+import { resolveNextPlaybackRate } from '@/shared/playback-speed'
+import type { ShortcutAction, ShortcutSettings } from '@/shared/shortcut-types'
 
 export type ShortcutCommandController = SpaceInteractionController & {
   execute(action: ShortcutAction, targetDoc: Document): boolean
+  setVolume(volume: number, targetDoc: Document): boolean
+}
+
+type ShortcutCommandControllerOptions = {
+  onSeekRequested?: () => void
 }
 
 const formatPlaybackRate = (rate: number): string =>
@@ -71,7 +73,11 @@ const showPlaybackRate = (
 }
 
 const seekCommand =
-  (playbackSession: NetflixPlaybackSession, direction: -1 | 1): ShortcutCommand =>
+  (
+    playbackSession: NetflixPlaybackSession,
+    direction: -1 | 1,
+    onSeekRequested?: () => void
+  ): ShortcutCommand =>
   context => {
     const failureIcon =
       direction === -1
@@ -82,6 +88,7 @@ const seekCommand =
       direction,
       seconds: context.settings.seek.seconds,
     })
+    onSeekRequested?.()
     void playbackSession.seekBy(direction * context.settings.seek.seconds * 1000).then(result => {
       if (!context.isCurrentAction()) return
 
@@ -118,7 +125,8 @@ const togglePlayback = (
 }
 
 const createCommandMap = (
-  playbackSession: NetflixPlaybackSession
+  playbackSession: NetflixPlaybackSession,
+  options: ShortcutCommandControllerOptions
 ): Record<ShortcutAction, ShortcutCommand> => ({
   playPause: context => {
     const video = findVideo(context.targetDoc)
@@ -127,13 +135,13 @@ const createCommandMap = (
     togglePlayback(playbackSession, video, context)
     return true
   },
-  seekBackward: seekCommand(playbackSession, -1),
-  seekForward: seekCommand(playbackSession, 1),
+  seekBackward: seekCommand(playbackSession, -1, options.onSeekRequested),
+  seekForward: seekCommand(playbackSession, 1, options.onSeekRequested),
   volumeUp: context => {
     const video = findVideo(context.targetDoc)
     if (!video) return false
     const state = playbackSession.adjustVolume(video, 0.05)
-    const icon = state.volume === 0 ? icons.mute : icons.volume
+    const icon = state.muted || state.volume === 0 ? icons.mute : icons.volume
     showVolume(context, icon, `${Math.round(state.volume * 100)}%`)
     showCommandFailure(context, state.completion, icon)
     return true
@@ -142,7 +150,7 @@ const createCommandMap = (
     const video = findVideo(context.targetDoc)
     if (!video) return false
     const state = playbackSession.adjustVolume(video, -0.05)
-    const icon = state.volume === 0 ? icons.mute : icons.volumeDown
+    const icon = state.muted || state.volume === 0 ? icons.mute : icons.volumeDown
     showVolume(context, icon, `${Math.round(state.volume * 100)}%`)
     showCommandFailure(context, state.completion, icon)
     return true
@@ -151,16 +159,9 @@ const createCommandMap = (
     const video = findVideo(context.targetDoc)
     if (!video) return false
     const state = playbackSession.toggleMute(video)
-    showVolume(
-      context,
-      state.muted ? icons.mute : icons.volume,
-      `${Math.round(state.volume * 100)}%`
-    )
-    showCommandFailure(
-      context,
-      state.completion,
-      state.muted ? icons.mute : icons.volume
-    )
+    const icon = state.muted ? icons.mute : icons.volume
+    showVolume(context, icon, `${state.muted ? 0 : Math.round(state.volume * 100)}%`)
+    showCommandFailure(context, state.completion, icon)
     return true
   },
   fullscreen: context => {
@@ -218,10 +219,11 @@ const createCommandMap = (
 
 export const createShortcutCommandController = (
   getSettings: () => ShortcutSettings,
-  playbackSession: NetflixPlaybackSession = createNetflixPlaybackSession()
+  playbackSession: NetflixPlaybackSession = createNetflixPlaybackSession(),
+  options: ShortcutCommandControllerOptions = {}
 ): ShortcutCommandController => {
   let currentActionToken = 0
-  const commands = createCommandMap(playbackSession)
+  const commands = createCommandMap(playbackSession, options)
 
   const createContext = (targetDoc: Document, actionToken = currentActionToken): CommandContext => ({
     settings: getSettings(),
@@ -239,6 +241,25 @@ export const createShortcutCommandController = (
     return commands[action](createContext(targetDoc, actionToken))
   }
 
+  const setVolume = (volume: number, targetDoc: Document): boolean => {
+    const actionToken = startAction()
+    const context = createContext(targetDoc, actionToken)
+    const video = findVideo(targetDoc)
+    if (!video) return false
+
+    const previousVolume = video.muted ? 0 : video.volume
+    const state = playbackSession.setVolume(video, volume)
+    const icon =
+      state.muted || state.volume === 0
+        ? icons.mute
+        : state.volume < previousVolume
+          ? icons.volumeDown
+          : icons.volume
+    showVolume(context, icon, `${state.muted ? 0 : Math.round(state.volume * 100)}%`)
+    showCommandFailure(context, state.completion, icon)
+    return true
+  }
+
   const spaceInteraction = createSpaceInteractionController({
     createContext,
     startAction,
@@ -253,5 +274,6 @@ export const createShortcutCommandController = (
   return {
     ...spaceInteraction,
     execute,
+    setVolume,
   }
 }

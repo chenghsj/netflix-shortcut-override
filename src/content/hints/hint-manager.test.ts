@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { createHintIcon, getHintManager, PIP_DOCUMENT_MARKER } from './hint-manager'
+import { markPipDocument } from '@/content/pip/pip-document'
+import { createHintIcon, getHintManager } from './hint-manager'
 
 describe('HintManager', () => {
   beforeEach(() => {
@@ -232,7 +233,7 @@ describe('HintManager', () => {
     const pipDoc = iframe.contentDocument
     if (!pipWindow || !pipDoc) throw new Error('Expected PiP document')
 
-    pipDoc.documentElement.dataset[PIP_DOCUMENT_MARKER] = 'true'
+    markPipDocument(pipDoc)
     pipDoc.body.append(pipDoc.createElement('video'))
     Object.defineProperties(pipWindow, {
       innerWidth: { configurable: true, value: 320 },
@@ -265,7 +266,7 @@ describe('HintManager', () => {
     const pipDoc = iframe.contentDocument
     if (!pipWindow || !pipDoc) throw new Error('Expected PiP document')
 
-    pipDoc.documentElement.dataset[PIP_DOCUMENT_MARKER] = 'true'
+    markPipDocument(pipDoc)
     pipDoc.body.append(pipDoc.createElement('video'))
     Object.defineProperties(pipWindow, {
       innerWidth: { configurable: true, value: 320 },
@@ -296,13 +297,49 @@ describe('HintManager', () => {
     const pipDoc = iframe.contentDocument
     if (!pipDoc) throw new Error('Expected PiP document')
 
-    pipDoc.documentElement.dataset[PIP_DOCUMENT_MARKER] = 'true'
+    markPipDocument(pipDoc)
     pipDoc.body.append(pipDoc.createElement('video'))
 
     const manager = getHintManager(pipDoc)
     manager.show({ type: 'spaceHold', label: '2x' })
 
-    expect(pipDoc.getElementById('shortcut-override-space-hold-hint')?.style.zIndex).toBe('9')
+    const hint = pipDoc.getElementById('shortcut-override-space-hold-hint')
+    const icon = hint?.lastElementChild as HTMLElement | null
+    expect(hint?.style.zIndex).toBe('9')
+    expect(hint?.style.minHeight).toBe('28px')
+    expect(hint?.style.padding).toBe('4px 9px 4px 10px')
+    expect(hint?.style.fontSize).toBe('12px')
+    expect(icon?.style.transform).toBe('scale(0.82)')
+
+    manager.destroy()
+    iframe.remove()
+  })
+
+  it('renders the PiP speed hint below mirrored subtitles', () => {
+    const iframe = document.createElement('iframe')
+    document.body.append(iframe)
+    const pipDoc = iframe.contentDocument
+    if (!pipDoc) throw new Error('Expected PiP document')
+
+    markPipDocument(pipDoc)
+    const videoArea = pipDoc.createElement('div')
+    videoArea.append(pipDoc.createElement('video'))
+    pipDoc.body.append(videoArea)
+
+    const manager = getHintManager(pipDoc)
+    manager.show({ type: 'speed', icon: createHintIcon('<svg />'), label: '1.25x' })
+
+    const hint = pipDoc.getElementById('shortcut-override-speed-hint')
+    const circle = hint?.firstElementChild as HTMLElement | null
+    const icon = circle?.firstElementChild as HTMLElement | null
+    const label = pipDoc.getElementById('shortcut-override-speed-hint-label')
+    expect(hint?.style.zIndex).toBe('9')
+    expect(hint?.parentElement).toBe(videoArea)
+    expect(circle?.style.width).toBe('86px')
+    expect(circle?.style.height).toBe('86px')
+    expect(icon?.style.transform).toBe('scale(0.82)')
+    expect(label?.style.fontSize).toBe('16px')
+    expect(label?.style.minHeight).toBe('38px')
 
     manager.destroy()
     iframe.remove()

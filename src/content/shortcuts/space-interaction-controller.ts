@@ -1,7 +1,7 @@
 import type { NetflixPlaybackSession } from '@/content/netflix-playback-session'
 import { resolveLocalePreference } from '@/shared/browser-locale'
 import type { CommandContext } from './shortcut-command-types'
-import type { Locale } from '@/shared/shortcuts'
+import type { Locale } from '@/shared/shortcut-types'
 
 type SpaceInteractionState = {
   targetDoc: Document

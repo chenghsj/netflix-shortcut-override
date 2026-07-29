@@ -5,6 +5,7 @@ export const NETFLIX_API_ACTIONS = [
   'play',
   'pause',
   'seek',
+  'seekTo',
   'setVolume',
   'setMuted',
   'unmuteWithVolume',

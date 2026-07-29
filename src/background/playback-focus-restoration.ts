@@ -1,10 +1,6 @@
-import {
-  COMPATIBILITY_DIAGNOSTICS_MESSAGE_TYPE,
-  type CompatibilityDiagnostics,
-} from '@/shared/diagnostics'
+import { requestCompatibilityDiagnostics } from '@/shared/compatibility-diagnostics-client'
 import {
   createCompatibilityReadinessPolicy,
-  type CompatibilityDiagnosticsState,
 } from '@/shared/compatibility-readiness'
 import {
   isNetflixWatchUrl,
@@ -147,26 +143,6 @@ const getWindow = (
     })
   })
 
-const getCompatibilityDiagnostics = (
-  tabId: number
-): Promise<CompatibilityDiagnosticsState> =>
-  new Promise(resolve => {
-    chrome.tabs.sendMessage(
-      tabId,
-      { type: COMPATIBILITY_DIAGNOSTICS_MESSAGE_TYPE },
-      response => {
-        resolve(
-          readinessPolicy.resolveState({
-            diagnostics: response
-              ? (response as CompatibilityDiagnostics)
-              : undefined,
-            errorMessage: chrome.runtime.lastError?.message,
-          })
-        )
-      }
-    )
-  })
-
 type FocusTargetState = 'waiting' | 'eligible' | 'cancel'
 
 const getFocusTargetState = async (
@@ -203,7 +179,10 @@ const attemptFocusRestoration = async (
   }
   if (targetState === 'waiting') return
 
-  const diagnosticsState = await getCompatibilityDiagnostics(pending.tabId)
+  const diagnosticsState = await requestCompatibilityDiagnostics(
+    pending.tabId,
+    readinessPolicy
+  )
   if (!(await isCurrentPendingFocusRestoration(pending))) return
   if (!readinessPolicy.isPlaybackReady(diagnosticsState)) {
     if (!readinessRetryTimers.has(pending.tabId)) {

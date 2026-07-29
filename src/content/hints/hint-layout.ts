@@ -1,10 +1,10 @@
-import { isVideoElement } from '@/content/dom-utils'
+import { findVideo } from '@/content/dom-utils'
+import { isPipDocument } from '@/content/pip/pip-document'
 import {
   HINT_SCALE_CSS_VAR,
   SEEK_HINT_EDGE_INSET_PX,
   SEEK_HINT_OUTER_TRANSFORM,
 } from './hint-constants'
-import { PIP_DOCUMENT_MARKER } from './hint-definitions'
 
 const PIP_HINT_BASE_WIDTH = 640
 const PIP_HINT_BASE_HEIGHT = 360
@@ -18,15 +18,8 @@ export const setStyles = (element: HTMLElement, styles: StyleMap): void => {
 }
 
 const getHintAnchor = (targetDoc: Document): HTMLElement | null => {
-  const localVideo = targetDoc.querySelector('video')
-  if (isVideoElement(localVideo)) return localVideo.parentElement ?? localVideo
-
-  if (targetDoc !== document) {
-    const rootVideo = document.querySelector('video')
-    if (isVideoElement(rootVideo)) return rootVideo.parentElement ?? rootVideo
-  }
-
-  return null
+  const video = findVideo(targetDoc)
+  return video ? video.parentElement ?? video : null
 }
 
 export const getHintRenderDocument = (targetDoc: Document): Document =>
@@ -38,6 +31,10 @@ export const getHintRenderHost = (renderDoc: Document): HTMLElement => {
     return fullscreenElement as HTMLElement
   }
 
+  if (isPipDocument(renderDoc)) {
+    return getHintAnchor(renderDoc) ?? renderDoc.body
+  }
+
   return renderDoc.body
 }
 
@@ -45,9 +42,6 @@ const getViewportSize = (targetDoc: Document): { width: number; height: number }
   width: targetDoc.defaultView?.innerWidth ?? window.innerWidth,
   height: targetDoc.defaultView?.innerHeight ?? window.innerHeight,
 })
-
-export const isPipHintDocument = (targetDoc: Document): boolean =>
-  targetDoc.documentElement?.dataset[PIP_DOCUMENT_MARKER] === 'true'
 
 export const getPipHintScale = (targetDoc: Document): number => {
   const { width, height } = getViewportSize(targetDoc)
@@ -93,7 +87,7 @@ export const positionLabeledHintLabel = (element: HTMLElement): void => {
 export const positionSpaceHoldHint = (element: HTMLElement, renderDoc: Document): void => {
   const anchorRect = getHintAnchor(renderDoc)?.getBoundingClientRect()
   const video = renderDoc.querySelector('video')
-  const videoRect = isVideoElement(video) ? video.getBoundingClientRect() : null
+  const videoRect = video?.getBoundingClientRect() ?? null
   const viewportHeight = getViewportSize(renderDoc).height
   const topOffset = Math.max(20, Math.min(40, viewportHeight * 0.04))
   const videoTop =
