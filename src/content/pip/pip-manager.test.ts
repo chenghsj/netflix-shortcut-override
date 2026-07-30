@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createNetflixPlaybackSession } from '@/content/netflix-playback-session'
+import { findVideo } from '@/content/dom-utils'
 import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
 import { PipManager } from './pip-manager'
 import { VideoPlacement } from './video-placement'
@@ -1192,9 +1193,38 @@ describe('PipManager', () => {
       expect(manager.isActive).toBe(false)
       expect(nextVideo.parentElement).toBe(player)
       expect(nextVideoRemovalCount).toBe(0)
+      expect(initialVideo.ownerDocument).toBe(pipWindow.document)
+      expect(Array.from(document.querySelectorAll('video'))).toEqual([nextVideo])
+      expect(findVideo(document)).toBe(nextVideo)
     } finally {
       observer.disconnect()
     }
+  })
+
+  it('restores the adopted video when Netflix reuses it for the next episode', async () => {
+    vi.useFakeTimers()
+    const player = document.createElement('div')
+    player.className = 'watch-video'
+    const video = createRenderableVideo()
+    let currentTime = 120
+    Object.defineProperty(video, 'currentTime', {
+      configurable: true,
+      get: () => currentTime,
+    })
+    player.appendChild(video)
+    document.body.appendChild(player)
+
+    expect(await manager.enter()).toBe(true)
+
+    video.dispatchEvent(new Event('timeupdate'))
+    video.dispatchEvent(new Event('ended'))
+    currentTime = 0
+    video.dispatchEvent(new Event('playing'))
+    await Promise.resolve()
+
+    expect(manager.isActive).toBe(false)
+    expect(video.ownerDocument).toBe(document)
+    expect(video.parentElement).toBe(player)
   })
 
   it('does not detach the next episode after Netflix binds its metadata and controls', async () => {

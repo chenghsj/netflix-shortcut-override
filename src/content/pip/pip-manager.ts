@@ -205,12 +205,16 @@ export class PipManager {
       return
     }
 
+    this.closeActivePip(true)
+  }
+
+  private closeActivePip(restoreAdoptedVideo: boolean): void {
     if (!this.isActive) return
 
     const pipWin = this.pipWindow
     if (!pipWin) return
     this.keyboardHandlers.onBlur?.(pipWin.document)
-    this.restore()
+    this.restore(restoreAdoptedVideo)
     if (pipWin && !pipWin.closed) pipWin.close()
   }
 
@@ -415,10 +419,13 @@ export class PipManager {
         return true
       },
       onEpisodeTransition: candidate => {
-        if (!this.isManualSourceWatchChange()) {
+        const isAutomaticTransition = !this.isManualSourceWatchChange()
+        if (isAutomaticTransition) {
           this.guardNextEpisodePause(candidate)
         }
-        this.exit()
+        const restoreAdoptedVideo =
+          !isAutomaticTransition || candidate === this.videoPlacement.currentVideo
+        this.closeActivePip(restoreAdoptedVideo)
       },
       onTimeout: () => this.exit(),
     })
@@ -537,7 +544,7 @@ export class PipManager {
     }
   }
 
-  private restore(): void {
+  private restore(restoreAdoptedVideo = true): void {
     if (this.restoring) return
     this.restoring = true
 
@@ -550,7 +557,7 @@ export class PipManager {
     this.cleanupVideoBindings()
     this.pipWindow = null
 
-    this.videoPlacement.restore()
+    this.videoPlacement.restore(false, restoreAdoptedVideo)
     this.videoArea = null
     this.pipEntryWatchId = null
     this.sourceWatchChangeIntentDeadline = 0

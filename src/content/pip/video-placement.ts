@@ -169,7 +169,7 @@ export class VideoPlacement {
     this.metadataCleanup = () => video.removeEventListener('loadedmetadata', onLoadedMetadata)
   }
 
-  restore(preserveVideoSize = false): void {
+  restore(preserveVideoSize = false, restoreVideo = true): void {
     const video = this.video
     const parent = this.originalParent
     const anchor = this.originalAnchor
@@ -186,7 +186,7 @@ export class VideoPlacement {
         ? placeholder.parentElement
         : findLiveRestoreParent(this.sourceDocument)
 
-    if (video && restoreParent) {
+    if (video && restoreVideo && restoreParent) {
       if (this.originalInlineStyle === null) video.removeAttribute('style')
       else video.setAttribute('style', this.originalInlineStyle)
       video.controls = this.originalControls
