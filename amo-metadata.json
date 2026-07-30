@@ -1,0 +1,9 @@
+{
+  "summary": {
+    "en-US": "Customize Netflix playback shortcuts with configurable keys, seeking, volume, and playback speed controls."
+  },
+  "categories": ["photos-music-videos"],
+  "version": {
+    "license": "MIT"
+  }
+}

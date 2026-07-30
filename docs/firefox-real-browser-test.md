@@ -25,6 +25,6 @@ Open a Netflix watch page and check:
 
 ## Release smoke test
 
-For a signed release build, download the Firefox `.xpi` from GitHub Releases and install it from `about:addons` using "Install Add-on From File…". Repeat the Netflix checklist, then confirm the installed add-on has the expected version and remains enabled after restarting Firefox.
+After Mozilla approves a listed release, install it from Firefox Add-ons. Repeat the Netflix checklist, then confirm the installed add-on has the expected version and remains enabled after restarting Firefox.
 
-The release also includes `shortcut-override-for-netflix-firefox-updates.json`; it is used by the Firefox manifest's update URL for later releases.
+Confirm the Firefox manifest does not include `browser_specific_settings.gecko.update_url`. Firefox Add-ons owns signing and automatic updates for listed releases.

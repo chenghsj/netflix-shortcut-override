@@ -133,15 +133,9 @@ Use this path if you just want to install the extension without building it from
 
 ### Firefox Desktop
 
-1. Download the signed Firefox `.xpi` from the [GitHub Releases page](https://github.com/chenghsj/netflix-shortcut-override/releases/latest).
+Install the extension from its Firefox Add-ons listing after Mozilla approves the public release.
 
-2. Open Firefox Add-ons and Themes with `about:addons`.
-
-3. Open the gear menu and choose "Install Add-on From File…".
-
-4. Select the downloaded `.xpi` file and confirm the installation.
-
-Firefox receives updates through the release's update manifest. The Firefox Picture-in-Picture setting is disabled and marked unsupported; `Shift+P` passes through without being intercepted.
+Firefox Add-ons provides signing, installation, and automatic updates. The Firefox Picture-in-Picture setting is disabled and marked unsupported; `Shift+P` passes through without being intercepted.
 
 ## Install From Source
 
@@ -213,7 +207,7 @@ For Firefox, run `npm run build:firefox` and load the generated `firefox-dist/ma
 | `npm run prepare:firefox` | Convert the Chromium build output into a Firefox-compatible manifest. |
 | `npm run lint:firefox` | Run `web-ext lint` against `firefox-dist`. |
 | `npm run package:chromium` | Create the keyless Chromium ZIP and checksum. |
-| `npm run package:firefox` | Submit source and sign the Firefox XPI through AMO, then create update metadata and checksums. |
+| `npm run package:firefox` | Submit the Firefox build and source archive to AMO for public listing. |
 | `npm run lint` | Run ESLint. |
 | `npm test` | Run Vitest tests. |
 | `npm run test:coverage` | Run the complete test suite with enforced coverage thresholds. |
@@ -246,6 +240,7 @@ For Firefox, run `npm run build:firefox` and load the generated `firefox-dist/ma
 |   |-- options
 |   `-- shared
 |-- manifest.json
+|-- amo-metadata.json
 |-- popup.html
 |-- options.html
 `-- vite.config.ts
@@ -346,24 +341,20 @@ The release workflow will:
 6. Prepare and lint the Firefox build.
 7. Generate release notes.
 8. Package a Chromium zip file without the manifest `key` field.
-9. Submit the Firefox source package to AMO, sign the Firefox XPI, and generate its update manifest and checksums.
+9. Submit the Firefox build and source package to AMO for public listing without waiting for review approval.
 10. Publish or update the GitHub Release.
 
 The generated release assets are:
 
 - `shortcut-override-for-netflix-chromium-<version>.zip`
 - `shortcut-override-for-netflix-chromium-<version>.zip.sha256`
-- `shortcut-override-for-netflix-firefox-<version>.xpi`
-- `shortcut-override-for-netflix-firefox-<version>.xpi.sha256`
-- `shortcut-override-for-netflix-firefox-updates.json`
-- `shortcut-override-for-netflix-firefox-updates.json.sha256`
 
-The Firefox signing step requires these repository secrets:
+The Firefox AMO submission step requires these repository secrets:
 
 - `AMO_JWT_ISSUER`
 - `AMO_JWT_SECRET`
 
-If AMO signing fails, the release stops before publishing so that a release cannot contain only a partially generated browser set.
+If AMO rejects the upload or its automated validation fails, the release stops before publishing the GitHub Release. A successful workflow means that AMO accepted the submission; the public listing may still be awaiting Mozilla review.
 
 ## Changelog
 

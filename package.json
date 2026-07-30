@@ -1,7 +1,7 @@
 {
   "name": "netflix-shortcut-override",
   "private": true,
-  "version": "0.4.1",
+  "version": "0.4.2",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -16,7 +16,7 @@
     "package:chromium": "node scripts/build-chromium-package.mjs",
     "package:firefox": "node scripts/build-firefox-package.mjs",
     "prepare:firefox": "node scripts/prepare-firefox-dist.mjs",
-    "lint:firefox": "web-ext lint --source-dir firefox-dist --self-hosted",
+    "lint:firefox": "web-ext lint --source-dir firefox-dist",
     "lint": "eslint .",
     "preview": "vite preview",
     "typecheck": "tsc -b",

@@ -127,11 +127,10 @@ jobs:
       - name: Package Chromium extension
         run: npm run package:chromium
 
-      - name: Package and sign Firefox extension
+      - name: Submit Firefox extension to AMO
         env:
           AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
           AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
-          RELEASE_TAG: ${{ steps.release_ref.outputs.tag }}
         run: npm run package:firefox
 
       - name: Publish GitHub Release
