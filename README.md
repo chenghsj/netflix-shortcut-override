@@ -13,18 +13,18 @@
 
 Customize Netflix playback shortcuts with a small unofficial browser extension.
 
-This extension intercepts configured keyboard shortcuts on Netflix watch pages and routes playback operations through Netflix's player API where needed. It is designed for users who want predictable shortcuts without relying on Netflix's default key handling or visible UI focus state.
+This extension intercepts configured keyboard shortcuts in Netflix playback contexts—watch pages or pages with a visible player—and routes playback operations through Netflix's player API where needed. It is designed for users who want predictable shortcuts without relying on Netflix's default key handling or visible UI focus state.
 
 This project is not affiliated with, endorsed by, or sponsored by Netflix.
 
 ## Features
 
-- Override Netflix playback shortcuts on watch pages.
+- Override Netflix shortcuts in active playback contexts.
 - Use the toolbar popup to check page status, toggle shortcut handling, review keys, and open options.
 - Diagnose content-script, video, Netflix player API, page bridge, and Picture-in-Picture compatibility from a discreet toolbar-popup dialog.
 - Show an inline recovery notice when an updated extension has not connected to the open Netflix tab.
 - Reload the Netflix tab from the recovery notice, close the popup, and return keyboard focus to the page.
-- Restore keyboard focus to the same still-visible Netflix watch page after the toolbar popup is dismissed, including when the popup was opened before a reload finished.
+- Restore keyboard focus to the same still-visible Netflix playback context after the toolbar popup is dismissed, including when the popup was opened before a reload finished.
 - Keep compatibility in the checking state while Netflix is loading, discard stale results, and recheck automatically after loading finishes.
 - Retry compatibility diagnostics automatically while the dialog is open and playback state is unresolved, then stop after reaching a stable result or detecting that the tab must be reloaded.
 - Copy a privacy-safe compatibility report that excludes the active Netflix URL.
@@ -284,7 +284,7 @@ The extension requests:
 | Permission | Why it is needed |
 | --- | --- |
 | `storage` | Save shortcut, language, playback speed, seek, and Space-hold settings. |
-| `scripting` | Execute Netflix player API operations and restore focus to the visible watch page after the popup closes. |
+| `scripting` | Execute Netflix player API operations and restore focus to the visible playback context after the popup closes. |
 | `activeTab` | Check the active Netflix tab, request local compatibility status, restore playback focus, and reload that tab when the user selects the recovery action. |
 | `*://*.netflix.com/*` | Run the extension only on Netflix pages. |
 
@@ -295,7 +295,7 @@ The extension requests:
 - Shortcut, language, playback speed, seek, and Space-hold settings are stored with `chrome.storage`.
 - A pending popup focus handoff is stored temporarily in `chrome.storage.session` for at most 30 seconds. It contains only tab/window identifiers, an opaque request identifier, and a deadline.
 - Content scripts only run on pages matching `*://*.netflix.com/*`.
-- The toolbar popup checks the active tab only after it is opened. It uses that tab to show page status, request locally generated compatibility diagnostics, restore keyboard focus to a still-visible watch page after dismissal, and reload the Netflix page only when the user selects the recovery action.
+- The toolbar popup checks the active tab only after it is opened. It uses that tab to show page status, request locally generated compatibility diagnostics, restore keyboard focus to a still-visible playback context after dismissal, and reload the Netflix page only when the user selects the recovery action.
 - Compatibility diagnostics stay on the device. A report is written to the clipboard only when the user selects Copy diagnostics.
 - See the full privacy policy in [PRIVACY.md](PRIVACY.md).
 
@@ -312,7 +312,8 @@ npm run build
 
 The coverage check enforces minimum global thresholds of 80% statements, 65% branches,
 80% functions, and 85% lines. The test suite covers shortcut normalization, options behavior,
-content shortcut handling, Netflix API bridge behavior, and background execution behavior.
+content shortcut handling, Netflix API bridge and background execution behavior, compatibility
+readiness, PiP controls and subtitle mirroring, video handoff, and episode-transition recovery.
 
 The real-Chrome regression flow, including the reload-in-progress popup case, is documented in [docs/chrome-real-browser-test.md](docs/chrome-real-browser-test.md). The Firefox smoke-test flow is documented in [docs/firefox-real-browser-test.md](docs/firefox-real-browser-test.md).
 
@@ -377,7 +378,7 @@ Commit messages that follow Conventional Commits are grouped into sections such 
 
 ## Known Limitations
 
-- Shortcuts only run on Netflix watch pages or pages with a visible Netflix player.
+- Shortcuts only run in Netflix playback contexts: watch pages or pages with a visible Netflix player.
 - Shortcut handling is skipped while typing in inputs, textareas, or editable content.
 - Skip intro only works when Netflix renders a visible skip intro button.
 - Seeking uses Netflix's internal player API. If Netflix changes that API, rewind and fast-forward may need an extension update.
@@ -457,7 +458,7 @@ Check the options page:
 1. Make sure shortcut override is enabled.
 2. Make sure the specific action is enabled.
 3. Check whether another action already uses the same key.
-4. Open the toolbar popup on the Netflix watch page.
+4. Open the toolbar popup in the Netflix playback context.
 5. If the popup shows that the extension is not active, select Reload Netflix. The popup closes after starting the reload so keyboard focus returns to Netflix.
 6. If the compatibility button is available, open it and confirm the required playback features are ready.
 

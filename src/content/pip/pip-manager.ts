@@ -4,6 +4,11 @@ import { findSubtitleSearchRoot, SubtitleMirror } from './pip-subtitle-mirror'
 import { PipControls } from './pip-controls'
 import { createPipVideoHandoff } from './pip-video-handoff'
 import {
+  getNetflixVideoTitle,
+  getNetflixWatchId,
+  startNextEpisodePauseGuard,
+} from './next-episode-pause-guard'
+import {
   createNetflixPlaybackSession,
   type NetflixPlaybackSession,
 } from '@/content/netflix-playback-session'
@@ -33,14 +38,6 @@ const DEFAULT_VIDEO_ASPECT_RATIO = 16 / 9
 const PLAYBACK_CONTEXT_CHECK_INTERVAL_MS = 250
 const WATCH_ID_CHANGE_CLASSIFICATION_MS = 500
 const SOURCE_WATCH_CHANGE_USER_INTENT_MS = 1_500
-const EPISODE_TRANSITION_PAUSE_GUARD_MS = 8_000
-
-const getNetflixWatchId = (sourceWindow: Window): string | null =>
-  sourceWindow.location.pathname.match(/^\/watch\/([^/]+)/)?.[1] ?? null
-
-const hasInitializedPlayback = (video: HTMLVideoElement): boolean =>
-  !video.paused && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
-
 export type PipKeyboardHandlers = {
   onKeydown: (event: KeyboardEvent, targetDoc: Document) => void
   onKeyup: (event: KeyboardEvent, targetDoc: Document) => void
@@ -93,8 +90,9 @@ export class PipManager {
   private videoArea: HTMLElement | null = null
   private keyboardCleanup: (() => void) | null = null
   private playbackContextCleanup: (() => void) | null = null
-  private episodeTransitionPauseCleanup: (() => void) | null = null
+  private nextEpisodePauseCleanup: (() => void) | null = null
   private pipEntryWatchId: string | null = null
+  private pipEntryVideoTitle: string | null = null
   private sourceWatchChangeIntentDeadline = 0
   private restoring = false
   private entering = false
@@ -151,7 +149,7 @@ export class PipManager {
 
   async enter(): Promise<boolean> {
     if (this.entering) return false
-    this.stopEpisodeTransitionPauseGuard()
+    this.stopNextEpisodePauseGuard()
     const entryVersion = ++this.entryVersion
     this.entering = true
 
@@ -160,6 +158,7 @@ export class PipManager {
       const sourceWindow = this.sourceDocument.defaultView
       if (!sourceWindow || !PipManager.isSupported(sourceWindow) || this.isActive) return false
       this.pipEntryWatchId = getNetflixWatchId(sourceWindow)
+      this.pipEntryVideoTitle = getNetflixVideoTitle(this.sourceDocument)
       this.sourceWatchChangeIntentDeadline = 0
 
       const video = findVideo(this.sourceDocument)
@@ -217,7 +216,7 @@ export class PipManager {
 
   destroy(): void {
     this.cancelPendingEntry()
-    this.stopEpisodeTransitionPauseGuard()
+    this.stopNextEpisodePauseGuard()
 
     const pipWin = this.pipWindow
     this.restore()
@@ -417,7 +416,7 @@ export class PipManager {
       },
       onEpisodeTransition: candidate => {
         if (!this.isManualSourceWatchChange()) {
-          this.guardEpisodeTransitionPause(candidate)
+          this.guardNextEpisodePause(candidate)
         }
         this.exit()
       },
@@ -426,44 +425,23 @@ export class PipManager {
     this.videoHandoff.start()
   }
 
-  private guardEpisodeTransitionPause(video: HTMLVideoElement): void {
-    this.stopEpisodeTransitionPauseGuard()
-
-    const sourceWindow = this.sourceDocument.defaultView
-    if (!sourceWindow) {
-      void this.playbackSession.pause(video)
-      return
-    }
-
-    const onPlaybackInitialized = (event: Event) => {
-      const candidate = event.target
-      if (!(candidate instanceof HTMLVideoElement)) return
-      void this.playbackSession.pause(candidate)
-    }
-    const onUserInteraction = () => this.stopEpisodeTransitionPauseGuard()
-    const timeoutId = sourceWindow.setTimeout(
-      () => this.stopEpisodeTransitionPauseGuard(),
-      EPISODE_TRANSITION_PAUSE_GUARD_MS
-    )
-
-    this.sourceDocument.addEventListener('playing', onPlaybackInitialized, true)
-    this.sourceDocument.addEventListener('pointerdown', onUserInteraction, true)
-    this.sourceDocument.addEventListener('keydown', onUserInteraction, true)
-    this.episodeTransitionPauseCleanup = () => {
-      sourceWindow.clearTimeout(timeoutId)
-      this.sourceDocument.removeEventListener('playing', onPlaybackInitialized, true)
-      this.sourceDocument.removeEventListener('pointerdown', onUserInteraction, true)
-      this.sourceDocument.removeEventListener('keydown', onUserInteraction, true)
-      this.episodeTransitionPauseCleanup = null
-    }
-
-    if (hasInitializedPlayback(video)) {
-      void this.playbackSession.pause(video)
+  private guardNextEpisodePause(video: HTMLVideoElement): void {
+    this.stopNextEpisodePauseGuard()
+    const cleanup = startNextEpisodePauseGuard({
+      sourceDocument: this.sourceDocument,
+      confirmedVideo: video,
+      entryWatchId: this.pipEntryWatchId,
+      entryVideoTitle: this.pipEntryVideoTitle,
+      playbackSession: this.playbackSession,
+    })
+    this.nextEpisodePauseCleanup = () => {
+      cleanup()
+      this.nextEpisodePauseCleanup = null
     }
   }
 
-  private stopEpisodeTransitionPauseGuard(): void {
-    this.episodeTransitionPauseCleanup?.()
+  private stopNextEpisodePauseGuard(): void {
+    this.nextEpisodePauseCleanup?.()
   }
 
   private isManualSourceWatchChange(): boolean {

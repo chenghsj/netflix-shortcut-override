@@ -154,6 +154,18 @@ Expected:
 - Pressing `Shift+P` inside the PiP window exits PiP without returning to the Netflix tab first.
 - Resizing the PiP window keeps the subtitle overlay aligned with the video.
 
+Verify automatic next-episode transition against at least two episode boundaries:
+
+1. Enter PiP while an episode is playing and leave Netflix autoplay enabled.
+2. Let Netflix reach the automatic next-episode boundary without interacting with the source page.
+3. Confirm PiP closes and the Netflix tab is not activated or focused.
+4. Confirm the next episode is paused before advancing playback is visibly rendered.
+5. Move the pointer over the Netflix player and confirm the next title is visible.
+6. Confirm play/pause, seek backward/forward, volume, next episode, episode list, audio/subtitles, speed, and fullscreen controls respond.
+7. Repeat once when Netflix replaces the player root and once when it temporarily keeps the previous root mounted, when both transition shapes can be observed.
+
+Any visible autoplay, blank title, black or stale video, or unresponsive control fails the run. Record the source and destination watch IDs and whether the old player root remained mounted when that state can be inspected safely.
+
 ## 6. Agent-Assisted Chrome Workflow
 
 When using `@Chrome`, use the existing real Netflix tab:

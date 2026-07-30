@@ -56,7 +56,7 @@ export const formatCompatibilityDiagnosticsReport = ({
     'Shortcut Override compatibility diagnostics',
     `Generated: ${generatedAt.toISOString()}`,
     `Extension version: ${extensionVersion}`,
-    'Page type: Netflix watch page',
+    'Page type: Netflix playback context',
     `Content script ready: ${value(diagnostics?.contentScriptReady)}`,
     `Settings loaded: ${value(diagnostics?.settingsLoaded)}`,
     `Shortcut handling enabled: ${value(diagnostics?.enabled)}`,

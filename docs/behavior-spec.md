@@ -23,8 +23,8 @@ This document defines observable product behavior. Domain terms have the meaning
 
 ## PiP session and video selection
 
-- A PiP session uses Document Picture-in-Picture and retains only one Netflix playback session. The adopted video is a visual and event mirror, not an independent playback owner.
-- Initial entry considers every attached video in the current playback context. Recoverable replacement considers every attached video in its connected current or remembered Netflix player roots, excluding the adopted video while it remains in PiP and any video already identified as stale or unrelated.
+- A PiP session uses Document Picture-in-Picture and retains only one Netflix playback session. The adopted video mirrors that session's visuals and events without creating another session.
+- Initial entry considers every attached video in the current playback context. Recoverable replacement considers every attached video in its connected current or remembered Netflix player roots, excluding the adopted video while it remains in PiP.
 - The complete candidate set is ranked globally, in this order: a current frame, active playback, valid intrinsic dimensions, then larger rendered area.
 - Player-root preference may break a tie, but it cannot allow a lower-ranked candidate in an old root to beat a higher-ranked candidate in another eligible root.
 - The user may resize the browser-owned PiP window. The video preserves its aspect ratio and uses black bars rather than stretching when the window ratio differs.
@@ -43,14 +43,16 @@ This document defines observable product behavior. Domain terms have the meaning
 - The first primary click on the PiP video requests play or pause while allowing the browser to focus the PiP window. Timeline clicks do not trigger this video-click action.
 - Controls overlay the video and hide after three seconds of pointer inactivity. Shortcut feedback remains a separate transient overlay.
 
-## Video replacement and episode transitions
+## Recoverable video replacement and episode transitions
 
 - Detachment, `error`, `ended`, or `emptied` starts bounded replacement handling. While replacement handling is pending, PiP video clicks are consumed without sending playback commands.
 - A different HTML video element is not, by itself, evidence of an episode transition.
-- After `ended` or `emptied`, a replacement element confirms an episode transition only when it was not observed in the candidate set before the boundary, or when independent Netflix playback-session evidence associates it with the next episode. A stale or unrelated sibling video cannot confirm a transition.
+- After `ended` or `emptied`, a replacement element confirms an episode transition only when it was not observed in the candidate set before the boundary. A sibling video observed before the boundary cannot confirm a transition, but it may remain eligible as a recoverable replacement.
 - Reuse of the adopted video confirms an episode transition only when playback previously advanced beyond 30 seconds, restarts at or before 30 seconds after the boundary, and the restart was not caused by an observed user seek.
 - An `emptied` event starts a new media-resource boundary and supersedes seek evidence recorded before that event. A seek observed after the boundary still prevents a playback reset from being classified as an automatic episode transition.
-- A confirmed automatic episode transition closes PiP and restores the adopted video without activating or focusing the Netflix page. The replacement is paused only after it reports initialized `playing` state (or is already presentation-ready and playing), so Netflix can finish mounting its native title and controls. A bounded post-transition guard reasserts pause if Netflix starts the replacement playback session after PiP has closed; explicit pointer or keyboard interaction in the source page releases that guard so the user can resume playback.
+- A confirmed automatic episode transition closes PiP and restores the adopted video without activating or focusing the Netflix playback context. The confirmed video and replacements in its player root remain eligible for the pause guard. If Netflix replaces that root, the guard may follow the replacement after the old root disconnects; if Netflix keeps the old root mounted, a different-root video becomes eligible only after the watch ID or title advances and it is the presentation-ready video.
+- Each eligible next-episode `playing` attempt is paused after Netflix's handlers for that event complete and before the next browser rendering opportunity. This lets Netflix bind the new playback session, title, and controls without intentionally presenting advancing playback. Unrelated player roots without next-episode identity evidence are not affected.
+- The Netflix playback session is synchronized to paused as soon as the next title is bound, with a fixed fallback deadline two seconds after the first guarded playback attempt when metadata never appears. After PiP closes, the source page must show the next title, remain paused, and expose working playback, seek, volume, episode, audio/subtitle, and fullscreen controls.
 - A replacement without sufficient episode-transition evidence is recoverable. The PiP session adopts the best presentation-ready candidate and keeps the same PiP window open.
 - The PiP session remembers the last valid intrinsic dimensions across a recoverable replacement. A candidate without metadata temporarily uses that aspect ratio until valid replacement dimensions arrive.
 

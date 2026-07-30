@@ -20,7 +20,7 @@ describe('background playback focus restoration', () => {
     vi.resetModules()
   })
 
-  it('restores focus for a ready active Netflix watch page', async () => {
+  it('restores focus for a ready active Netflix playback context', async () => {
     await import('@/background/index')
     const listener = vi.mocked(chrome.runtime.onMessage.addListener).mock.calls.at(-1)?.[0]
 

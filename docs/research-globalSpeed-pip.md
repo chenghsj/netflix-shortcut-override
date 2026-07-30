@@ -105,7 +105,7 @@ globalSpeed 的同步鏈路是 [`MediaTower.ts#L111-L124`](https://github.com/po
 
 目前 Document PiP 的 [`video-placement.ts#L53-L83`](../src/content/pip/video-placement.ts) 把影片放入 PiP document 後設定 `object-fit: contain`，並明確設定 `video.controls = false`。因此目前的 PiP 會有影片比例與字幕鏡像，但不會自動有原生 timeline、播放/暫停或 hover controls。
 
-若要保留你現在的 Document PiP 架構，需自行建立 controls：`input[type=range]` 只作為自己的預覽 UI，由 `timeupdate` 等唯讀媒體事件更新；點擊或拖曳結束後，透過 Netflix player bridge 發出絕對 seek，不可綁定 `video.currentTime` setter。控制列可用 CSS 的 `:hover` 或 `pointerenter/pointerleave` 控制顯示。若要直接得到瀏覽器原生 timeline/hover controls，則要改走 GlobalSpeed 使用的 `video.requestPictureInPicture()`；兩者不能同時把同一個 video 當成兩套 PiP UI 管理。
+本專案目前已在 Document PiP 中建立自訂 controls：`input[type=range]` 只作為預覽 UI，由 `timeupdate` 等唯讀媒體事件更新；點擊或拖曳結束後，透過 Netflix player bridge 發出絕對 seek，不綁定 `video.currentTime` setter。控制列由 pointer activity 控制顯示與隱藏。若要直接改用瀏覽器原生 timeline/hover controls，則必須改走 GlobalSpeed 使用的 `video.requestPictureInPicture()`；兩者不能同時把同一個 video 當成兩套 PiP UI 管理。
 
 ### 3.5 Netflix 不能直接走 native `currentTime`
 

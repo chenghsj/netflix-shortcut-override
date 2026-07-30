@@ -172,17 +172,17 @@ const getRoundedRectPath = (rect: SubtitleBackgroundRect, radius: number): strin
   const right = rect.left + rect.width
   const bottom = rect.top + rect.height
   const corner = Math.min(radius, rect.width / 2, rect.height / 2)
-  const n = formatPathNumber
+  const formatCoordinate = formatPathNumber
   return [
-    `M ${n(left + corner)} ${n(top)}`,
-    `H ${n(right - corner)}`,
-    `Q ${n(right)} ${n(top)} ${n(right)} ${n(top + corner)}`,
-    `V ${n(bottom - corner)}`,
-    `Q ${n(right)} ${n(bottom)} ${n(right - corner)} ${n(bottom)}`,
-    `H ${n(left + corner)}`,
-    `Q ${n(left)} ${n(bottom)} ${n(left)} ${n(bottom - corner)}`,
-    `V ${n(top + corner)}`,
-    `Q ${n(left)} ${n(top)} ${n(left + corner)} ${n(top)}`,
+    `M ${formatCoordinate(left + corner)} ${formatCoordinate(top)}`,
+    `H ${formatCoordinate(right - corner)}`,
+    `Q ${formatCoordinate(right)} ${formatCoordinate(top)} ${formatCoordinate(right)} ${formatCoordinate(top + corner)}`,
+    `V ${formatCoordinate(bottom - corner)}`,
+    `Q ${formatCoordinate(right)} ${formatCoordinate(bottom)} ${formatCoordinate(right - corner)} ${formatCoordinate(bottom)}`,
+    `H ${formatCoordinate(left + corner)}`,
+    `Q ${formatCoordinate(left)} ${formatCoordinate(bottom)} ${formatCoordinate(left)} ${formatCoordinate(bottom - corner)}`,
+    `V ${formatCoordinate(top + corner)}`,
+    `Q ${formatCoordinate(left)} ${formatCoordinate(top)} ${formatCoordinate(left + corner)} ${formatCoordinate(top)}`,
     'Z',
   ].join(' ')
 }
@@ -196,7 +196,7 @@ const getVariableRoundedRectPath = (
     bottomLeft: number
   }
 ): string => {
-  const n = formatPathNumber
+  const formatCoordinate = formatPathNumber
   const left = rect.left
   const top = rect.top
   const right = rect.left + rect.width
@@ -208,15 +208,15 @@ const getVariableRoundedRectPath = (
   const bottomRight = limitRadius(radii.bottomRight)
   const bottomLeft = limitRadius(radii.bottomLeft)
   return [
-    `M ${n(left + topLeft)} ${n(top)}`,
-    `H ${n(right - topRight)}`,
-    `Q ${n(right)} ${n(top)} ${n(right)} ${n(top + topRight)}`,
-    `V ${n(bottom - bottomRight)}`,
-    `Q ${n(right)} ${n(bottom)} ${n(right - bottomRight)} ${n(bottom)}`,
-    `H ${n(left + bottomLeft)}`,
-    `Q ${n(left)} ${n(bottom)} ${n(left)} ${n(bottom - bottomLeft)}`,
-    `V ${n(top + topLeft)}`,
-    `Q ${n(left)} ${n(top)} ${n(left + topLeft)} ${n(top)}`,
+    `M ${formatCoordinate(left + topLeft)} ${formatCoordinate(top)}`,
+    `H ${formatCoordinate(right - topRight)}`,
+    `Q ${formatCoordinate(right)} ${formatCoordinate(top)} ${formatCoordinate(right)} ${formatCoordinate(top + topRight)}`,
+    `V ${formatCoordinate(bottom - bottomRight)}`,
+    `Q ${formatCoordinate(right)} ${formatCoordinate(bottom)} ${formatCoordinate(right - bottomRight)} ${formatCoordinate(bottom)}`,
+    `H ${formatCoordinate(left + bottomLeft)}`,
+    `Q ${formatCoordinate(left)} ${formatCoordinate(bottom)} ${formatCoordinate(left)} ${formatCoordinate(bottom - bottomLeft)}`,
+    `V ${formatCoordinate(top + topLeft)}`,
+    `Q ${formatCoordinate(left)} ${formatCoordinate(top)} ${formatCoordinate(left + topLeft)} ${formatCoordinate(top)}`,
     'Z',
   ].join(' ')
 }
@@ -263,9 +263,9 @@ const getConnectedRowsPath = (
     const connectorRight = overlapRight - inset
     if (connectorRight <= connectorLeft) continue
     const upperBottom = upper.top + upper.height
-    const n = formatPathNumber
+    const formatCoordinate = formatPathNumber
     pathParts.push(
-      `M ${n(connectorLeft)} ${n(upperBottom)} H ${n(connectorRight)} V ${n(lower.top)} H ${n(connectorLeft)} Z`
+      `M ${formatCoordinate(connectorLeft)} ${formatCoordinate(upperBottom)} H ${formatCoordinate(connectorRight)} V ${formatCoordinate(lower.top)} H ${formatCoordinate(connectorLeft)} Z`
     )
   }
   return pathParts.join(' ')

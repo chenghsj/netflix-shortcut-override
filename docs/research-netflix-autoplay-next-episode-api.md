@@ -44,7 +44,7 @@ Netflix 當前 Akira client 則在 UI/state orchestration 層執行以下流程�
 | 觸發下一集 | `addEpisode(...)` 後呼叫 `playNextEpisode(...)` | 存在，但依賴 Netflix 已建立的 next-episode/playgraph 資料，屬未公開且可能改版的內部 API。 |
 | 取消自動下一集 | 未找到可靠入口；`watchCredits(currentMovieId)` 只操作 player playgraph | 實測不能取消已啟動的 Akira post-play transition，並會破壞目前播放頁／PiP 版面。未找到通用的 `cancelAutoplay()` 方法。 |
 | 偵測 post-play 倒數 | Akira state 有 `autoplaySeconds`、`startedByVideoId` | 存在於 client state，但目前沒有證據顯示它透過 `window.netflix...videoPlayer` 提供穩定入口。 |
-| 偵測已切換下一集 | player 有 video/session 變更事件與 movie ID；頁面 URL、video replacement 也會改變 | 適合在 transition 發生後偵測；比介入倒數可靠。 |
+| 偵測已切換下一集 | player 有 video/session 變更事件與 movie ID；頁面 URL 與影片元素也會改變 | 適合在 transition 發生後偵測；比介入倒數可靠。 |
 | 播放／暫停／跳轉 | `play()`、`pause()`、`seek(...)` | 僅控制當前 media transport；不等於取消 post-play timer/state。 |
 
 ### 4. 本專案現況

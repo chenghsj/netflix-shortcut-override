@@ -271,7 +271,7 @@ describe('useCompatibilitySession', () => {
     }
   })
 
-  it('does not request diagnostics outside a Netflix watch page', async () => {
+  it('does not request diagnostics outside a Netflix playback context', async () => {
     vi.mocked(chrome.tabs.query).mockImplementationOnce((_query, callback) => {
       callback([{ id: 7, url: 'https://example.com/' } as chrome.tabs.Tab])
     })

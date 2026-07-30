@@ -169,7 +169,7 @@ export const COPY: Record<Locale, Copy> = {
     streamDanmakuStoreAriaLabel:
       'Open Stream Danmaku, another product by the same maker, in the extension store',
     popupNetflixPage: 'Open a Netflix title to use shortcuts.',
-    popupNetflixOnly: 'Shortcuts only run on Netflix watch pages.',
+    popupNetflixOnly: 'Shortcuts only run in Netflix playback contexts.',
     diagnosticsTitle: 'Compatibility',
     diagnosticsReady: 'Netflix playback features are ready.',
     diagnosticsWarning: 'Some playback features may be unavailable.',
@@ -279,7 +279,7 @@ export const COPY: Record<Locale, Copy> = {
     streamDanmakuStoreAriaLabel:
       '在擴充功能商店開啟同作者的其他產品 Stream Danmaku',
     popupNetflixPage: '開啟 Netflix 影片後即可使用快捷鍵。',
-    popupNetflixOnly: '快捷鍵只會在 Netflix 觀看頁生效。',
+    popupNetflixOnly: '快捷鍵只會在 Netflix 播放環境中生效。',
     diagnosticsTitle: '相容性診斷',
     diagnosticsReady: 'Netflix 播放功能已就緒。',
     diagnosticsWarning: '部分播放功能可能無法使用。',
@@ -406,7 +406,7 @@ export const COPY: Record<Locale, Copy> = {
     streamDanmakuStoreAriaLabel:
       '在扩展商店打开同作者的其他产品 Stream Danmaku',
     popupNetflixPage: '打开 Netflix 视频后即可使用快捷键。',
-    popupNetflixOnly: '快捷键只会在 Netflix 观看页生效。',
+    popupNetflixOnly: '快捷键只会在 Netflix 播放环境中生效。',
     diagnosticsTitle: '兼容性诊断',
     diagnosticsReady: 'Netflix 播放功能已就绪。',
     diagnosticsWarning: '部分播放功能可能无法使用。',
@@ -533,7 +533,7 @@ export const COPY: Record<Locale, Copy> = {
     streamDanmakuStoreAriaLabel:
       '同じ作者の別製品 Stream Danmaku を拡張機能ストアで開く',
     popupNetflixPage: 'Netflix の作品を開くとショートカットを使えます。',
-    popupNetflixOnly: 'ショートカットは Netflix の視聴ページでのみ動作します。',
+    popupNetflixOnly: 'ショートカットは Netflix の再生コンテキストでのみ動作します。',
     diagnosticsTitle: '互換性診断',
     diagnosticsReady: 'Netflix の再生機能を使用できます。',
     diagnosticsWarning: '一部の再生機能を使用できない可能性があります。',
@@ -664,7 +664,7 @@ export const COPY: Record<Locale, Copy> = {
     streamDanmakuStoreAriaLabel:
       '같은 제작자의 다른 제품 Stream Danmaku를 확장 프로그램 스토어에서 열기',
     popupNetflixPage: 'Netflix 콘텐츠를 열면 단축키를 사용할 수 있습니다.',
-    popupNetflixOnly: '단축키는 Netflix 시청 페이지에서만 동작합니다.',
+    popupNetflixOnly: '단축키는 Netflix 재생 컨텍스트에서만 동작합니다.',
     diagnosticsTitle: '호환성 진단',
     diagnosticsReady: 'Netflix 재생 기능을 사용할 수 있습니다.',
     diagnosticsWarning: '일부 재생 기능을 사용하지 못할 수 있습니다.',

@@ -72,7 +72,9 @@ describe('PopupApp', () => {
     expect(screen.queryByText('Netflix playback features are ready.')).not.toBeInTheDocument()
     await waitFor(() => expect(chrome.tabs.sendMessage).toHaveBeenCalledTimes(1))
     expect(screen.queryByText('Open a Netflix title to use shortcuts.')).not.toBeInTheDocument()
-    expect(screen.queryByText('Shortcuts only run on Netflix watch pages.')).not.toBeInTheDocument()
+    expect(
+      screen.queryByText('Shortcuts only run in Netflix playback contexts.')
+    ).not.toBeInTheDocument()
     expect(screen.getByText('Space')).toBeInTheDocument()
     expect(screen.getByText('Space').closest('[data-slot="kbd"]')).toBeInTheDocument()
     const localeCombobox = screen.getByRole('combobox', { name: 'Language' })
@@ -285,7 +287,9 @@ describe('PopupApp', () => {
 
     render(<PopupApp />)
 
-    expect(await screen.findByText('Shortcuts only run on Netflix watch pages.')).toBeInTheDocument()
+    expect(
+      await screen.findByText('Shortcuts only run in Netflix playback contexts.')
+    ).toBeInTheDocument()
     expect(screen.queryByText('Compatibility')).not.toBeInTheDocument()
   })
 
