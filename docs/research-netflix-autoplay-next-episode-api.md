@@ -8,7 +8,7 @@ Netflix Web **有未公開的內部方法可以預載與觸發下一集**：目�
 
 沒有找到受官方支援的 JavaScript API，也沒有在目前 bundle 找到通用的 `cancelAutoplay()` 類方法。雖然 `watchCredits(currentMovieId)` 會操作目前 playgraph 的 credits 路徑，但本專案實測顯示：在下一集提示出現後由 PiP 往回 seek 時呼叫它，**無法取消已啟動的 Akira post-play transition**，而且會讓 `/watch` player teardown、頁面回到 `/browse`，使 Document PiP 裡的影片失去原本版面並縮小。
 
-因此：**可以研究性地觸發下一集，但目前沒有找到可安全取消當次自動跳轉的 API。** 對擴充功能而言，不應呼叫 `watchCredits(...)` 介入這個流程；目前較可靠的 fallback 是偵測下一集已實際切換，立即暫停新一集並關閉 PiP，不聚焦 Netflix 分頁。
+因此：**可以研究性地觸發下一集，但目前沒有找到可安全取消當次自動跳轉的 API。** 對擴充功能而言，不應呼叫 `watchCredits(...)` 介入這個流程；目前只在偵測下一集已實際切換後關閉 PiP，不聚焦 Netflix 分頁，也不改變下一集的播放狀態。
 
 ## 證據
 
@@ -51,11 +51,11 @@ Netflix 當前 Akira client 則在 UI/state orchestration 層執行以下流程�
 
 本專案曾實測 `watchCredits` action，結果是下一集仍會自動播放，同時 Netflix 頁面從 `/watch` 回到 `/browse`，造成 PiP 畫面縮小。再次以 `/watch/<id>` 的 `currentMovieId` 呼叫後結果仍相同，因此這條實驗路徑已移除。PiP timeline 往回 seek 已恢復為單純 seek，不再改寫 Netflix 的 credits/playgraph 狀態。
 
-PiP handoff 測試已把下一集視為影片生命週期／session replacement：包括 `ended`、`emptied`、`loadedmetadata`、新 video 出現與同一 video 被重用。確認自動換集後，scoped pause guard 只追蹤已確認的下一集影片及其合格 replacement，讓 Netflix 完成新 playback session、標題與控制列初始化後維持暫停；來源頁面的第一次鍵盤操作會在快捷鍵處理前解除 guard，因此不需要先點擊畫面。這條 transition-after-the-fact 偵測路徑比呼叫未公開的 post-play state/action 更穩定。[`next-episode-pause-guard.ts`](../src/content/pip/next-episode-pause-guard.ts) [`pip-manager.test.ts`](../src/content/pip/pip-manager.test.ts)
+PiP handoff 測試已把下一集視為影片生命週期／session replacement：包括 `ended`、`emptied`、`loadedmetadata`、新 video 出現與同一 video 被重用。確認換集後只關閉 PiP，並保留 Netflix 所擁有的下一集影片與 playback session；擴充功能不呼叫 `pause()`、`play()`，也不追蹤後續的 `playing` 事件。這讓 Chrome 與 Edge 都由 Netflix 及使用者個人檔案的自動播放設定決定下一集狀態。[`pip-manager.ts`](../src/content/pip/pip-manager.ts) [`pip-manager.test.ts`](../src/content/pip/pip-manager.test.ts)
 
 ## 建議
 
-不要把 `playNextEpisode(...)` 或 `watchCredits(...)` 當成一般 transport API，也不要假設 seek backward 本身會取消 Netflix 的 post-play 狀態。維持正常 seek 行為；若仍發生 transition，交由 PiP handoff 偵測下一集、暫停新一集並關閉 PiP，但不聚焦 Netflix 分頁。若未來要在倒數期間真正取消，應尋找 Akira post-play action/state 的穩定入口，而不是操作 player credits playgraph。
+不要把 `playNextEpisode(...)` 或 `watchCredits(...)` 當成一般 transport API，也不要假設 seek backward 本身會取消 Netflix 的 post-play 狀態。維持正常 seek 行為；若仍發生 transition，交由 PiP handoff 偵測下一集並關閉 PiP，但不暫停新一集、不聚焦 Netflix 分頁。若未來要在倒數期間真正取消，應尋找 Akira post-play action/state 的穩定入口，而不是操作 player credits playgraph。
 
 ## 限制
 

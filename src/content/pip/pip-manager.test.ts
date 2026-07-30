@@ -547,7 +547,7 @@ describe('PipManager', () => {
     }
   })
 
-  it('pauses an automatic episode transition when the watch ID changes first', async () => {
+  it('closes PiP without pausing when the watch ID changes before the episode video', async () => {
     vi.useFakeTimers()
     const transport = vi.fn().mockResolvedValue({ success: true })
     manager = new PipManager({
@@ -571,15 +571,16 @@ describe('PipManager', () => {
       expect(manager.isActive).toBe(true)
 
       const nextVideo = createRenderableVideo()
+      const pause = vi.spyOn(nextVideo, 'pause')
       document.body.appendChild(nextVideo)
       await Promise.resolve()
       await Promise.resolve()
       await vi.advanceTimersByTimeAsync(300)
-      appendNetflixVideoTitle()
       nextVideo.dispatchEvent(new Event('playing'))
       await Promise.resolve()
 
-      expect(transport).toHaveBeenCalledWith('pause')
+      expect(pause).not.toHaveBeenCalled()
+      expect(transport).not.toHaveBeenCalledWith('pause')
       expect(manager.isActive).toBe(false)
       expect(pipWindow.close).toHaveBeenCalledOnce()
     } finally {
@@ -790,61 +791,7 @@ describe('PipManager', () => {
     expect(pipWindow.close).not.toHaveBeenCalled()
   })
 
-  it('pauses a detected next episode once playback initializes without focusing its page', async () => {
-    vi.useFakeTimers()
-    const replaceVideo = vi.spyOn(VideoPlacement.prototype, 'replaceVideo')
-    const transport = vi.fn().mockResolvedValue({ success: true })
-    manager = new PipManager({
-      onKeydown: vi.fn(),
-      onKeyup: vi.fn(),
-      playbackSession: createNetflixPlaybackSession(transport),
-    })
-    const focus = vi.spyOn(window, 'focus')
-    const initialVideo = document.createElement('video')
-    document.body.appendChild(initialVideo)
-
-    expect(await manager.enter()).toBe(true)
-
-    initialVideo.dispatchEvent(new Event('ended'))
-    const nextVideo = createRenderableVideo()
-    Object.defineProperties(nextVideo, {
-      currentTime: {
-        configurable: true,
-        value: 0,
-      },
-      readyState: {
-        configurable: true,
-        value: HTMLMediaElement.HAVE_CURRENT_DATA,
-      },
-    })
-    const pause = vi.spyOn(nextVideo, 'pause')
-    document.body.appendChild(nextVideo)
-    await Promise.resolve()
-    await Promise.resolve()
-
-    expect(pause).not.toHaveBeenCalled()
-    expect(transport).not.toHaveBeenCalledWith('pause')
-    expect(manager.isActive).toBe(false)
-    expect(pipWindow.close).toHaveBeenCalledOnce()
-
-    appendNetflixVideoTitle()
-    nextVideo.dispatchEvent(new Event('playing'))
-    await Promise.resolve()
-
-    expect(pause).toHaveBeenCalledTimes(2)
-    expect(transport).toHaveBeenCalledWith('pause')
-    expect(replaceVideo).not.toHaveBeenCalled()
-    expect(nextVideo.ownerDocument).toBe(document)
-    expect(focus).not.toHaveBeenCalled()
-
-    await vi.advanceTimersByTimeAsync(8_001)
-    nextVideo.dispatchEvent(new Event('playing'))
-    await Promise.resolve()
-
-    expect(pause).toHaveBeenCalledTimes(4)
-  })
-
-  it('pauses a replacement next-episode video that Netflix starts after PiP closes', async () => {
+  it('does not monitor or pause replacement videos after an episode transition closes PiP', async () => {
     vi.useFakeTimers()
     const transport = vi.fn().mockResolvedValue({ success: true })
     manager = new PipManager({
@@ -862,10 +809,6 @@ describe('PipManager', () => {
 
     initialVideo.dispatchEvent(new Event('ended'))
     const detectedNextVideo = createRenderableVideo()
-    Object.defineProperty(detectedNextVideo, 'readyState', {
-      configurable: true,
-      value: HTMLMediaElement.HAVE_CURRENT_DATA,
-    })
     player.appendChild(detectedNextVideo)
     await Promise.resolve()
     await Promise.resolve()
@@ -877,291 +820,11 @@ describe('PipManager', () => {
     const playingNextVideo = createRenderableVideo()
     const pause = vi.spyOn(playingNextVideo, 'pause')
     player.appendChild(playingNextVideo)
-    appendNetflixVideoTitle()
     playingNextVideo.dispatchEvent(new Event('playing'))
-    await Promise.resolve()
-
-    expect(pause).toHaveBeenCalledTimes(2)
-  })
-
-  it('pauses next-episode playback after Netflix replaces its player root', async () => {
-    vi.useFakeTimers()
-    const transport = vi.fn().mockResolvedValue({ success: true })
-    manager = new PipManager({
-      onKeydown: vi.fn(),
-      onKeyup: vi.fn(),
-      playbackSession: createNetflixPlaybackSession(transport),
-    })
-    const initialPlayer = document.createElement('div')
-    initialPlayer.className = 'watch-video'
-    const initialVideo = document.createElement('video')
-    initialPlayer.appendChild(initialVideo)
-    document.body.appendChild(initialPlayer)
-
-    expect(await manager.enter()).toBe(true)
-
-    initialVideo.dispatchEvent(new Event('ended'))
-    const detectedNextVideo = createRenderableVideo()
-    Object.defineProperty(detectedNextVideo, 'readyState', {
-      configurable: true,
-      value: HTMLMediaElement.HAVE_CURRENT_DATA,
-    })
-    initialPlayer.appendChild(detectedNextVideo)
-    await Promise.resolve()
-    await Promise.resolve()
-
-    expect(manager.isActive).toBe(false)
-    expect(pipWindow.close).toHaveBeenCalledOnce()
-
-    initialPlayer.remove()
-    const nextPlayer = document.createElement('div')
-    nextPlayer.className = 'watch-video'
-    const playingNextVideo = createRenderableVideo()
-    const pause = vi.spyOn(playingNextVideo, 'pause')
-    nextPlayer.appendChild(playingNextVideo)
-    document.body.appendChild(nextPlayer)
-    appendNetflixVideoTitle()
-    playingNextVideo.dispatchEvent(new Event('playing'))
-    await Promise.resolve()
-
-    expect(pause).toHaveBeenCalledTimes(2)
-    expect(transport).toHaveBeenCalledWith('pause')
-  })
-
-  it('lets Netflix bind the next-episode UI before pausing it in the next microtask', async () => {
-    vi.useFakeTimers()
-    const transport = vi.fn().mockResolvedValue({ success: true })
-    manager = new PipManager({
-      onKeydown: vi.fn(),
-      onKeyup: vi.fn(),
-      playbackSession: createNetflixPlaybackSession(transport),
-    })
-    const previousPlayer = document.createElement('div')
-    previousPlayer.className = 'watch-video'
-    const initialVideo = document.createElement('video')
-    previousPlayer.appendChild(initialVideo)
-    document.body.appendChild(previousPlayer)
-
-    expect(await manager.enter()).toBe(true)
-
-    initialVideo.dispatchEvent(new Event('ended'))
-    const detectedNextVideo = createRenderableVideo()
-    Object.defineProperty(detectedNextVideo, 'readyState', {
-      configurable: true,
-      value: HTMLMediaElement.HAVE_CURRENT_DATA,
-    })
-    previousPlayer.appendChild(detectedNextVideo)
-    await Promise.resolve()
-    await Promise.resolve()
-
-    expect(manager.isActive).toBe(false)
-    expect(previousPlayer.isConnected).toBe(true)
-
-    const activePlayer = document.createElement('div')
-    activePlayer.className = 'watch-video'
-    const playingNextVideo = createRenderableVideo()
-    Object.defineProperty(playingNextVideo, 'readyState', {
-      configurable: true,
-      value: HTMLMediaElement.HAVE_CURRENT_DATA,
-    })
-    let nextVideoPaused = false
-    Object.defineProperty(playingNextVideo, 'paused', {
-      configurable: true,
-      get: () => nextVideoPaused,
-    })
-    const pause = vi.spyOn(playingNextVideo, 'pause').mockImplementation(() => {
-      nextVideoPaused = true
-    })
-    let netflixUiBound = false
-    playingNextVideo.addEventListener('playing', () => {
-      if (playingNextVideo.paused) return
-      netflixUiBound = true
-      appendNetflixVideoTitle()
-    })
-    activePlayer.appendChild(playingNextVideo)
-    document.body.appendChild(activePlayer)
-    playingNextVideo.dispatchEvent(new Event('playing'))
-
-    expect(netflixUiBound).toBe(true)
-    expect(pause).not.toHaveBeenCalled()
-
-    await Promise.resolve()
-
-    expect(pause).toHaveBeenCalledTimes(2)
-    expect(transport).toHaveBeenCalledWith('pause')
-  })
-
-  it('does not pause an unrelated player root before next-episode identity advances', async () => {
-    vi.useFakeTimers()
-    const transport = vi.fn().mockResolvedValue({ success: true })
-    manager = new PipManager({
-      onKeydown: vi.fn(),
-      onKeyup: vi.fn(),
-      playbackSession: createNetflixPlaybackSession(transport),
-    })
-    const player = document.createElement('div')
-    player.className = 'watch-video'
-    const initialVideo = document.createElement('video')
-    player.appendChild(initialVideo)
-    const previewRoot = document.createElement('div')
-    previewRoot.className = 'watch-video'
-    document.body.append(player, previewRoot)
-
-    expect(await manager.enter()).toBe(true)
-
-    initialVideo.dispatchEvent(new Event('ended'))
-    const nextVideo = createRenderableVideo()
-    player.appendChild(nextVideo)
-    await Promise.resolve()
-    await Promise.resolve()
-
-    const previewVideo = createRenderableVideo()
-    Object.defineProperty(previewVideo, 'readyState', {
-      configurable: true,
-      value: HTMLMediaElement.HAVE_CURRENT_DATA,
-    })
-    Object.defineProperty(previewVideo, 'paused', { configurable: true, value: false })
-    const previewPause = vi.spyOn(previewVideo, 'pause')
-    previewRoot.appendChild(previewVideo)
-    previewVideo.dispatchEvent(new Event('playing'))
-    await Promise.resolve()
-
-    expect(previewPause).not.toHaveBeenCalled()
-    expect(transport).not.toHaveBeenCalledWith('pause')
-
-    appendNetflixVideoTitle()
-    nextVideo.dispatchEvent(new Event('playing'))
-    await Promise.resolve()
-
-    expect(transport).toHaveBeenCalledWith('pause')
-  })
-
-  it('waits for Netflix title metadata before pausing initialized next-episode playback', async () => {
-    vi.useFakeTimers()
-    const transport = vi.fn().mockResolvedValue({ success: true })
-    manager = new PipManager({
-      onKeydown: vi.fn(),
-      onKeyup: vi.fn(),
-      playbackSession: createNetflixPlaybackSession(transport),
-    })
-    const initialVideo = document.createElement('video')
-    document.body.appendChild(initialVideo)
-    const title = appendNetflixVideoTitle('Series S1:E1 Previous episode')
-
-    expect(await manager.enter()).toBe(true)
-
-    initialVideo.dispatchEvent(new Event('ended'))
-    const nextVideo = createRenderableVideo()
-    const pause = vi.spyOn(nextVideo, 'pause')
-    document.body.appendChild(nextVideo)
-    await Promise.resolve()
-    await Promise.resolve()
-
-    nextVideo.dispatchEvent(new Event('playing'))
-    await Promise.resolve()
-
-    expect(pause).toHaveBeenCalledOnce()
-    expect(transport).not.toHaveBeenCalledWith('pause')
-
-    title.textContent = 'Series S1:E2 Next episode'
-    await Promise.resolve()
-    await Promise.resolve()
-
-    expect(pause).toHaveBeenCalledTimes(2)
-    expect(transport).toHaveBeenCalledWith('pause')
-  })
-
-  it('pauses next-episode playback after a short fallback when title metadata never appears', async () => {
-    vi.useFakeTimers()
-    const transport = vi.fn().mockResolvedValue({ success: true })
-    manager = new PipManager({
-      onKeydown: vi.fn(),
-      onKeyup: vi.fn(),
-      playbackSession: createNetflixPlaybackSession(transport),
-    })
-    const initialVideo = document.createElement('video')
-    document.body.appendChild(initialVideo)
-
-    expect(await manager.enter()).toBe(true)
-
-    initialVideo.dispatchEvent(new Event('ended'))
-    const nextVideo = createRenderableVideo()
-    const pause = vi.spyOn(nextVideo, 'pause')
-    document.body.appendChild(nextVideo)
-    await Promise.resolve()
-    await Promise.resolve()
-
-    nextVideo.dispatchEvent(new Event('playing'))
-    await vi.advanceTimersByTimeAsync(1_999)
-    expect(pause).toHaveBeenCalledOnce()
-
-    await vi.advanceTimersByTimeAsync(1)
-    expect(pause).toHaveBeenCalledTimes(2)
-  })
-
-  it('does not extend the fallback deadline when Netflix retries playing', async () => {
-    vi.useFakeTimers()
-    const transport = vi.fn().mockResolvedValue({ success: true })
-    manager = new PipManager({
-      onKeydown: vi.fn(),
-      onKeyup: vi.fn(),
-      playbackSession: createNetflixPlaybackSession(transport),
-    })
-    const initialVideo = document.createElement('video')
-    document.body.appendChild(initialVideo)
-
-    expect(await manager.enter()).toBe(true)
-
-    initialVideo.dispatchEvent(new Event('ended'))
-    const nextVideo = createRenderableVideo()
-    document.body.appendChild(nextVideo)
-    await Promise.resolve()
-    await Promise.resolve()
-
-    nextVideo.dispatchEvent(new Event('playing'))
-    await vi.advanceTimersByTimeAsync(1_000)
-    nextVideo.dispatchEvent(new Event('playing'))
-    await vi.advanceTimersByTimeAsync(999)
-
-    expect(transport).not.toHaveBeenCalledWith('pause')
-
-    await vi.advanceTimersByTimeAsync(1)
-
-    expect(transport).toHaveBeenCalledWith('pause')
-  })
-
-  it('does not auto-pause the next episode after the user takes over', async () => {
-    vi.useFakeTimers()
-    const transport = vi.fn().mockResolvedValue({ success: true })
-    manager = new PipManager({
-      onKeydown: vi.fn(),
-      onKeyup: vi.fn(),
-      playbackSession: createNetflixPlaybackSession(transport),
-    })
-    const initialVideo = document.createElement('video')
-    document.body.appendChild(initialVideo)
-    expect(await manager.enter()).toBe(true)
-
-    initialVideo.dispatchEvent(new Event('ended'))
-    const nextVideo = createRenderableVideo()
-    Object.defineProperty(nextVideo, 'readyState', {
-      configurable: true,
-      value: HTMLMediaElement.HAVE_CURRENT_DATA,
-    })
-    const pause = vi.spyOn(nextVideo, 'pause')
-    document.body.appendChild(nextVideo)
-    await Promise.resolve()
     await Promise.resolve()
 
     expect(pause).not.toHaveBeenCalled()
     expect(transport).not.toHaveBeenCalledWith('pause')
-
-    document.dispatchEvent(new Event('pointerdown'))
-    nextVideo.dispatchEvent(new Event('play'))
-    nextVideo.dispatchEvent(new Event('playing'))
-    await Promise.resolve()
-
-    expect(pause).not.toHaveBeenCalled()
   })
 
   it('leaves the next episode video in Netflix so its controls and metadata stay bound', async () => {
@@ -1340,7 +1003,7 @@ describe('PipManager', () => {
     expect(nextVideo.style.objectFit).toBe('contain')
   })
 
-  it('pauses the next episode beside a stale Netflix player and closes PiP', async () => {
+  it('closes PiP without pausing the next episode beside a stale Netflix player', async () => {
     vi.useFakeTimers()
     const transport = vi.fn().mockResolvedValue({ success: true })
     manager = new PipManager({
@@ -1365,12 +1028,11 @@ describe('PipManager', () => {
     await Promise.resolve()
     await Promise.resolve()
     await vi.advanceTimersByTimeAsync(300)
-    appendNetflixVideoTitle()
     nextVideo.dispatchEvent(new Event('playing'))
     await Promise.resolve()
 
-    expect(pause).toHaveBeenCalled()
-    expect(transport).toHaveBeenCalledWith('pause')
+    expect(pause).not.toHaveBeenCalled()
+    expect(transport).not.toHaveBeenCalledWith('pause')
     expect(manager.isActive).toBe(false)
     expect(pipWindow.close).toHaveBeenCalledOnce()
     expect(nextVideo.parentElement).toBe(activePlayer)
@@ -1667,8 +1329,8 @@ describe('PipManager', () => {
     video.dispatchEvent(new Event('playing'))
     await Promise.resolve()
 
-    expect(pause).toHaveBeenCalled()
-    expect(transport).toHaveBeenCalledWith('pause')
+    expect(pause).not.toHaveBeenCalled()
+    expect(transport).not.toHaveBeenCalledWith('pause')
     expect(manager.isActive).toBe(false)
     expect(pipWindow.close).toHaveBeenCalledOnce()
     expect(video.ownerDocument).toBe(document)
@@ -1733,8 +1395,8 @@ describe('PipManager', () => {
     video.dispatchEvent(new Event('playing'))
     await Promise.resolve()
 
-    expect(pause).toHaveBeenCalled()
-    expect(transport).toHaveBeenCalledWith('pause')
+    expect(pause).not.toHaveBeenCalled()
+    expect(transport).not.toHaveBeenCalledWith('pause')
     expect(manager.isActive).toBe(false)
     expect(pipWindow.close).toHaveBeenCalledOnce()
   })
@@ -1767,8 +1429,8 @@ describe('PipManager', () => {
     video.dispatchEvent(new Event('playing'))
     await Promise.resolve()
 
-    expect(pause).toHaveBeenCalled()
-    expect(transport).toHaveBeenCalledWith('pause')
+    expect(pause).not.toHaveBeenCalled()
+    expect(transport).not.toHaveBeenCalledWith('pause')
     expect(manager.isActive).toBe(false)
     expect(pipWindow.close).toHaveBeenCalledOnce()
   })
