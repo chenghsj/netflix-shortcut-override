@@ -158,8 +158,8 @@ Verify automatic next-episode transition against at least two episode boundaries
 
 1. Enter PiP while an episode is playing and leave Netflix autoplay enabled.
 2. Let Netflix reach the automatic next-episode boundary without interacting with the source page.
-3. Confirm PiP closes and the Netflix tab is not activated or focused.
-4. Confirm the next episode is paused before advancing playback is visibly rendered.
+3. Confirm PiP closes. If the Netflix playback context is still visible, confirm the next episode is paused before advancing playback is visibly rendered; if another tab was selected before transition, confirm Netflix is not activated or focused.
+4. If the Netflix playback context is still visible, press `Space` without clicking the page and confirm the next episode starts.
 5. Move the pointer over the Netflix player and confirm the next title is visible.
 6. Confirm play/pause, seek backward/forward, volume, next episode, episode list, audio/subtitles, speed, and fullscreen controls respond.
 7. Repeat once when Netflix replaces the player root and once when it temporarily keeps the previous root mounted, when both transition shapes can be observed.

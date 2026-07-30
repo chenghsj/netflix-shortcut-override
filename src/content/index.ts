@@ -51,6 +51,7 @@ const handleKeydown = (event: KeyboardEvent, explicitTargetDoc?: Document) => {
     stopContentListeners()
     return
   }
+  pipManager?.releaseNextEpisodePauseGuard()
   if (!settingsLoaded) return
 
   const targetDoc = explicitTargetDoc ?? getTargetDocument(event)

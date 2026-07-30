@@ -138,6 +138,10 @@ export class PipManager {
     this.videoHandoff?.recordUserSeek()
   }
 
+  releaseNextEpisodePauseGuard(): void {
+    this.stopNextEpisodePauseGuard()
+  }
+
   async toggle(): Promise<boolean> {
     if (this.isActive) {
       this.exit()

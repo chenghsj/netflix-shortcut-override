@@ -51,7 +51,7 @@ Netflix 當前 Akira client 則在 UI/state orchestration 層執行以下流程�
 
 本專案曾實測 `watchCredits` action，結果是下一集仍會自動播放，同時 Netflix 頁面從 `/watch` 回到 `/browse`，造成 PiP 畫面縮小。再次以 `/watch/<id>` 的 `currentMovieId` 呼叫後結果仍相同，因此這條實驗路徑已移除。PiP timeline 往回 seek 已恢復為單純 seek，不再改寫 Netflix 的 credits/playgraph 狀態。
 
-PiP handoff 測試已把下一集視為影片生命週期／session replacement：包括 `ended`、`emptied`、`loadedmetadata`、新 video 出現與同一 video 被重用。這條 transition-after-the-fact 偵測路徑比呼叫未公開的 post-play state/action 更穩定。[`pip-manager.test.ts`](../src/content/pip/pip-manager.test.ts)
+PiP handoff 測試已把下一集視為影片生命週期／session replacement：包括 `ended`、`emptied`、`loadedmetadata`、新 video 出現與同一 video 被重用。確認自動換集後，scoped pause guard 只追蹤已確認的下一集影片及其合格 replacement，讓 Netflix 完成新 playback session、標題與控制列初始化後維持暫停；來源頁面的第一次鍵盤操作會在快捷鍵處理前解除 guard，因此不需要先點擊畫面。這條 transition-after-the-fact 偵測路徑比呼叫未公開的 post-play state/action 更穩定。[`next-episode-pause-guard.ts`](../src/content/pip/next-episode-pause-guard.ts) [`pip-manager.test.ts`](../src/content/pip/pip-manager.test.ts)
 
 ## 建議
 

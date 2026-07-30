@@ -38,6 +38,7 @@ This project is not affiliated with, endorsed by, or sponsored by Netflix.
 - Control play/pause, volume, mute, fullscreen, skip intro, and playback speed.
 - Toggle a Document Picture-in-Picture player with Netflix subtitle mirroring on Chrome and Edge Chromium.
 - Use the same configurable shortcut to enter or exit Picture-in-Picture on supported Chromium browsers.
+- When Netflix automatically advances to the next episode, close Picture-in-Picture and leave the new episode paused; use the configured play/pause shortcut (`Space` by default) without clicking the page first to resume.
 - Firefox supports the shortcut, popup, and options features; the subtitle-preserving Picture-in-Picture setting is disabled because Firefox is not supported.
 - In Chromium's subtitle-mirrored Picture-in-Picture window, the first primary click immediately plays or pauses the video while allowing the browser to focus the window.
 - Use the PiP overlay for timeline seeking, playback transport, volume, mute, and subtitle appearance settings; it hides after three seconds of pointer idle.

@@ -5,27 +5,130 @@ import { getSettings, saveSettings } from '@/shared/storage'
 
 import { setupContentIndexTests } from '../shortcuts/content-script.test-support'
 
+const createDocumentPipFixture = () => {
+  const iframe = document.createElement('iframe')
+  document.body.appendChild(iframe)
+  const pipWindow = iframe.contentWindow
+  if (!pipWindow) throw new Error('Expected iframe window for PiP test')
+
+  const close = vi.fn()
+  const requestWindow = vi.fn().mockResolvedValue(pipWindow)
+  Object.defineProperty(pipWindow, 'close', {
+    configurable: true,
+    value: close,
+  })
+  Object.defineProperty(window, 'documentPictureInPicture', {
+    configurable: true,
+    value: { requestWindow },
+  })
+
+  return {
+    pipWindow,
+    cleanup: () => {
+      pipWindow.dispatchEvent(new Event('pagehide'))
+      pipWindow.close()
+      iframe.remove()
+      delete (window as Window & { documentPictureInPicture?: unknown })
+        .documentPictureInPicture
+    },
+  }
+}
+
 describe('content PiP shortcuts', () => {
   setupContentIndexTests()
+
+  it('lets the first Space press resume playback after an automatic episode transition', async () => {
+    const { pipWindow, cleanup } = createDocumentPipFixture()
+
+    try {
+      const initialVideo = document.createElement('video')
+      document.body.appendChild(initialVideo)
+
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          code: 'KeyP',
+          key: 'P',
+          shiftKey: true,
+          bubbles: true,
+          cancelable: true,
+        })
+      )
+      await Promise.resolve()
+      await Promise.resolve()
+
+      initialVideo.dispatchEvent(new Event('ended'))
+
+      let paused = true
+      const nextVideo = document.createElement('video')
+      nextVideo.getBoundingClientRect = () =>
+        ({
+          x: 0,
+          y: 0,
+          top: 0,
+          right: 640,
+          bottom: 360,
+          left: 0,
+          width: 640,
+          height: 360,
+          toJSON: () => ({}),
+        }) as DOMRect
+      Object.defineProperties(nextVideo, {
+        paused: { configurable: true, get: () => paused },
+        readyState: {
+          configurable: true,
+          value: HTMLMediaElement.HAVE_CURRENT_DATA,
+        },
+        play: {
+          configurable: true,
+          value: vi.fn(() => {
+            paused = false
+            nextVideo.dispatchEvent(new Event('playing'))
+            return Promise.resolve()
+          }),
+        },
+        pause: {
+          configurable: true,
+          value: vi.fn(() => {
+            paused = true
+          }),
+        },
+      })
+      document.body.appendChild(nextVideo)
+      await Promise.resolve()
+      await Promise.resolve()
+
+      expect(pipWindow.close).toHaveBeenCalledOnce()
+
+      const keydown = new KeyboardEvent('keydown', {
+        code: 'Space',
+        key: ' ',
+        bubbles: true,
+        cancelable: true,
+      })
+      const keyup = new KeyboardEvent('keyup', {
+        code: 'Space',
+        key: ' ',
+        bubbles: true,
+        cancelable: true,
+      })
+      window.dispatchEvent(keydown)
+      window.dispatchEvent(keyup)
+      await Promise.resolve()
+      await Promise.resolve()
+
+      expect(keydown.defaultPrevented).toBe(true)
+      expect(keyup.defaultPrevented).toBe(true)
+      expect(nextVideo.play).toHaveBeenCalledOnce()
+      expect(nextVideo.paused).toBe(false)
+    } finally {
+      cleanup()
+    }
+  })
 
   it('attempts the PiP shortcut without requiring the visible Netflix player root', async () => {
     window.history.replaceState(null, '', '/watch/123')
 
-    const iframe = document.createElement('iframe')
-    document.body.append(iframe)
-    const pipWindow = iframe.contentWindow
-    if (!pipWindow) throw new Error('Expected iframe window for PiP shortcut test')
-
-    Object.defineProperty(pipWindow, 'close', {
-      configurable: true,
-      value: vi.fn(),
-    })
-    Object.defineProperty(window, 'documentPictureInPicture', {
-      configurable: true,
-      value: {
-        requestWindow: vi.fn().mockResolvedValue(pipWindow),
-      },
-    })
+    const { pipWindow, cleanup } = createDocumentPipFixture()
 
     try {
       const video = document.createElement('video')
@@ -45,10 +148,7 @@ describe('content PiP shortcuts', () => {
       expect(event.defaultPrevented).toBe(true)
       expect(pipWindow.document.querySelector('video')).toBe(video)
     } finally {
-      pipWindow.dispatchEvent(new Event('pagehide'))
-      pipWindow.close()
-      iframe.remove()
-      delete (window as Window & { documentPictureInPicture?: unknown }).documentPictureInPicture
+      cleanup()
     }
   })
 
@@ -90,21 +190,7 @@ describe('content PiP shortcuts', () => {
   })
 
   it('uses Shift+P as a toggle shortcut for entering and exiting PiP', async () => {
-    const iframe = document.createElement('iframe')
-    document.body.appendChild(iframe)
-    const pipWindow = iframe.contentWindow
-    if (!pipWindow) throw new Error('Expected iframe window for PiP shortcut test')
-
-    Object.defineProperty(pipWindow, 'close', {
-      configurable: true,
-      value: vi.fn(),
-    })
-    Object.defineProperty(window, 'documentPictureInPicture', {
-      configurable: true,
-      value: {
-        requestWindow: vi.fn().mockResolvedValue(pipWindow),
-      },
-    })
+    const { pipWindow, cleanup } = createDocumentPipFixture()
 
     try {
       const video = document.createElement('video')
@@ -140,27 +226,12 @@ describe('content PiP shortcuts', () => {
       expect(video.parentElement).toBe(document.body)
       expect(document.getElementById('shortcut-override-media-hint')).toBeNull()
     } finally {
-      iframe.remove()
-      delete (window as Window & { documentPictureInPicture?: unknown }).documentPictureInPicture
+      cleanup()
     }
   })
 
   it('handles Space in PiP even when play/pause and Space hold are disabled on the main page', async () => {
-    const iframe = document.createElement('iframe')
-    document.body.appendChild(iframe)
-    const pipWindow = iframe.contentWindow
-    if (!pipWindow) throw new Error('Expected iframe window for PiP shortcut test')
-
-    Object.defineProperty(pipWindow, 'close', {
-      configurable: true,
-      value: vi.fn(),
-    })
-    Object.defineProperty(window, 'documentPictureInPicture', {
-      configurable: true,
-      value: {
-        requestWindow: vi.fn().mockResolvedValue(pipWindow),
-      },
-    })
+    const { pipWindow, cleanup } = createDocumentPipFixture()
 
     try {
       const video = document.createElement('video')
@@ -217,29 +288,12 @@ describe('content PiP shortcuts', () => {
         pipWindow.document.getElementById('shortcut-override-playback-hint')
       ).not.toBeNull()
     } finally {
-      pipWindow.dispatchEvent(new Event('pagehide'))
-      pipWindow.close()
-      iframe.remove()
-      delete (window as Window & { documentPictureInPicture?: unknown }).documentPictureInPicture
+      cleanup()
     }
   })
 
   it('toggles playback on the first PiP click, including after refocus', async () => {
-    const iframe = document.createElement('iframe')
-    document.body.appendChild(iframe)
-    const pipWindow = iframe.contentWindow
-    if (!pipWindow) throw new Error('Expected iframe window for PiP click test')
-
-    Object.defineProperty(pipWindow, 'close', {
-      configurable: true,
-      value: vi.fn(),
-    })
-    Object.defineProperty(window, 'documentPictureInPicture', {
-      configurable: true,
-      value: {
-        requestWindow: vi.fn().mockResolvedValue(pipWindow),
-      },
-    })
+    const { pipWindow, cleanup } = createDocumentPipFixture()
 
     try {
       const video = document.createElement('video')
@@ -299,24 +353,12 @@ describe('content PiP shortcuts', () => {
       expect(pause).toHaveBeenCalledOnce()
       expect(paused).toBe(false)
     } finally {
-      pipWindow.dispatchEvent(new Event('pagehide'))
-      pipWindow.close()
-      iframe.remove()
-      delete (window as Window & { documentPictureInPicture?: unknown }).documentPictureInPicture
+      cleanup()
     }
   })
 
   it('uses shared shortcut feedback and persists live PiP control settings', async () => {
-    const iframe = document.createElement('iframe')
-    document.body.appendChild(iframe)
-    const pipWindow = iframe.contentWindow
-    if (!pipWindow) throw new Error('Expected iframe window for PiP controls test')
-
-    Object.defineProperty(pipWindow, 'close', { configurable: true, value: vi.fn() })
-    Object.defineProperty(window, 'documentPictureInPicture', {
-      configurable: true,
-      value: { requestWindow: vi.fn().mockResolvedValue(pipWindow) },
-    })
+    const { pipWindow, cleanup } = createDocumentPipFixture()
 
     try {
       await saveSettings({ ...DEFAULT_SETTINGS, locale: 'zh-TW', seek: { seconds: 5 } })
@@ -420,10 +462,7 @@ describe('content PiP shortcuts', () => {
       await Promise.resolve()
       expect((await getSettings()).pip.subtitleBackground).toBe('dark')
     } finally {
-      pipWindow.dispatchEvent(new Event('pagehide'))
-      pipWindow.close()
-      iframe.remove()
-      delete (window as Window & { documentPictureInPicture?: unknown }).documentPictureInPicture
+      cleanup()
     }
   })
 })
