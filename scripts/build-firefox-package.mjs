@@ -1,31 +1,46 @@
 import { spawnSync } from 'node:child_process'
+import { mkdir, readFile, rm } from 'node:fs/promises'
 import path from 'node:path'
 
 import { prepareFirefoxDist } from './prepare-firefox-dist.mjs'
-import { withTemporaryDirectory } from './package-utils.mjs'
+import {
+  createZipArchive,
+  withTemporaryDirectory,
+  writeSha256,
+} from './package-utils.mjs'
 
 const rootDir = process.cwd()
 const distDir = path.join(rootDir, 'dist')
-const metadataPath = path.join(rootDir, 'amo-metadata.json')
-const apiKey = process.env.AMO_JWT_ISSUER?.trim()
-const apiSecret = process.env.AMO_JWT_SECRET?.trim()
-
-if (!apiKey || !apiSecret) {
-  throw new Error('AMO_JWT_ISSUER and AMO_JWT_SECRET are required to publish to AMO.')
-}
+const releaseAssetsDir = path.join(rootDir, 'release-assets')
+const manifest = JSON.parse(await readFile(path.join(distDir, 'manifest.json'), 'utf8'))
+const firefoxZipPath = path.join(
+  releaseAssetsDir,
+  `shortcut-override-for-netflix-firefox-${manifest.version}.zip`
+)
+const sourceZipPath = path.join(
+  releaseAssetsDir,
+  `shortcut-override-for-netflix-source-${manifest.version}.zip`
+)
 
 await withTemporaryDirectory({
   prefix: 'netflix-shortcut-firefox-',
   task: async tempRoot => {
     const firefoxDistDir = path.join(tempRoot, 'firefox-dist')
-    const artifactsDir = path.join(tempRoot, 'web-ext-artifacts')
-    const sourcePackagePath = path.join(tempRoot, 'source.zip')
 
     await prepareFirefoxDist({ sourceDir: distDir, outputDir: firefoxDistDir })
+    await mkdir(releaseAssetsDir, { recursive: true })
+    await Promise.all([
+      rm(firefoxZipPath, { force: true }),
+      rm(`${firefoxZipPath}.sha256`, { force: true }),
+      rm(sourceZipPath, { force: true }),
+      rm(`${sourceZipPath}.sha256`, { force: true }),
+    ])
+
+    createZipArchive({ sourceDir: firefoxDistDir, archivePath: firefoxZipPath })
 
     const archiveResult = spawnSync(
       'git',
-      ['archive', '--format=zip', '--output', sourcePackagePath, 'HEAD'],
+      ['archive', '--format=zip', '--output', sourceZipPath, 'HEAD'],
       { cwd: rootDir, stdio: 'inherit' }
     )
 
@@ -34,39 +49,14 @@ await withTemporaryDirectory({
       throw new Error(`git archive exited with status ${archiveResult.status}`)
     }
 
-    const signResult = spawnSync(
-      'npm',
-      [
-        'exec',
-        '--',
-        'web-ext',
-        'sign',
-        '--source-dir',
-        firefoxDistDir,
-        '--artifacts-dir',
-        artifactsDir,
-        '--channel',
-        'listed',
-        '--amo-metadata',
-        metadataPath,
-        '--api-key',
-        apiKey,
-        '--api-secret',
-        apiSecret,
-        '--upload-source-code',
-        sourcePackagePath,
-        '--approval-timeout',
-        '0',
-        '--no-input',
-      ],
-      { cwd: rootDir, stdio: 'inherit' }
-    )
+    await Promise.all([
+      writeSha256({ filePath: firefoxZipPath, rootDir }),
+      writeSha256({ filePath: sourceZipPath, rootDir }),
+    ])
 
-    if (signResult.error) throw signResult.error
-    if (signResult.status !== 0) {
-      throw new Error(`web-ext sign exited with status ${signResult.status}`)
-    }
-
-    console.log('Submitted the Firefox extension to AMO for public listing.')
+    console.log(`Created ${path.relative(rootDir, firefoxZipPath)}`)
+    console.log(`Created ${path.relative(rootDir, `${firefoxZipPath}.sha256`)}`)
+    console.log(`Created ${path.relative(rootDir, sourceZipPath)}`)
+    console.log(`Created ${path.relative(rootDir, `${sourceZipPath}.sha256`)}`)
   },
 })

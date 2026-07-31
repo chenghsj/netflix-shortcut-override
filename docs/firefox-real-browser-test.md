@@ -25,6 +25,8 @@ Open a Netflix watch page and check:
 
 ## Release smoke test
 
-After Mozilla approves a listed release, install it from Firefox Add-ons. Repeat the Netflix checklist, then confirm the installed add-on has the expected version and remains enabled after restarting Firefox.
+Download `shortcut-override-for-netflix-firefox-<version>.zip` from the GitHub Release. Load the ZIP through `about:debugging#/runtime/this-firefox`, repeat the Netflix checklist, and confirm it is removed after restarting Firefox because the package is temporarily loaded.
+
+For AMO validation, manually upload that same Firefox ZIP as the add-on package and upload `shortcut-override-for-netflix-source-<version>.zip` when source code is requested. After Mozilla approves the listed release, install it from Firefox Add-ons, repeat the checklist, and confirm it remains enabled after restarting Firefox.
 
 Confirm the Firefox manifest does not include `browser_specific_settings.gecko.update_url`. Firefox Add-ons owns signing and automatic updates for listed releases.
