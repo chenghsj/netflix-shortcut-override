@@ -1,7 +1,4 @@
-import { requestCompatibilityDiagnostics } from '@/shared/compatibility-diagnostics-client'
-import {
-  createCompatibilityReadinessPolicy,
-} from '@/shared/compatibility-readiness'
+import { createCompatibilityReadinessObserver } from '@/shared/compatibility-readiness-observer'
 import {
   isNetflixWatchUrl,
   restoreVisibleNetflixWatchPageFocus,
@@ -13,7 +10,6 @@ const PENDING_FOCUS_RESTORATIONS_KEY =
 const FOCUS_RESTORATION_TTL_MS = 30_000
 const FOCUS_RETRY_INTERVAL_MS = 100
 const FOCUS_MAX_ATTEMPTS = 3
-const readinessPolicy = createCompatibilityReadinessPolicy()
 
 type PendingFocusRestoration = PlaybackFocusTarget & {
   requestId: string
@@ -28,9 +24,9 @@ type ScheduledExpiration = {
 }
 
 const expirationTimers = new Map<number, ScheduledExpiration>()
-const readinessRetryTimers = new Map<
+const readinessObservers = new Map<
   number,
-  ReturnType<typeof setTimeout>
+  { requestId: string; cancel: () => void }
 >()
 
 const clearPendingFocusRestorationTimers = (tabId: number) => {
@@ -39,10 +35,10 @@ const clearPendingFocusRestorationTimers = (tabId: number) => {
     clearTimeout(expirationTimer.timer)
     expirationTimers.delete(tabId)
   }
-  const readinessRetryTimer = readinessRetryTimers.get(tabId)
-  if (readinessRetryTimer !== undefined) {
-    clearTimeout(readinessRetryTimer)
-    readinessRetryTimers.delete(tabId)
+  const readinessObserver = readinessObservers.get(tabId)
+  if (readinessObserver !== undefined) {
+    readinessObserver.cancel()
+    readinessObservers.delete(tabId)
   }
 }
 
@@ -163,42 +159,9 @@ const getFocusTargetState = async (
   return tab.status === 'complete' ? 'eligible' : 'waiting'
 }
 
-const attemptFocusRestoration = async (
+const completeFocusRestoration = async (
   pending: PendingFocusRestoration
 ): Promise<void> => {
-  if (Date.now() >= pending.expiresAt) {
-    await removePendingFocusRestoration(pending.tabId, pending.requestId)
-    return
-  }
-
-  const targetState = await getFocusTargetState(pending)
-  if (!(await isCurrentPendingFocusRestoration(pending))) return
-  if (targetState === 'cancel') {
-    await removePendingFocusRestoration(pending.tabId, pending.requestId)
-    return
-  }
-  if (targetState === 'waiting') return
-
-  const diagnosticsState = await requestCompatibilityDiagnostics(
-    pending.tabId,
-    readinessPolicy
-  )
-  if (!(await isCurrentPendingFocusRestoration(pending))) return
-  if (!readinessPolicy.isPlaybackReady(diagnosticsState)) {
-    if (!readinessRetryTimers.has(pending.tabId)) {
-      readinessRetryTimers.set(
-        pending.tabId,
-        setTimeout(() => {
-          readinessRetryTimers.delete(pending.tabId)
-          void resumePendingFocusRestoration(pending.tabId).catch(
-            () => undefined
-          )
-        }, readinessPolicy.missingReceiverRetryIntervalMs)
-      )
-    }
-    return
-  }
-
   for (let attempt = 0; attempt < FOCUS_MAX_ATTEMPTS; attempt += 1) {
     if (attempt > 0) {
       await new Promise(resolve =>
@@ -227,6 +190,51 @@ const attemptFocusRestoration = async (
     }
   }
   await removePendingFocusRestoration(pending.tabId, pending.requestId)
+}
+
+const observePlaybackReadiness = (pending: PendingFocusRestoration): void => {
+  const existing = readinessObservers.get(pending.tabId)
+  if (existing?.requestId === pending.requestId) return
+  existing?.cancel()
+
+  const observer = createCompatibilityReadinessObserver()
+  const cancel = observer.observePlaybackReadiness(pending.tabId, {
+    beforeAttempt: async () => {
+      if (Date.now() >= pending.expiresAt) return 'cancel'
+      if (!(await isCurrentPendingFocusRestoration(pending))) return 'cancel'
+      const targetState = await getFocusTargetState(pending)
+      if (targetState === 'cancel') return 'cancel'
+      return targetState === 'waiting' ? 'wait' : 'continue'
+    },
+    onReady: async () => {
+      readinessObservers.delete(pending.tabId)
+      await completeFocusRestoration(pending)
+    },
+    onCancel: () => removePendingFocusRestoration(pending.tabId, pending.requestId),
+    onWait: () => {
+      const current = readinessObservers.get(pending.tabId)
+      if (current?.requestId === pending.requestId) readinessObservers.delete(pending.tabId)
+    },
+  })
+  readinessObservers.set(pending.tabId, { requestId: pending.requestId, cancel })
+}
+
+const attemptFocusRestoration = async (
+  pending: PendingFocusRestoration
+): Promise<void> => {
+  if (Date.now() >= pending.expiresAt) {
+    await removePendingFocusRestoration(pending.tabId, pending.requestId)
+    return
+  }
+
+  const targetState = await getFocusTargetState(pending)
+  if (!(await isCurrentPendingFocusRestoration(pending))) return
+  if (targetState === 'cancel') {
+    await removePendingFocusRestoration(pending.tabId, pending.requestId)
+    return
+  }
+  if (targetState === 'waiting') return
+  observePlaybackReadiness(pending)
 }
 
 export const requestPlaybackFocusRestoration = async (

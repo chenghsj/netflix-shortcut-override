@@ -1,16 +1,12 @@
 import { canHandlePlaybackShortcut, findVideo } from '@/content/dom-utils'
 import { getBrowserCapabilities } from '@/shared/browser-capabilities'
-import { findSubtitleSearchRoot, SubtitleMirror } from './pip-subtitle-mirror'
-import { PipControls } from './pip-controls'
+import { AdoptedVideoBinding } from './adopted-video-binding'
 import { createPipVideoHandoff } from './pip-video-handoff'
 import {
   createNetflixPlaybackSession,
   type NetflixPlaybackSession,
 } from '@/content/netflix-playback-session'
-import { VideoPlacement } from './video-placement'
 import { markPipDocument } from './pip-document'
-import { resolveLocalePreference } from '@/shared/browser-locale'
-import { getCopy } from '@/shared/i18n'
 import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
 import type { ShortcutSettings } from '@/shared/shortcut-types'
 import type { ShortcutCommandController } from '@/content/shortcuts/shortcut-command-controller'
@@ -76,17 +72,14 @@ const isPipControlTarget = (target: EventTarget | null): boolean => {
 export class PipManager {
   private readonly sourceDocument: Document
   private readonly keyboardHandlers: PipKeyboardHandlers
-  private readonly videoPlacement: VideoPlacement
   private readonly playbackSession: NetflixPlaybackSession
   private readonly commands: PipManagerOptions['commands']
   private readonly onSettingsChange: PipManagerOptions['onSettingsChange']
   private settings: ShortcutSettings
   private pipWindow: Window | null = null
 
-  private subtitleMirror: SubtitleMirror | null = null
-  private pipControls: PipControls | null = null
+  private adoptedVideoBinding: AdoptedVideoBinding | null = null
   private videoHandoff: ReturnType<typeof createPipVideoHandoff> | null = null
-  private videoArea: HTMLElement | null = null
   private keyboardCleanup: (() => void) | null = null
   private playbackContextCleanup: (() => void) | null = null
   private pipEntryWatchId: string | null = null
@@ -98,7 +91,6 @@ export class PipManager {
   constructor(options: PipManagerOptions) {
     const { sourceDocument, onKeydown, onKeyup, onBlur, onClick, playbackSession } = options
     this.sourceDocument = sourceDocument ?? document
-    this.videoPlacement = new VideoPlacement(this.sourceDocument)
     this.playbackSession = playbackSession ?? createNetflixPlaybackSession()
     this.commands = options.commands
     this.keyboardHandlers = { onKeydown, onKeyup, onBlur, onClick }
@@ -127,8 +119,7 @@ export class PipManager {
 
   updateSettings(settings: ShortcutSettings): void {
     this.settings = settings
-    this.subtitleMirror?.setSettings(settings.pip)
-    this.pipControls?.updateSettings(this.getControlsSettings())
+    this.adoptedVideoBinding?.updateSettings(settings)
   }
 
   recordUserSeek(): void {
@@ -157,11 +148,8 @@ export class PipManager {
       this.sourceWatchChangeIntentDeadline = 0
 
       const video = findVideo(this.sourceDocument)
-      const parent = video?.parentElement
-      if (!video || !parent) return false
+      if (!video || !video.parentElement) return false
       const shouldMonitorPlaybackContext = canHandlePlaybackShortcut(this.sourceDocument)
-
-      this.videoPlacement.prepare(video)
 
       let pipWin: Window | null = null
 
@@ -175,9 +163,16 @@ export class PipManager {
         this.pipWindow = pipWin
         this.initPipDocument(pipWin, this.sourceDocument)
 
-        const videoArea = this.videoPlacement.createPipVideoArea(pipWin)
-        this.videoArea = videoArea
-        this.mountVideoBindings(pipWin, video, videoArea, parent)
+        this.adoptedVideoBinding = new AdoptedVideoBinding({
+          sourceDocument: this.sourceDocument,
+          pipWindow: pipWin,
+          playbackSession: this.playbackSession,
+          commands: this.commands,
+          settings: this.settings,
+          onSettingsChange: this.onSettingsChange,
+          onUserSeek: () => this.recordUserSeek(),
+        })
+        const videoArea = this.adoptedVideoBinding.adopt(video)
         pipWin.document.body.appendChild(videoArea)
         this.attachPipEventListeners(pipWin)
         this.startVideoHandoffMonitoring(pipWin, video, videoArea)
@@ -302,91 +297,6 @@ export class PipManager {
     }
   }
 
-  private mountVideoBindings(
-    pipWin: Window,
-    video: HTMLVideoElement,
-    videoArea: HTMLElement,
-    fallbackSourceParent: HTMLElement
-  ): void {
-    this.subtitleMirror = new SubtitleMirror({
-      sourceDocument: this.sourceDocument,
-      searchRoot: findSubtitleSearchRoot(
-        this.videoPlacement.sourceParent ?? fallbackSourceParent
-      ),
-      pipWindow: pipWin,
-      video,
-      videoArea,
-      settings: this.settings.pip,
-    })
-    this.subtitleMirror.start()
-    this.pipControls = new PipControls({
-      pipWindow: pipWin,
-      video,
-      videoArea,
-      seekTo: milliseconds => {
-        this.recordUserSeek()
-        return this.playbackSession.seekTo(milliseconds)
-      },
-      resumeAfterSeek: () => this.playbackSession.play(video),
-      onVisibilityChange: visible => this.subtitleMirror?.setControlsVisible(visible),
-      settings: this.getControlsSettings(),
-      onAction: action => this.executeControlAction(action, pipWin.document, video),
-      onVolumeChange: volume => this.executeVolumeChange(volume, pipWin.document, video),
-      onPipSettingsChange: settings => {
-        const nextSettings = { ...this.settings, pip: settings }
-        this.updateSettings(nextSettings)
-        this.onSettingsChange?.(nextSettings)
-      },
-    })
-    this.pipControls.start()
-  }
-
-  private getControlsSettings() {
-    const copy = getCopy(resolveLocalePreference(this.settings.locale)).pipControls
-    return {
-      seekSeconds: this.settings.seek.seconds,
-      pip: this.settings.pip,
-      copy,
-    }
-  }
-
-  private executeControlAction(
-    action: 'playPause' | 'seekBackward' | 'seekForward' | 'mute',
-    targetDoc: Document,
-    video: HTMLVideoElement
-  ): void {
-    if (action === 'seekBackward' || action === 'seekForward') {
-      this.recordUserSeek()
-    }
-    if (this.commands) {
-      this.commands.execute(action, targetDoc)
-      return
-    }
-
-    if (action === 'playPause') {
-      void this.playbackSession.togglePlayback(video)
-      return
-    }
-    if (action === 'mute') {
-      this.playbackSession.toggleMute(video)
-      return
-    }
-    const direction = action === 'seekBackward' ? -1 : 1
-    void this.playbackSession.seekBy(direction * this.settings.seek.seconds * 1_000)
-  }
-
-  private executeVolumeChange(
-    volume: number,
-    targetDoc: Document,
-    video: HTMLVideoElement
-  ): void {
-    if (this.commands) {
-      this.commands.setVolume(volume, targetDoc)
-      return
-    }
-    this.playbackSession.setVolume(video, volume)
-  }
-
   private startVideoHandoffMonitoring(
     pipWin: Window,
     video: HTMLVideoElement,
@@ -398,23 +308,10 @@ export class PipManager {
       videoArea,
       initialVideo: video,
       isActive: () => this.isActive,
-      onVideoHandoff: candidate => {
-        const candidateParent = candidate.parentElement
-        if (!candidateParent || !this.videoArea) return false
-
-        this.cleanupVideoBindings()
-        this.videoPlacement.replaceVideo(candidate, this.videoArea)
-        this.mountVideoBindings(
-          pipWin,
-          candidate,
-          this.videoArea,
-          candidateParent
-        )
-        return true
-      },
+      onVideoHandoff: candidate => this.adoptedVideoBinding?.replace(candidate) ?? false,
       onEpisodeTransition: candidate => {
         const restoreAdoptedVideo =
-          this.isManualSourceWatchChange() || candidate === this.videoPlacement.currentVideo
+          this.isManualSourceWatchChange() || candidate === this.adoptedVideoBinding?.currentVideo
         this.closeActivePip(restoreAdoptedVideo)
       },
       onTimeout: () => this.exit(),
@@ -525,29 +422,12 @@ export class PipManager {
     this.playbackContextCleanup = null
     this.keyboardCleanup?.()
     this.keyboardCleanup = null
-    this.cleanupVideoBindings()
+    this.adoptedVideoBinding?.destroy(restoreAdoptedVideo)
+    this.adoptedVideoBinding = null
     this.pipWindow = null
-
-    this.videoPlacement.restore(false, restoreAdoptedVideo)
-    this.videoArea = null
     this.pipEntryWatchId = null
     this.sourceWatchChangeIntentDeadline = 0
     this.restoring = false
-  }
-
-  private cleanupSubtitleMirror(): void {
-    this.subtitleMirror?.destroy()
-    this.subtitleMirror = null
-  }
-
-  private cleanupPipControls(): void {
-    this.pipControls?.destroy()
-    this.pipControls = null
-  }
-
-  private cleanupVideoBindings(): void {
-    this.cleanupPipControls()
-    this.cleanupSubtitleMirror()
   }
 
 }

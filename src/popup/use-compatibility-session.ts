@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { requestCompatibilityDiagnostics as requestDiagnostics } from '@/shared/compatibility-diagnostics-client'
 import {
   createCompatibilityReadinessPolicy,
-  createCompatibilityRequestGeneration,
   INITIAL_COMPATIBILITY_DIAGNOSTICS_STATE,
   type CompatibilityDiagnosticsState,
 } from '@/shared/compatibility-readiness'
+import { createCompatibilityReadinessObserver } from '@/shared/compatibility-readiness-observer'
 import {
   isNetflixWatchUrl,
   type PlaybackFocusTarget,
@@ -78,7 +77,9 @@ const getPlaybackFocusTarget = (
 
 export const useCompatibilitySession = () => {
   const readinessPolicy = useMemo(() => createCompatibilityReadinessPolicy(), [])
-  const diagnosticsRequestGenerationRef = useRef(createCompatibilityRequestGeneration())
+  const readinessObserverRef = useRef(
+    createCompatibilityReadinessObserver({ readinessPolicy })
+  )
   const initialDiagnosticsCompleteRef = useRef(false)
   const pageContextRef = useRef<ActivePageContext>({ generation: 0, status: 'unknown' })
   const pageContextRequestRef = useRef<Promise<ActivePageContext> | null>(null)
@@ -95,16 +96,8 @@ export const useCompatibilitySession = () => {
   const [longLoadingGeneration, setLongLoadingGeneration] =
     useState<number | null>(null)
 
-  const requestCompatibilityDiagnostics = useCallback(async (tabId: number) => {
-    const requestGeneration = diagnosticsRequestGenerationRef.current.start()
-    const nextState = await requestDiagnostics(tabId, readinessPolicy)
-    return diagnosticsRequestGenerationRef.current.isCurrent(requestGeneration)
-      ? nextState
-      : null
-  }, [readinessPolicy])
-
   const cancelCompatibilityDiagnosticsRequest = useCallback(() => {
-    diagnosticsRequestGenerationRef.current.cancel()
+    readinessObserverRef.current.cancelActive()
   }, [])
 
   const commitCompatibilityDiagnosticsState = useCallback(
@@ -194,60 +187,28 @@ export const useCompatibilitySession = () => {
 
   const startDiagnosticsCycle = useCallback(
     (tabId: number, mode: 'initial' | 'refresh'): (() => void) => {
-      let active = true
-      let timer: number | undefined
-      let attempt = 0
-      let hasDiagnosticsResult = false
-
-      const schedule = (callback: () => void, delay: number) => {
-        timer = window.setTimeout(callback, delay)
+      if (mode === 'initial') {
+        return readinessObserverRef.current.observeInitial(tabId, nextState => {
+          initialDiagnosticsCompleteRef.current = true
+          commitCompatibilityDiagnosticsState(nextState)
+        })
       }
 
-      const run = async (): Promise<void> => {
-        if (!active) return
-        if (mode === 'refresh' && !hasDiagnosticsResult) {
-          setDiagnosticsState(INITIAL_COMPATIBILITY_DIAGNOSTICS_STATE)
-        }
-
-        attempt += 1
-        const nextState = await requestCompatibilityDiagnostics(tabId)
-        if (!active || nextState === null) return
-
-        hasDiagnosticsResult = true
-        if (mode === 'initial' && readinessPolicy.shouldRetryMissingReceiver(nextState, attempt)) {
-          schedule(() => void run(), readinessPolicy.missingReceiverRetryIntervalMs)
-          return
-        }
-
-        initialDiagnosticsCompleteRef.current = true
-        commitCompatibilityDiagnosticsState(nextState)
-
-        if (mode === 'refresh' && readinessPolicy.shouldRefreshDiagnostics(nextState)) {
-          schedule(() => void run(), readinessPolicy.diagnosticsRefreshIntervalMs)
-        }
-      }
-
-      void run()
+      const cancel = readinessObserverRef.current.observeRefresh(tabId, {
+        onStart: () => setDiagnosticsState(INITIAL_COMPATIBILITY_DIAGNOSTICS_STATE),
+        onState: commitCompatibilityDiagnosticsState,
+      })
 
       return () => {
-        active = false
-        cancelCompatibilityDiagnosticsRequest()
-        if (timer !== undefined) window.clearTimeout(timer)
-        if (mode === 'refresh') {
-          setDiagnosticsState(currentState =>
-            currentState.status === 'loading'
-              ? settledDiagnosticsStateRef.current
-              : currentState
-          )
-        }
+        cancel()
+        setDiagnosticsState(currentState =>
+          currentState.status === 'loading'
+            ? settledDiagnosticsStateRef.current
+            : currentState
+        )
       }
     },
-    [
-      cancelCompatibilityDiagnosticsRequest,
-      commitCompatibilityDiagnosticsState,
-      readinessPolicy,
-      requestCompatibilityDiagnostics,
-    ]
+    [commitCompatibilityDiagnosticsState]
   )
 
   useEffect(() => {
