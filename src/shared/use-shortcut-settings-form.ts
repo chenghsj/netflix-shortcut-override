@@ -3,7 +3,6 @@ import {
   useEffect,
   useRef,
   useState,
-  useTransition,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react'
 
@@ -53,7 +52,6 @@ export const useShortcutSettingsForm = () => {
   )
   const [loaded, setLoaded] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [, startSavingTransition] = useTransition()
   const latestSettingsRef = useRef<ShortcutSettings>(DEFAULT_SETTINGS)
   const saveRequestIdRef = useRef(0)
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve())
@@ -109,17 +107,16 @@ export const useShortcutSettingsForm = () => {
       () => undefined
     )
 
-    startSavingTransition(() => {
-      void savePromise.then(
-        () => {
-          if (saveRequestIdRef.current === saveRequestId) setSaveError(null)
-        },
-        error => {
-          if (saveRequestIdRef.current !== saveRequestId) return
-          setSaveError(error instanceof Error ? error.message : 'Unable to save settings.')
-        }
-      )
-    })
+    void savePromise.then(
+      () => {
+        if (saveRequestIdRef.current !== saveRequestId) return
+        setSaveError(null)
+      },
+      error => {
+        if (saveRequestIdRef.current !== saveRequestId) return
+        setSaveError(error instanceof Error ? error.message : 'Unable to save settings.')
+      }
+    )
   }
 
   const setSpeedDraftField = (field: SpeedField, value: string) => {

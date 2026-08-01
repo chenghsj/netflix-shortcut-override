@@ -1,4 +1,5 @@
-import react from '@vitejs/plugin-react'
+import babel from '@rolldown/plugin-babel'
+import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { crx, type ManifestV3Export } from '@crxjs/vite-plugin'
 import path from 'node:path'
@@ -31,7 +32,12 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
-  plugins: [react(), tailwindcss(), crx({ manifest: extensionManifest })],
+  plugins: [
+    react(),
+    babel({ presets: [reactCompilerPreset()] }),
+    tailwindcss(),
+    crx({ manifest: extensionManifest }),
+  ],
   build: {
     rollupOptions: {
       input: {

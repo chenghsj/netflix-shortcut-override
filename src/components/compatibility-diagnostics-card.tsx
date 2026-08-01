@@ -62,7 +62,7 @@ export function CompatibilityDiagnosticsCard({
 }: CompatibilityDiagnosticsCardProps) {
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle')
   const diagnostics = state.diagnostics
-  const readinessPolicy = useMemo(() => createCompatibilityReadinessPolicy(), [])
+  const readinessPolicy = createCompatibilityReadinessPolicy()
   const showPageBridgeDiagnostic = readinessPolicy.requirePageBridge
   const coreReady = readinessPolicy.isCoreReady(state)
   const compatible = coreReady && diagnostics?.pipSupported === true

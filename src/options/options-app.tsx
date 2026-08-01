@@ -7,7 +7,7 @@ import {
   RotateCcwIcon,
   SettingsIcon,
 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 
 import { GitHubIcon } from '@/components/github-icon'
 import { HoldSpeedIcon } from '@/components/hold-speed-icon'
@@ -112,14 +112,13 @@ export function OptionsApp() {
   const browserCapabilities = getBrowserCapabilities()
   useTheme(settings.theme)
 
-  const activeConflict = useMemo(() => {
-    if (!recorder?.draft) return null
-    return findBindingConflict(settings, recorder.action, recorder.draft, {
-      ignoredActions: browserCapabilities.supportsSubtitlePreservingPip
-        ? []
-        : ['pictureInPicture'],
-    })
-  }, [browserCapabilities.supportsSubtitlePreservingPip, recorder, settings])
+  const activeConflict = recorder?.draft
+    ? findBindingConflict(settings, recorder.action, recorder.draft, {
+        ignoredActions: browserCapabilities.supportsSubtitlePreservingPip
+          ? []
+          : ['pictureInPicture'],
+      })
+    : null
 
   const canSaveDraft = Boolean(recorder?.draft && !activeConflict)
   const canRestoreDraft = Boolean(

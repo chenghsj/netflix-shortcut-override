@@ -6,8 +6,6 @@ import {
   KeyboardIcon,
   SettingsIcon,
 } from 'lucide-react'
-import { useMemo } from 'react'
-
 import { GitHubIcon } from '@/components/github-icon'
 import { HoldSpeedIcon } from '@/components/hold-speed-icon'
 import { KeyBindingKbd } from '@/components/key-binding-kbd'
@@ -89,11 +87,12 @@ export function PopupApp() {
   const browserCapabilities = getBrowserCapabilities()
   useTheme(settings.theme)
 
-  const statusText = useMemo(() => {
-    if (pageStatus === 'netflix') return copy.popupNetflixPage
-    if (pageStatus === 'external') return copy.popupNetflixOnly
-    return null
-  }, [copy, pageStatus])
+  const statusText =
+    pageStatus === 'netflix'
+      ? copy.popupNetflixPage
+      : pageStatus === 'external'
+        ? copy.popupNetflixOnly
+        : null
   const shouldShowPageStatus = Boolean(statusText)
 
   if (!loaded) {
