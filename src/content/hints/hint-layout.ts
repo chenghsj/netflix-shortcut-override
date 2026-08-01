@@ -2,6 +2,7 @@ import { findVideo } from '@/content/dom-utils'
 import { isPipDocument } from '@/content/pip/pip-document'
 import {
   HINT_SCALE_CSS_VAR,
+  PIP_HINT_COMPACT_SCALE,
   SEEK_HINT_EDGE_INSET_PX,
   SEEK_HINT_OUTER_TRANSFORM,
 } from './hint-constants'
@@ -51,8 +52,16 @@ export const getPipHintScale = (targetDoc: Document): number => {
   return Math.min(PIP_HINT_MAX_SCALE, Math.max(PIP_HINT_MIN_SCALE, scale))
 }
 
-export const getHintTransform = (responsive: boolean, transform: string): string =>
-  responsive ? `${transform} scale(var(${HINT_SCALE_CSS_VAR}, 1))` : transform
+export const getHintTransform = (
+  responsive: boolean,
+  transform: string,
+  compactInPip = false
+): string => {
+  if (!responsive) return transform
+
+  const compactScale = compactInPip ? ` scale(${PIP_HINT_COMPACT_SCALE})` : ''
+  return `${transform}${compactScale} scale(var(${HINT_SCALE_CSS_VAR}, 1))`
+}
 
 export const updateHintScale = (
   element: HTMLElement,
@@ -110,7 +119,7 @@ export const positionSeekHint = (
 ): void => {
   const anchorRect = getHintAnchor(renderDoc)?.getBoundingClientRect()
   const viewportWidth = getViewportSize(renderDoc).width
-  const scale = responsive ? getPipHintScale(renderDoc) : 1
+  const scale = responsive ? getPipHintScale(renderDoc) * PIP_HINT_COMPACT_SCALE : 1
   const edgeInset = Math.round(SEEK_HINT_EDGE_INSET_PX * scale * 100) / 100
   const hintWidth = element.getBoundingClientRect().width / scale
   const preferredLeft =
@@ -126,7 +135,7 @@ export const positionSeekHint = (
     anchorRect && anchorRect.width > 0 && anchorRect.height > 0
       ? `${anchorRect.top + anchorRect.height / 2}px`
       : '50%'
-  element.style.transform = getHintTransform(responsive, SEEK_HINT_OUTER_TRANSFORM)
+  element.style.transform = getHintTransform(responsive, SEEK_HINT_OUTER_TRANSFORM, true)
 
   if (viewportWidth <= 0 || hintWidth <= 0) {
     element.style.left = `${preferredLeft}px`

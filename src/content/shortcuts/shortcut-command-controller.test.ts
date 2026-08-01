@@ -250,7 +250,7 @@ describe('ShortcutCommandController', () => {
     const volumeHint = document.getElementById('shortcut-override-volume-hint')
     expect(volumeHint?.style.width).toBe('100%')
     expect(volumeHint?.style.height).toBe('100%')
-    expect(volumeHint?.querySelector('div')?.style.width).toBe('100px')
+    expect(volumeHint?.querySelector('div')?.style.width).toBe('92px')
     expect(volumeHint?.querySelector('div')?.style.borderRadius).toBe('50%')
     expect(document.querySelectorAll('[id^="shortcut-override-"]').length).toBeGreaterThan(0)
   })

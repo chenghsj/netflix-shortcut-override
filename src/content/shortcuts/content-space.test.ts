@@ -281,8 +281,8 @@ describe('content Space shortcuts', () => {
     expect(playbackHint?.querySelector('rect[rx="1.25"]')).not.toBeNull()
     expect(playbackHint?.querySelector('svg')?.getAttribute('width')).toBe('56')
     expect(playbackHint?.textContent).toBe('')
-    expect(playbackHint?.style.width).toBe('100px')
-    expect(playbackHint?.style.height).toBe('100px')
+    expect(playbackHint?.style.width).toBe('92px')
+    expect(playbackHint?.style.height).toBe('92px')
     expect(playbackHint?.style.borderRadius).toBe('50%')
     expect(playbackHint?.style.background).toBe('rgba(0, 0, 0, 0.68)')
 

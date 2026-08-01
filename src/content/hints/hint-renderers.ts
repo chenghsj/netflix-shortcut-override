@@ -3,6 +3,7 @@ import {
   HINT_EXIT_TRANSFORM,
   HINT_EXIT_TRANSITION,
   HINT_HIDDEN_TRANSFORM,
+  HINT_SURFACE_BACKGROUND,
   HINT_VISIBLE_OPACITY,
   HINT_VISIBLE_TRANSFORM,
   MEDIA_HINT_ID,
@@ -60,7 +61,7 @@ export type HintRendererContext = {
 }
 
 const getTransform = (context: HintRendererContext, transform: string): string =>
-  getHintTransform(context.responsive, transform)
+  getHintTransform(context.responsive, transform, true)
 
 const isHTMLElementInDocument = (
   element: Element | null,
@@ -109,7 +110,7 @@ export const renderMediaHint = (
     gap: '8px',
     padding: '20px 32px',
     borderRadius: '12px',
-    background: 'rgba(48,48,48,0.6)',
+    background: HINT_SURFACE_BACKGROUND,
     color: 'white',
     fontFamily: 'sans-serif',
     pointerEvents: 'none',
@@ -147,11 +148,11 @@ export const renderPlaybackHint = (
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    width: '100px',
-    height: '100px',
+    width: '92px',
+    height: '92px',
     boxSizing: 'border-box',
     borderRadius: '50%',
-    background: 'rgba(0,0,0,0.68)',
+    background: HINT_SURFACE_BACKGROUND,
     color: 'white',
     pointerEvents: 'none',
     zIndex: '2147483647',
@@ -166,6 +167,8 @@ export const renderPlaybackHint = (
     alignItems: 'center',
     justifyContent: 'center',
     lineHeight: '0',
+    transform: 'scale(0.82)',
+    transformOrigin: 'center',
   })
   root.replaceChildren(icon)
   positionCenteredHint(root, context.renderDoc)
@@ -173,7 +176,7 @@ export const renderPlaybackHint = (
   root.style.opacity = '0'
   root.style.transform = getTransform(context, PLAYBACK_HINT_HIDDEN_TRANSFORM)
   void root.offsetWidth
-  root.style.opacity = '1'
+  root.style.opacity = HINT_VISIBLE_OPACITY
   root.style.transform = getTransform(context, PLAYBACK_HINT_VISIBLE_TRANSFORM)
   context.scheduleExit(PLAYBACK_HINT_TOTAL_DURATION_MS - PLAYBACK_HINT_EXIT_MS, () => {
     root.style.transition = PLAYBACK_HINT_EXIT_TRANSITION
@@ -206,9 +209,11 @@ const renderLabeledHint = (
   labelId: string,
   zIndex = '2147483647'
 ): void => {
-  const compactPipSpeedHint = context.responsive && hintId === SPEED_HINT_ID
   const root = context.getRoot()
-  const visibleRoot = root?.isConnected && root.id === hintId && root.style.opacity === '1' ? root : null
+  const visibleRoot =
+    root?.isConnected && root.id === hintId && root.style.opacity === HINT_VISIBLE_OPACITY
+      ? root
+      : null
   const existingCircle = visibleRoot?.firstElementChild ?? null
   const existingIcon = existingCircle?.firstElementChild as HTMLElement | null
   const existingLabel = visibleRoot?.querySelector<HTMLElement>(`#${labelId}`)
@@ -251,11 +256,11 @@ const renderLabeledHint = (
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    width: compactPipSpeedHint ? '86px' : '100px',
-    height: compactPipSpeedHint ? '86px' : '100px',
+    width: '92px',
+    height: '92px',
     boxSizing: 'border-box',
     borderRadius: '50%',
-    background: 'rgba(0,0,0,0.68)',
+    background: HINT_SURFACE_BACKGROUND,
     color: 'white',
     pointerEvents: 'none',
     opacity: '1',
@@ -270,7 +275,7 @@ const renderLabeledHint = (
     alignItems: 'center',
     justifyContent: 'center',
     lineHeight: '0',
-    transform: compactPipSpeedHint ? 'scale(0.82)' : 'none',
+    transform: 'scale(0.82)',
     transformOrigin: 'center',
   })
   circle.append(icon)
@@ -288,16 +293,16 @@ const renderLabeledHint = (
     alignItems: 'center',
     justifyContent: 'center',
     boxSizing: 'border-box',
-    minWidth: compactPipSpeedHint ? '64px' : '74px',
-    minHeight: compactPipSpeedHint ? '38px' : '44px',
-    padding: compactPipSpeedHint ? '6px 10px' : '8px 12px',
+    minWidth: '68px',
+    minHeight: '38px',
+    padding: '6px 10px',
     borderRadius: '4px',
-    background: 'rgba(33,33,33,0.92)',
+    background: HINT_SURFACE_BACKGROUND,
     color: 'white',
     fontFamily: 'Arial,sans-serif',
-    fontSize: compactPipSpeedHint ? '16px' : '18px',
+    fontSize: '16px',
     fontWeight: '400',
-    lineHeight: compactPipSpeedHint ? '22px' : '24px',
+    lineHeight: '22px',
     whiteSpace: 'nowrap',
     pointerEvents: 'none',
     zIndex: '2147483647',
@@ -315,7 +320,7 @@ const renderLabeledHint = (
   label.style.opacity = '0'
   label.style.transform = getTransform(context, VOLUME_HINT_LABEL_HIDDEN_TRANSFORM)
   void nextRoot.offsetWidth
-  nextRoot.style.opacity = '1'
+  nextRoot.style.opacity = HINT_VISIBLE_OPACITY
   circle.style.transform = getTransform(context, PLAYBACK_HINT_VISIBLE_TRANSFORM)
   label.style.opacity = '1'
   label.style.transform = getTransform(context, VOLUME_HINT_LABEL_VISIBLE_TRANSFORM)
@@ -474,7 +479,6 @@ export const renderSpaceHoldHint = (
   context: HintRendererContext,
   request: Extract<HintRequest, { type: 'spaceHold' }>
 ): void => {
-  const compactPipHint = context.responsive
   const root = context.createRoot(SPACE_HOLD_HINT_ID, {
     position: 'fixed',
     top: '0',
@@ -484,17 +488,17 @@ export const renderSpaceHoldHint = (
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: compactPipHint ? '4px' : '6px',
+    gap: '5px',
     boxSizing: 'border-box',
-    minHeight: compactPipHint ? '28px' : '32px',
-    padding: compactPipHint ? '4px 9px 4px 10px' : '6px 12px 6px 14px',
+    minHeight: '32px',
+    padding: '6px 14px',
     borderRadius: '999px',
-    background: 'rgba(33,33,33,0.92)',
+    background: HINT_SURFACE_BACKGROUND,
     color: 'white',
     fontFamily: 'Arial,sans-serif',
-    fontSize: compactPipHint ? '12px' : '14px',
+    fontSize: '13px',
     fontWeight: '600',
-    lineHeight: compactPipHint ? '16px' : '20px',
+    lineHeight: '18px',
     whiteSpace: 'nowrap',
     pointerEvents: 'none',
     zIndex: context.responsive ? '9' : '2147483647',
@@ -510,7 +514,7 @@ export const renderSpaceHoldHint = (
     display: 'flex',
     alignItems: 'center',
     lineHeight: '0',
-    transform: compactPipHint ? 'scale(0.82)' : 'none',
+    transform: 'scale(0.9)',
     transformOrigin: 'center',
   })
   root.replaceChildren(label, icon)
@@ -519,6 +523,6 @@ export const renderSpaceHoldHint = (
   root.style.opacity = '0'
   root.style.transform = getTransform(context, SPACE_HOLD_HINT_HIDDEN_TRANSFORM)
   void root.offsetWidth
-  root.style.opacity = '1'
+  root.style.opacity = HINT_VISIBLE_OPACITY
   root.style.transform = getTransform(context, SPACE_HOLD_HINT_VISIBLE_TRANSFORM)
 }

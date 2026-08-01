@@ -19,7 +19,8 @@ export const HINT_IDS = [
 ] as const
 
 export const TRANSIENT_HINT_VISIBLE_DURATION_MS = 360
-export const HINT_VISIBLE_OPACITY = '0.9'
+export const HINT_VISIBLE_OPACITY = '1'
+export const HINT_SURFACE_BACKGROUND = 'rgba(0,0,0,0.68)'
 export const HINT_HIDDEN_TRANSFORM = 'translate(-50%,-50%) scale(0.96)'
 export const HINT_VISIBLE_TRANSFORM = 'translate(-50%,-50%) scale(1)'
 export const HINT_EXIT_TRANSFORM = 'translate(-50%,-50%) scale(0.98)'
@@ -51,3 +52,4 @@ export const SPACE_HOLD_HINT_HIDDEN_TRANSFORM = 'translate(-50%,-6px)'
 export const SPACE_HOLD_HINT_ENTER_TRANSITION =
   'opacity 140ms ease,transform 140ms cubic-bezier(0.2,0.8,0.2,1)'
 export const HINT_SCALE_CSS_VAR = '--shortcut-override-hint-scale'
+export const PIP_HINT_COMPACT_SCALE = 0.86

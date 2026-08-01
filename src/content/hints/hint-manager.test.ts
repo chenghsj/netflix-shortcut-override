@@ -53,7 +53,8 @@ describe('HintManager', () => {
     expect(hint?.firstElementChild).toBe(icon)
     expect(hint?.lastElementChild).toBe(label)
     expect(label).toHaveTextContent('1.25x')
-    expect(hint?.style.opacity).toBe('0.9')
+    expect(hint?.style.opacity).toBe('1')
+    expect(hint?.style.background).toBe('rgba(0, 0, 0, 0.68)')
   })
 
   it('updates a visible volume hint without restarting its animation', () => {
@@ -76,6 +77,8 @@ describe('HintManager', () => {
     expect(label).toHaveTextContent('45%')
     expect(circle?.querySelector('svg')).toHaveAttribute('data-icon', 'down')
     expect(root?.style.opacity).toBe('1')
+    expect((circle as HTMLElement | null)?.style.width).toBe('92px')
+    expect(label?.style.fontSize).toBe('16px')
   })
 
   it('updates labeled hints using the PiP document realm', () => {
@@ -103,7 +106,6 @@ describe('HintManager', () => {
     expect(pipDoc.getElementById('shortcut-override-volume-hint-label')).toBe(label)
     expect(label).toHaveTextContent('45%')
     expect(circle?.querySelector('svg')).toHaveAttribute('data-icon', 'down')
-
     manager.destroy()
     iframe.remove()
   })
@@ -118,8 +120,13 @@ describe('HintManager', () => {
     })
 
     const root = document.getElementById('shortcut-override-speed-hint')
+    const circle = root?.firstElementChild as HTMLElement | null
+    const label = document.getElementById('shortcut-override-speed-hint-label')
     expect(root).toHaveTextContent('1.25x')
     expect(root?.style.width).toBe('100%')
+    expect(root?.style.opacity).toBe('1')
+    expect(circle?.style.width).toBe('92px')
+    expect(label?.style.fontSize).toBe('16px')
     expect(root?.querySelector('[data-hint-icon="speed-up"]')).toBeInTheDocument()
     expect(document.getElementById('shortcut-override-speed-hint-label')?.style.top).toBe('10%')
     expect(document.getElementById('shortcut-override-volume-hint')).toBeNull()
@@ -245,6 +252,12 @@ describe('HintManager', () => {
     const hint = pipDoc.getElementById('shortcut-override-playback-hint')
 
     expect(hint?.style.getPropertyValue('--shortcut-override-hint-scale')).toBe('0.7')
+    expect(hint?.style.opacity).toBe('1')
+    expect(hint?.style.width).toBe('92px')
+    expect(hint?.style.height).toBe('92px')
+    expect(hint?.style.background).toBe('rgba(0, 0, 0, 0.68)')
+    expect((hint?.firstElementChild as HTMLElement | null)?.style.transform).toBe('scale(0.82)')
+    expect(hint?.style.transform).toContain('scale(0.86)')
 
     Object.defineProperties(pipWindow, {
       innerWidth: { configurable: true, value: 640 },
@@ -277,7 +290,8 @@ describe('HintManager', () => {
     manager.show({ type: 'seek', direction: -1, seconds: 10 })
     const hint = pipDoc.getElementById('shortcut-override-seek-hint')
 
-    expect(hint?.style.left).toBe('33.6px')
+    expect(hint?.style.left).toBe('28.9px')
+    expect(hint?.style.transform).toContain('scale(0.86)')
 
     Object.defineProperties(pipWindow, {
       innerWidth: { configurable: true, value: 1_280 },
@@ -285,7 +299,7 @@ describe('HintManager', () => {
     })
     pipWindow.dispatchEvent(new Event('resize'))
 
-    expect(hint?.style.left).toBe('48px')
+    expect(hint?.style.left).toBe('41.28px')
 
     manager.destroy()
     iframe.remove()
@@ -306,10 +320,40 @@ describe('HintManager', () => {
     const hint = pipDoc.getElementById('shortcut-override-space-hold-hint')
     const icon = hint?.lastElementChild as HTMLElement | null
     expect(hint?.style.zIndex).toBe('9')
-    expect(hint?.style.minHeight).toBe('28px')
-    expect(hint?.style.padding).toBe('4px 9px 4px 10px')
-    expect(hint?.style.fontSize).toBe('12px')
-    expect(icon?.style.transform).toBe('scale(0.82)')
+    expect(hint?.style.minHeight).toBe('32px')
+    expect(hint?.style.padding).toBe('6px 14px')
+    expect(hint?.style.fontSize).toBe('13px')
+    expect(hint?.style.background).toBe('rgba(0, 0, 0, 0.68)')
+    expect(icon?.style.transform).toBe('scale(0.9)')
+    expect(hint?.style.transform).toContain('scale(0.86)')
+
+    manager.destroy()
+    iframe.remove()
+  })
+
+  it('scales the shared labeled hint style for PiP volume feedback', () => {
+    const iframe = document.createElement('iframe')
+    document.body.append(iframe)
+    const pipDoc = iframe.contentDocument
+    if (!pipDoc) throw new Error('Expected PiP document')
+
+    markPipDocument(pipDoc)
+    pipDoc.body.append(pipDoc.createElement('video'))
+
+    const manager = getHintManager(pipDoc)
+    manager.show({ type: 'volume', icon: createHintIcon('<svg />'), label: '50%' })
+
+    const hint = pipDoc.getElementById('shortcut-override-volume-hint')
+    const circle = hint?.firstElementChild as HTMLElement | null
+    const label = pipDoc.getElementById('shortcut-override-volume-hint-label')
+    expect(circle?.style.width).toBe('92px')
+    expect(circle?.style.height).toBe('92px')
+    expect(circle?.style.background).toBe('rgba(0, 0, 0, 0.68)')
+    expect(circle?.firstElementChild).toHaveStyle({ transform: 'scale(0.82)' })
+    expect(circle?.style.transform).toContain('scale(0.86)')
+    expect(label?.style.fontSize).toBe('16px')
+    expect(label?.style.background).toBe('rgba(0, 0, 0, 0.68)')
+    expect(label?.style.transform).toContain('scale(0.86)')
 
     manager.destroy()
     iframe.remove()
@@ -335,11 +379,13 @@ describe('HintManager', () => {
     const label = pipDoc.getElementById('shortcut-override-speed-hint-label')
     expect(hint?.style.zIndex).toBe('9')
     expect(hint?.parentElement).toBe(videoArea)
-    expect(circle?.style.width).toBe('86px')
-    expect(circle?.style.height).toBe('86px')
+    expect(circle?.style.width).toBe('92px')
+    expect(circle?.style.height).toBe('92px')
+    expect(circle?.style.transform).toContain('scale(0.86)')
     expect(icon?.style.transform).toBe('scale(0.82)')
     expect(label?.style.fontSize).toBe('16px')
     expect(label?.style.minHeight).toBe('38px')
+    expect(label?.style.transform).toContain('scale(0.86)')
 
     manager.destroy()
     iframe.remove()
@@ -368,6 +414,10 @@ describe('HintManager', () => {
     const hint = document.getElementById('shortcut-override-space-hold-hint')
 
     expect(hint?.style.opacity).toBe('1')
+    expect(hint?.style.minHeight).toBe('32px')
+    expect(hint?.style.padding).toBe('6px 14px')
+    expect(hint?.style.fontSize).toBe('13px')
+    expect(hint?.style.background).toBe('rgba(0, 0, 0, 0.68)')
     manager.hide()
 
     expect(hint?.style.opacity).toBe('0')
