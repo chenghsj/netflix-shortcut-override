@@ -226,18 +226,22 @@ For Firefox, run `npm run build:firefox` and load the generated `firefox-dist/ma
 |   |-- favicon.svg
 |   `-- icons
 |-- scripts
-|   |-- fix-extension-build.mjs
 |   |-- build-chromium-package.mjs
 |   |-- build-firefox-package.mjs
+|   |-- check-version-consistency.mjs
 |   |-- firefox-config.mjs
+|   |-- fix-extension-build.mjs
 |   |-- generate-icons.mjs
 |   |-- generate-release-notes.mjs
+|   |-- package-utils.mjs
 |   `-- prepare-firefox-dist.mjs
 |-- src
 |   |-- background
 |   |-- components
 |   |-- content
+|   |-- lib
 |   |-- options
+|   |-- popup
 |   `-- shared
 |-- manifest.json
 |-- popup.html
@@ -287,7 +291,7 @@ The extension requests:
 
 - No remote analytics or tracking code is included.
 - No external API calls are made by the extension.
-- Shortcut, language, playback speed, seek, and Space-hold settings are stored with `chrome.storage`.
+- Shortcut, enabled state, language, theme, playback speed, seek, Space-hold, and PiP subtitle settings are stored with `chrome.storage.sync`.
 - A pending popup focus handoff is stored temporarily in `chrome.storage.session` for at most 30 seconds. It contains only tab/window identifiers, an opaque request identifier, and a deadline.
 - Content scripts only run on pages matching `*://*.netflix.com/*`.
 - The toolbar popup checks the active tab only after it is opened. It uses that tab to show page status, request locally generated compatibility diagnostics, restore keyboard focus to a still-visible playback context after dismissal, and reload the Netflix page only when the user selects the recovery action.

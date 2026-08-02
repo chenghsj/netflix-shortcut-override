@@ -33,11 +33,13 @@ Do not use:
 npm run build
 ```
 
-The unpacked extension directory is:
+The unpacked extension directory is `<repository-root>/dist`. For example, from the repository root:
 
-```text
-/Users/cheng/Desktop/netflix-shortcut-override/dist
+```sh
+pwd
 ```
+
+Append `/dist` to the printed path when selecting the unpacked extension.
 
 ## 2. Load the Extension in the Real Chrome Profile
 
@@ -47,10 +49,10 @@ Skip this section only when intentionally testing the Chrome Web Store version t
 2. Go to `chrome://extensions`.
 3. Enable Developer mode.
 4. Click Load unpacked.
-5. Select:
+5. Select the `dist` directory inside the repository:
 
 ```text
-/Users/cheng/Desktop/netflix-shortcut-override/dist
+<repository-root>/dist
 ```
 
 Chrome assigns an ID to this unpacked extension. It may differ from the Chrome Web Store ID:
@@ -261,7 +263,7 @@ Code follow-up from this run:
 
 To live-test the patched local build, load or switch to the unpacked `dist` extension in the real Chrome profile first. Do not assume the Chrome Web Store extension uses local source changes.
 
-## 9. Current Blocker Observed
+## 9. Historical Blocker Observed, 2026-05-18
 
 On 2026-05-18, the Chrome health checks passed:
 
@@ -274,7 +276,7 @@ But control failed:
 
 - `browser.user.claimTab()` timed out for the existing Netflix tab after 60 seconds.
 
-This means discovery works, but the tab-control channel is blocked. Because the task is to test real Netflix behavior, do not replace this with Playwright, fake Netflix pages, or another browser path.
+During that run, discovery worked but the tab-control channel was blocked. This record does not establish the current browser state. When the same failure occurs, do not replace real Netflix validation with Playwright, fake Netflix pages, or another browser path.
 
 Recommended recovery:
 

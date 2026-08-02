@@ -1,7 +1,7 @@
 # Behavior specification — Netflix Shortcut Override
 
 Status: Active
-Date: 2026-07-26
+Date: 2026-08-02
 
 This document defines observable product behavior. Domain terms have the meanings established in [`CONTEXT.md`](../CONTEXT.md); implementation structure and historical design decisions are outside this specification.
 
@@ -42,6 +42,13 @@ This document defines observable product behavior. Domain terms have the meaning
 - Playback-control state follows reported Netflix playback events; it does not assume a requested command succeeded.
 - The first primary click on the PiP video requests play or pause while allowing the browser to focus the PiP window. Timeline clicks do not trigger this video-click action.
 - Controls overlay the video and hide after three seconds of pointer inactivity. Shortcut feedback remains a separate transient overlay.
+
+## Shortcut feedback
+
+- A handled shortcut may show transient visual feedback without taking focus or blocking playback interaction.
+- Repeated volume or speed actions update the visible feedback in place. Repeated seeks in the same direction accumulate during the feedback window; changing direction starts new feedback.
+- Space-hold feedback remains visible while hold speed is active and disappears after release.
+- Feedback shown in the PiP window scales with the window, stays within the video viewport, and remains visually separate from mirrored subtitles and transport controls.
 
 ## Recoverable video replacement and episode transitions
 
