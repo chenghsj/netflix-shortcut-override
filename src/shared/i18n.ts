@@ -69,6 +69,8 @@ type Copy = {
   openOptions: string
   githubRepository: string
   githubRepositoryAriaLabel: string
+  rateExtension: string
+  rateExtensionAriaLabel: string
   otherProjects: string
   otherProjectsAriaLabel: string
   streamDanmakuStore: string
@@ -163,6 +165,8 @@ export const COPY: Record<Locale, Copy> = {
     openOptions: 'Open options',
     githubRepository: 'GitHub',
     githubRepositoryAriaLabel: 'Open GitHub repository',
+    rateExtension: 'Rate this extension',
+    rateExtensionAriaLabel: 'Rate this extension in the extension store',
     otherProjects: 'Other products',
     otherProjectsAriaLabel: 'Other products',
     streamDanmakuStore: 'Stream Danmaku',
@@ -274,6 +278,8 @@ export const COPY: Record<Locale, Copy> = {
     openOptions: '開啟設定頁',
     githubRepository: 'GitHub',
     githubRepositoryAriaLabel: '開啟 GitHub repo',
+    rateExtension: '為這個擴充功能評分',
+    rateExtensionAriaLabel: '在擴充功能商店為這個擴充功能評分',
     otherProjects: '其他產品',
     otherProjectsAriaLabel: '其他產品',
     streamDanmakuStore: 'Stream Danmaku',
@@ -402,6 +408,8 @@ export const COPY: Record<Locale, Copy> = {
     openOptions: '打开设置页',
     githubRepository: 'GitHub',
     githubRepositoryAriaLabel: '打开 GitHub repo',
+    rateExtension: '为这个扩展程序评分',
+    rateExtensionAriaLabel: '在扩展程序商店为这个扩展程序评分',
     otherProjects: '其他产品',
     otherProjectsAriaLabel: '其他产品',
     streamDanmakuStore: 'Stream Danmaku',
@@ -530,6 +538,8 @@ export const COPY: Record<Locale, Copy> = {
     openOptions: '設定を開く',
     githubRepository: 'GitHub',
     githubRepositoryAriaLabel: 'GitHub リポジトリを開く',
+    rateExtension: 'この拡張機能を評価',
+    rateExtensionAriaLabel: '拡張機能ストアでこの拡張機能を評価',
     otherProjects: '他の製品',
     otherProjectsAriaLabel: '他の製品',
     streamDanmakuStore: 'Stream Danmaku',
@@ -662,6 +672,8 @@ export const COPY: Record<Locale, Copy> = {
     openOptions: '설정 열기',
     githubRepository: 'GitHub',
     githubRepositoryAriaLabel: 'GitHub 저장소 열기',
+    rateExtension: '이 확장 프로그램 평가하기',
+    rateExtensionAriaLabel: '확장 프로그램 스토어에서 이 확장 프로그램 평가하기',
     otherProjects: '다른 제품',
     otherProjectsAriaLabel: '다른 제품',
     streamDanmakuStore: 'Stream Danmaku',

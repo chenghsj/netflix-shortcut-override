@@ -19,6 +19,9 @@ describe('OptionsApp', () => {
       'href',
       EXTERNAL_LINKS.githubRepository
     )
+    expect(
+      screen.getByRole('link', { name: 'Rate this extension in the extension store' })
+    ).toHaveAttribute('href', EXTERNAL_LINKS.shortcutOverrideChromeWebStore)
     expect(screen.getByRole('combobox', { name: 'Other products' })).toBeInTheDocument()
     expect(screen.getByText('General settings')).toBeInTheDocument()
     const localeCombobox = screen.getByRole('combobox', { name: 'Language' })

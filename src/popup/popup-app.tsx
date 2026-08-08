@@ -5,6 +5,7 @@ import {
   GaugeIcon,
   KeyboardIcon,
   SettingsIcon,
+  StarIcon,
 } from 'lucide-react'
 import { GitHubIcon } from '@/components/github-icon'
 import { HoldSpeedIcon } from '@/components/hold-speed-icon'
@@ -24,7 +25,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { useCompatibilitySession } from '@/popup/use-compatibility-session'
 import { usePopupFocusRestoration } from '@/popup/use-popup-focus-restoration'
-import { EXTERNAL_LINKS } from '@/shared/external-links'
+import { EXTERNAL_LINKS, getShortcutOverrideRatingUrl } from '@/shared/external-links'
 import { resolveLocalePreference } from '@/shared/browser-locale'
 import { getBrowserCapabilities } from '@/shared/browser-capabilities'
 import { getCopy } from '@/shared/i18n'
@@ -434,6 +435,19 @@ export function PopupApp() {
               labelClassName="text-center"
               onNavigate={suppressFocusRestoration}
             />
+            <Button variant="outline" size="xs" asChild className="col-span-2 min-w-0">
+              <a
+                href={getShortcutOverrideRatingUrl()}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={copy.rateExtensionAriaLabel}
+                onClick={suppressFocusRestoration}
+                onAuxClick={suppressFocusRestoration}
+              >
+                <StarIcon data-icon="inline-start" aria-hidden="true" />
+                <span className="min-w-0 truncate">{copy.rateExtension}</span>
+              </a>
+            </Button>
             <SettingsSaveStatus
               error={saveError}
               errorLabel={copy.settingsSaveError}

@@ -6,6 +6,7 @@ import {
   PlayIcon,
   RotateCcwIcon,
   SettingsIcon,
+  StarIcon,
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -76,7 +77,7 @@ import {
   type ShortcutAction,
 } from '@/shared/shortcut-types'
 import { useShortcutSettingsForm } from '@/shared/use-shortcut-settings-form'
-import { EXTERNAL_LINKS } from '@/shared/external-links'
+import { EXTERNAL_LINKS, getShortcutOverrideRatingUrl } from '@/shared/external-links'
 import { useTheme } from '@/shared/use-theme'
 
 const ignoredRecordKeys = new Set([
@@ -174,6 +175,17 @@ export function OptionsApp() {
                       >
                         <GitHubIcon data-icon="inline-start" />
                         {copy.githubRepository}
+                      </a>
+                    </Button>
+                    <Button variant="outline" size="sm" asChild>
+                      <a
+                        href={getShortcutOverrideRatingUrl()}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label={copy.rateExtensionAriaLabel}
+                      >
+                        <StarIcon data-icon="inline-start" aria-hidden="true" />
+                        {copy.rateExtension}
                       </a>
                     </Button>
                     <OtherProjectsSelect
