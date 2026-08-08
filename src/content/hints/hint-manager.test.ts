@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { markPipDocument } from '@/content/pip/pip-document'
 import { createHintIcon, getHintManager } from './hint-manager'
 
+const testIcon = (attributes: Record<string, string> = {}) => createHintIcon(attributes)
+
 describe('HintManager', () => {
   beforeEach(() => {
     document.body.innerHTML = ''
@@ -21,7 +23,7 @@ describe('HintManager', () => {
     manager.show({ type: 'seek', direction: -1, seconds: 10 })
     const previousHint = document.getElementById('shortcut-override-seek-hint')
 
-    manager.show({ type: 'media', icon: createHintIcon('<svg />'), label: '1.25x' })
+    manager.show({ type: 'media', icon: testIcon(), label: '1.25x' })
 
     expect(previousHint?.style.opacity).toBe('0')
     expect(document.querySelectorAll('#shortcut-override-media-hint')).toHaveLength(1)
@@ -31,9 +33,9 @@ describe('HintManager', () => {
   it('reuses the existing root for repeated hints of the same type', () => {
     const manager = getHintManager(document)
 
-    manager.show({ type: 'media', icon: createHintIcon('<svg />'), label: '1x' })
+    manager.show({ type: 'media', icon: testIcon(), label: '1x' })
     const firstHint = document.getElementById('shortcut-override-media-hint')
-    manager.show({ type: 'media', icon: createHintIcon('<svg />'), label: '1.25x' })
+    manager.show({ type: 'media', icon: testIcon(), label: '1.25x' })
     const secondHint = document.getElementById('shortcut-override-media-hint')
 
     expect(secondHint).toBe(firstHint)
@@ -42,12 +44,16 @@ describe('HintManager', () => {
 
   it('updates a visible media hint without restarting its animation', () => {
     const manager = getHintManager(document)
-    manager.show({ type: 'media', icon: createHintIcon('<svg data-icon="speed" />'), label: '1x' })
+    manager.show({ type: 'media', icon: testIcon({ 'data-icon': 'speed' }), label: '1x' })
     const hint = document.getElementById('shortcut-override-media-hint')
     const icon = hint?.firstElementChild
     const label = hint?.lastElementChild
 
-    manager.show({ type: 'media', icon: createHintIcon('<svg data-icon="speed" />'), label: '1.25x' })
+    manager.show({
+      type: 'media',
+      icon: testIcon({ 'data-icon': 'speed' }),
+      label: '1.25x',
+    })
 
     expect(document.getElementById('shortcut-override-media-hint')).toBe(hint)
     expect(hint?.firstElementChild).toBe(icon)
@@ -59,7 +65,7 @@ describe('HintManager', () => {
 
   it('updates a visible volume hint without restarting its animation', () => {
     const manager = getHintManager(document)
-    manager.show({ type: 'volume', icon: createHintIcon('<svg data-icon="up" />'), label: '50%' })
+    manager.show({ type: 'volume', icon: testIcon({ 'data-icon': 'up' }), label: '50%' })
 
     const root = document.getElementById('shortcut-override-volume-hint')
     const circle = root?.firstElementChild
@@ -67,7 +73,7 @@ describe('HintManager', () => {
 
     manager.show({
       type: 'volume',
-      icon: createHintIcon('<svg data-icon="down" />'),
+      icon: testIcon({ 'data-icon': 'down' }),
       label: '45%',
     })
 
@@ -89,7 +95,7 @@ describe('HintManager', () => {
 
     pipDoc.body.append(pipDoc.createElement('video'))
     const manager = getHintManager(pipDoc)
-    manager.show({ type: 'volume', icon: createHintIcon('<svg data-icon="up" />'), label: '50%' })
+    manager.show({ type: 'volume', icon: testIcon({ 'data-icon': 'up' }), label: '50%' })
 
     const root = pipDoc.getElementById('shortcut-override-volume-hint')
     const circle = root?.firstElementChild
@@ -97,7 +103,7 @@ describe('HintManager', () => {
 
     manager.show({
       type: 'volume',
-      icon: createHintIcon('<svg data-icon="down" />'),
+      icon: testIcon({ 'data-icon': 'down' }),
       label: '45%',
     })
 
@@ -115,7 +121,7 @@ describe('HintManager', () => {
 
     manager.show({
       type: 'speed',
-      icon: createHintIcon('<svg data-hint-icon="speed-up" />'),
+      icon: testIcon({ 'data-hint-icon': 'speed-up' }),
       label: '1.25x',
     })
 
@@ -135,7 +141,7 @@ describe('HintManager', () => {
   it('starts fading a volume hint 360ms after the last update', () => {
     vi.useFakeTimers()
     const manager = getHintManager(document)
-    manager.show({ type: 'volume', icon: createHintIcon('<svg />'), label: '50%' })
+    manager.show({ type: 'volume', icon: testIcon(), label: '50%' })
     const hint = document.getElementById('shortcut-override-volume-hint')
 
     vi.advanceTimersByTime(359)
@@ -248,7 +254,7 @@ describe('HintManager', () => {
     })
 
     const manager = getHintManager(pipDoc)
-    manager.show({ type: 'playback', icon: createHintIcon('<svg />') })
+    manager.show({ type: 'playback', icon: testIcon() })
     const hint = pipDoc.getElementById('shortcut-override-playback-hint')
 
     expect(hint?.style.getPropertyValue('--shortcut-override-hint-scale')).toBe('0.7')
@@ -341,7 +347,7 @@ describe('HintManager', () => {
     pipDoc.body.append(pipDoc.createElement('video'))
 
     const manager = getHintManager(pipDoc)
-    manager.show({ type: 'volume', icon: createHintIcon('<svg />'), label: '50%' })
+    manager.show({ type: 'volume', icon: testIcon(), label: '50%' })
 
     const hint = pipDoc.getElementById('shortcut-override-volume-hint')
     const circle = hint?.firstElementChild as HTMLElement | null
@@ -371,7 +377,7 @@ describe('HintManager', () => {
     pipDoc.body.append(videoArea)
 
     const manager = getHintManager(pipDoc)
-    manager.show({ type: 'speed', icon: createHintIcon('<svg />'), label: '1.25x' })
+    manager.show({ type: 'speed', icon: testIcon(), label: '1.25x' })
 
     const hint = pipDoc.getElementById('shortcut-override-speed-hint')
     const circle = hint?.firstElementChild as HTMLElement | null

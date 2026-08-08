@@ -68,7 +68,47 @@ describe('shortcut settings', () => {
     expect(normalized.bindings.pictureInPicture.key).toEqual(
       DEFAULT_SETTINGS.bindings.pictureInPicture.key
     )
-    expect(normalized.version).toBe(8)
+    expect(normalized.version).toBe(9)
+  })
+
+  it('adds the subtitle toggle binding when normalizing older settings', () => {
+    const olderBindings = Object.fromEntries(
+      Object.entries(DEFAULT_SETTINGS.bindings).filter(
+        ([action]) => action !== 'toggleSubtitles'
+      )
+    )
+    const normalized = normalizeSettings({
+      version: 8,
+      bindings: olderBindings,
+    })
+
+    expect(normalized.bindings.toggleSubtitles).toEqual(
+      DEFAULT_SETTINGS.bindings.toggleSubtitles
+    )
+    expect(normalized.bindings.toggleSubtitles.key.code).toBe('KeyC')
+  })
+
+  it('disables the migrated subtitle binding when C is already assigned', () => {
+    const normalized = normalizeSettings({
+      version: 8,
+      bindings: {
+        ...DEFAULT_SETTINGS.bindings,
+        toggleSubtitles: undefined,
+        fullscreen: {
+          enabled: true,
+          key: DEFAULT_SETTINGS.bindings.toggleSubtitles.key,
+        },
+      },
+    })
+
+    expect(normalized.bindings.fullscreen).toEqual({
+      enabled: true,
+      key: DEFAULT_SETTINGS.bindings.toggleSubtitles.key,
+    })
+    expect(normalized.bindings.toggleSubtitles).toEqual({
+      enabled: false,
+      key: DEFAULT_SETTINGS.bindings.toggleSubtitles.key,
+    })
   })
 
   it('defaults unknown or missing theme values to automatic mode', () => {

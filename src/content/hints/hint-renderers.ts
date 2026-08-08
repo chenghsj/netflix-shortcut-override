@@ -35,7 +35,13 @@ import {
   VOLUME_HINT_LABEL_ID,
   VOLUME_HINT_LABEL_VISIBLE_TRANSFORM,
 } from './hint-constants'
-import { mediaHintIcons, type HintIcon, type HintRequest } from './hint-definitions'
+import {
+  createHintIcon,
+  mediaHintIcons,
+  renderHintIcon,
+  type HintIcon,
+  type HintRequest,
+} from './hint-definitions'
 import {
   getHintTransform,
   positionCenteredHint,
@@ -92,7 +98,7 @@ export const renderMediaHint = (
   const existingLabel = visibleRoot?.lastElementChild as HTMLElement | null
 
   if (visibleRoot && existingIcon && existingLabel) {
-    existingIcon.innerHTML = request.icon.html
+    existingIcon.replaceChildren(renderHintIcon(context.renderDoc, request.icon))
     existingLabel.textContent = request.label
     positionCenteredHint(visibleRoot, context.renderDoc)
     scheduleMediaExit(context, visibleRoot)
@@ -120,7 +126,7 @@ export const renderMediaHint = (
     willChange: 'opacity,transform',
   })
   const icon = context.renderDoc.createElement('div')
-  icon.innerHTML = request.icon.html
+  icon.appendChild(renderHintIcon(context.renderDoc, request.icon))
   icon.style.color = 'white'
   const label = context.renderDoc.createElement('span')
   label.textContent = request.label
@@ -153,7 +159,7 @@ export const renderPlaybackHint = (
     boxSizing: 'border-box',
     borderRadius: '50%',
     background: HINT_SURFACE_BACKGROUND,
-    color: 'white',
+    color: request.color ?? 'white',
     pointerEvents: 'none',
     zIndex: '2147483647',
     opacity: '0',
@@ -161,7 +167,7 @@ export const renderPlaybackHint = (
     willChange: 'opacity,transform',
   })
   const icon = context.renderDoc.createElement('div')
-  icon.innerHTML = request.icon.html
+  icon.appendChild(renderHintIcon(context.renderDoc, request.icon))
   setStyles(icon, {
     display: 'flex',
     alignItems: 'center',
@@ -224,7 +230,7 @@ const renderLabeledHint = (
     existingIcon &&
     existingLabel
   ) {
-    existingIcon.innerHTML = request.icon.html
+    existingIcon.replaceChildren(renderHintIcon(context.renderDoc, request.icon))
     existingLabel.textContent = request.label
     positionCenteredHint(existingCircle, context.renderDoc)
     positionLabeledHintLabel(existingLabel)
@@ -269,7 +275,7 @@ const renderLabeledHint = (
     willChange: 'opacity,transform',
   })
   const icon = context.renderDoc.createElement('div')
-  icon.innerHTML = request.icon.html
+  icon.appendChild(renderHintIcon(context.renderDoc, request.icon))
   setStyles(icon, {
     display: 'flex',
     alignItems: 'center',
@@ -463,7 +469,22 @@ export const renderSeekHint = (
     filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.45))',
   })
   const path = request.direction > 0 ? 'M2 3l9 9-9 9' : 'M13 3l-9 9 9 9'
-  icon.innerHTML = `<svg data-hint-icon="${request.direction > 0 ? 'seek-forward' : 'seek-backward'}" data-seek-arrow-count="1" viewBox="0 0 17 24" width="21" height="30" fill="none" stroke="white" stroke-width="3.25" stroke-linecap="round" stroke-linejoin="round"><path d="${path}"/></svg>`
+  const seekIcon = createHintIcon(
+    {
+      'data-hint-icon': request.direction > 0 ? 'seek-forward' : 'seek-backward',
+      'data-seek-arrow-count': 1,
+      viewBox: '0 0 17 24',
+      width: 21,
+      height: 30,
+      fill: 'none',
+      stroke: 'white',
+      'stroke-width': 3.25,
+      'stroke-linecap': 'round',
+      'stroke-linejoin': 'round',
+    },
+    [{ tag: 'path', attributes: { d: path } }]
+  )
+  icon.appendChild(renderHintIcon(context.renderDoc, seekIcon))
   content.append(label, icon)
   nextRoot.replaceChildren(content)
   positionSeekHint(nextRoot, context.renderDoc, context.responsive, request.direction)
@@ -509,7 +530,7 @@ export const renderSpaceHoldHint = (
   const label = context.renderDoc.createElement('span')
   label.textContent = request.label
   const icon = context.renderDoc.createElement('div')
-  icon.innerHTML = mediaHintIcons.holdSpeed
+  icon.appendChild(renderHintIcon(context.renderDoc, mediaHintIcons.holdSpeed))
   setStyles(icon, {
     display: 'flex',
     alignItems: 'center',

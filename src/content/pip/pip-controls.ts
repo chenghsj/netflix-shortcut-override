@@ -1,5 +1,9 @@
 import type { PlaybackCommandResult } from '@/content/netflix-playback-session'
-import { mediaHintIcons } from '@/content/hints/hint-definitions'
+import {
+  mediaHintIcons,
+  renderHintIcon,
+  type HintIcon,
+} from '@/content/hints/hint-definitions'
 import { EN_PIP_CONTROLS_COPY, type PipControlsCopy } from '@/shared/i18n'
 import type { PipSettings } from '@/shared/shortcut-types'
 import { createPipSubtitleMenu } from './pip-subtitle-menu'
@@ -31,20 +35,20 @@ const DEFAULT_CONTROLS_SETTINGS: PipControlsSettings = {
 const withSeconds = (template: string, seconds: number): string =>
   template.replace('{seconds}', Math.round(seconds).toString())
 
-const seekIcon = (direction: -1 | 1): string =>
+const seekIcon = (direction: -1 | 1): HintIcon =>
   direction === -1 ? mediaHintIcons.rewindDirection : mediaHintIcons.forwardDirection
 
-const volumeIcon = (muted: boolean): string =>
+const volumeIcon = (muted: boolean): HintIcon =>
   muted ? mediaHintIcons.mute : mediaHintIcons.volume
 
-const playbackIcon = (paused: boolean): string =>
-  (paused ? mediaHintIcons.playbackPlay : mediaHintIcons.playbackPause).replace(
-    '<svg ',
-    '<svg aria-hidden="true" '
-  )
+const playbackIcon = (paused: boolean): HintIcon =>
+  paused ? mediaHintIcons.playbackPlay : mediaHintIcons.playbackPause
 
-const subtitleIcon = (): string =>
-  '<svg data-pip-icon="subtitles" viewBox="0 0 26 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect data-pip-icon-part="subtitle-frame" x="2" y="3" width="22" height="18" rx="3"/><path data-pip-icon-part="subtitle-lines" d="M6 11.5h7.5M16 11.5h4M6 16.5h3.5M12.5 16.5H20"/></svg>'
+const setButtonIcon = (button: HTMLButtonElement, icon: HintIcon): void => {
+  const svg = renderHintIcon(button.ownerDocument, icon)
+  svg.setAttribute('aria-hidden', 'true')
+  button.replaceChildren(svg)
+}
 
 export type PipControlsOptions = {
   pipWindow: Window
@@ -542,7 +546,7 @@ export class PipControls {
     volumeSlider.dataset[PIP_CONTROL_MARKER] = 'true'
 
     const subtitlesButton = this.createButton('subtitles-button')
-    subtitlesButton.innerHTML = subtitleIcon()
+    setButtonIcon(subtitlesButton, mediaHintIcons.subtitles)
     subtitlesButton.setAttribute('aria-haspopup', 'dialog')
     subtitlesButton.setAttribute('aria-expanded', 'false')
 
@@ -620,12 +624,12 @@ export class PipControls {
     const { seekSeconds, copy, pip } = settings
     this.timelineController?.updateLabel(copy.timeline)
     if (this.rewindButton) {
-      this.rewindButton.innerHTML = seekIcon(-1)
+      setButtonIcon(this.rewindButton, seekIcon(-1))
       this.rewindButton.setAttribute('aria-label', withSeconds(copy.rewind, seekSeconds))
       this.rewindButton.title = withSeconds(copy.rewind, seekSeconds)
     }
     if (this.forwardButton) {
-      this.forwardButton.innerHTML = seekIcon(1)
+      setButtonIcon(this.forwardButton, seekIcon(1))
       this.forwardButton.setAttribute('aria-label', withSeconds(copy.forward, seekSeconds))
       this.forwardButton.title = withSeconds(copy.forward, seekSeconds)
     }
@@ -767,7 +771,7 @@ export class PipControls {
     if (!this.muteButton) return
     const muted = this.video.muted || this.video.volume === 0
     const label = muted ? this.settings.copy.unmute : this.settings.copy.mute
-    this.muteButton.innerHTML = volumeIcon(muted)
+    setButtonIcon(this.muteButton, volumeIcon(muted))
     this.muteButton.setAttribute('aria-label', label)
     this.muteButton.title = label
     this.muteButton.dataset.muted = muted.toString()
@@ -777,7 +781,7 @@ export class PipControls {
     if (!this.playbackButton) return
     const paused = this.video.paused || this.video.ended
     const label = paused ? this.settings.copy.play : this.settings.copy.pause
-    this.playbackButton.innerHTML = playbackIcon(paused)
+    setButtonIcon(this.playbackButton, playbackIcon(paused))
     this.playbackButton.setAttribute('aria-label', label)
     this.playbackButton.title = label
     this.playbackButton.dataset.paused = paused.toString()

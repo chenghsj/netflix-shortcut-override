@@ -1,7 +1,7 @@
 # Behavior specification — Netflix Shortcut Override
 
 Status: Active
-Date: 2026-08-02
+Date: 2026-08-08
 
 This document defines observable product behavior. Domain terms have the meanings established in [`CONTEXT.md`](../CONTEXT.md); implementation structure and historical design decisions are outside this specification.
 
@@ -49,6 +49,14 @@ This document defines observable product behavior. Domain terms have the meaning
 - Repeated volume or speed actions update the visible feedback in place. Repeated seeks in the same direction accumulate during the feedback window; changing direction starts new feedback.
 - Space-hold feedback remains visible while hold speed is active and disappears after release.
 - Feedback shown in the PiP window scales with the window, stays within the video viewport, and remains visually separate from mirrored subtitles and transport controls.
+
+## Netflix subtitles
+
+- The configurable subtitle shortcut toggles the active Netflix playback session's native subtitle track.
+- Turning subtitles off remembers the selected track. Turning them on restores the same track when it remains available, otherwise it selects the first available non-off track.
+- A successful shortcut shows the same subtitle-settings icon used by PiP controls in the standard circular, text-free transient hint. The icon is white when subtitles are enabled and dimmed when they are disabled. If the Netflix subtitle API is unavailable, it reports failure without guessing from transient subtitle DOM content.
+- When PiP opens, it reads the active Netflix playback session's native subtitle state and uses that state to initialize the subtitle switch and mirrored-subtitle visibility. The extension's last stored PiP subtitle-visibility value is only a fallback when the Netflix API state is unavailable.
+- In PiP, the subtitle switch toggles Netflix's native subtitle track and updates mirrored-subtitle visibility from the API's resulting state. Using the subtitle shortcut inside PiP updates the same switch and stored fallback value. Once a subtitle action is issued from PiP, a successful API result updates the stored fallback even if PiP closes before the result arrives.
 
 ## Recoverable video replacement and episode transitions
 

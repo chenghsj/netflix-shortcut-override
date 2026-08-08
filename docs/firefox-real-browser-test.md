@@ -17,7 +17,8 @@ The generated `firefox-dist` directory is disposable. The Chromium build remains
 Open a Netflix watch page and check:
 
 - The extension loads without a manifest or background-script error.
-- The configured shortcuts work for play/pause, seeking, volume, mute, fullscreen, skip intro, and playback speed.
+- The configured shortcuts work for play/pause, seeking, volume, mute, Netflix subtitles, fullscreen, skip intro, and playback speed.
+- Press `C` twice and confirm Netflix's native subtitles turn off and then restore the previously selected track when it remains available.
 - The popup reports the Netflix page status and shows the configured shortcuts.
 - The options page can edit, enable, disable, and reset shortcuts.
 - The Picture-in-Picture row is visible but disabled and marked unsupported.

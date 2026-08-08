@@ -1,4 +1,4 @@
-import { DEFAULT_KEY_BINDINGS, isKeyBinding } from './shortcut-bindings'
+import { DEFAULT_KEY_BINDINGS, isKeyBinding, keyBindingsEqual } from './shortcut-bindings'
 import {
   LOCALES,
   LOCALE_PREFERENCES,
@@ -54,7 +54,7 @@ export const DEFAULT_PIP_SETTINGS: PipSettings = {
   subtitleBackground: 'translucent',
 }
 
-export const SHORTCUT_SETTINGS_VERSION = 8
+export const SHORTCUT_SETTINGS_VERSION = 9
 
 const LEGACY_PICTURE_IN_PICTURE_BINDING = {
   code: 'KeyW',
@@ -179,11 +179,20 @@ export const normalizeSettings = (raw: unknown): ShortcutSettings => {
           : isKeyBinding(rawBinding?.key)
             ? rawBinding.key
             : DEFAULT_KEY_BINDINGS[action]
+      const migratedDefaultConflicts =
+        action === 'toggleSubtitles' &&
+        sourceVersion < 9 &&
+        rawBinding === undefined &&
+        Object.values(rawBindings).some(
+          candidate =>
+            isKeyBinding(candidate?.key) && keyBindingsEqual(candidate.key, key)
+        )
       return [
         action,
         {
-          enabled:
-            typeof rawBinding?.enabled === 'boolean'
+          enabled: migratedDefaultConflicts
+            ? false
+            : typeof rawBinding?.enabled === 'boolean'
               ? rawBinding.enabled
               : DEFAULT_SETTINGS.bindings[action].enabled,
           key,

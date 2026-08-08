@@ -357,10 +357,92 @@ describe('content PiP shortcuts', () => {
     }
   })
 
+  it('initializes PiP subtitle visibility from the Netflix API state', async () => {
+    const { pipWindow, cleanup } = createDocumentPipFixture()
+
+    try {
+      vi.mocked(chrome.runtime.sendMessage).mockImplementation((message, callback) => {
+        const request = message as unknown as { action?: string }
+        if (request.action === 'getSubtitleState' && typeof callback === 'function') {
+          callback({
+            success: true,
+            result: {
+              action: 'getSubtitleState',
+              playerApiFound: true,
+              playerFound: true,
+              seekCalled: false,
+              sessionIds: ['session-id'],
+              subtitlesEnabled: false,
+              subtitleTrack: 'Off',
+            },
+          })
+        }
+        return undefined as never
+      })
+
+      await saveSettings({
+        ...DEFAULT_SETTINGS,
+        pip: { ...DEFAULT_SETTINGS.pip, subtitlesEnabled: true },
+      })
+      const video = document.createElement('video')
+      document.body.appendChild(video)
+
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          code: 'KeyP',
+          key: 'P',
+          shiftKey: true,
+          bubbles: true,
+          cancelable: true,
+        })
+      )
+
+      await vi.waitFor(() => {
+        expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+          expect.objectContaining({ action: 'getSubtitleState' }),
+          expect.any(Function)
+        )
+      })
+      await vi.waitFor(() => {
+        expect(
+          pipWindow.document.querySelector('[data-pip-control="subtitle-switch"]')
+        ).toHaveAttribute('aria-checked', 'false')
+      })
+      expect((await getSettings()).pip.subtitlesEnabled).toBe(false)
+    } finally {
+      cleanup()
+    }
+  })
+
   it('uses shared shortcut feedback and persists live PiP control settings', async () => {
     const { pipWindow, cleanup } = createDocumentPipFixture()
 
     try {
+      let nativeSubtitlesEnabled = true
+      vi.mocked(chrome.runtime.sendMessage).mockImplementation((message, callback) => {
+        const request = message as unknown as { action?: string }
+        if (
+          request.action === 'toggleSubtitles'
+        ) {
+          nativeSubtitlesEnabled = !nativeSubtitlesEnabled
+          if (typeof callback === 'function') {
+            callback({
+              success: true,
+              result: {
+                action: 'toggleSubtitles',
+                playerApiFound: true,
+                playerFound: true,
+                seekCalled: false,
+                sessionIds: ['session-id'],
+                subtitleToggleCalled: true,
+                subtitlesEnabled: nativeSubtitlesEnabled,
+              },
+            })
+          }
+        }
+        return undefined as never
+      })
+
       await saveSettings({ ...DEFAULT_SETTINGS, locale: 'zh-TW', seek: { seconds: 5 } })
       await Promise.resolve()
       const video = document.createElement('video')
@@ -448,9 +530,35 @@ describe('content PiP shortcuts', () => {
       pipWindow.document
         .querySelector<HTMLButtonElement>('[data-pip-control="subtitle-switch"]')
         ?.click()
-      await Promise.resolve()
-      await Promise.resolve()
-      expect((await getSettings()).pip.subtitlesEnabled).toBe(false)
+      await vi.waitFor(async () => {
+        expect((await getSettings()).pip.subtitlesEnabled).toBe(false)
+      })
+
+      pipWindow.document.body.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          code: 'KeyC',
+          key: 'c',
+          bubbles: true,
+          cancelable: true,
+        })
+      )
+      await vi.waitFor(async () => {
+        expect((await getSettings()).pip.subtitlesEnabled).toBe(true)
+      })
+      expect(
+        pipWindow.document.querySelector('[data-pip-control="subtitle-switch"]')
+      ).toHaveAttribute('aria-checked', 'true')
+      expect(
+        pipWindow.document.getElementById('shortcut-override-playback-hint')
+      ).toHaveStyle({
+        borderRadius: '50%',
+        background: 'rgba(0, 0, 0, 0.68)',
+      })
+      expect(
+        pipWindow.document.querySelector(
+          '#shortcut-override-playback-hint [data-pip-icon="subtitles"]'
+        )
+      ).not.toBeNull()
 
       pipWindow.document
         .querySelector<HTMLButtonElement>('[data-pip-subtitle-nav="background"]')
@@ -461,6 +569,77 @@ describe('content PiP shortcuts', () => {
       await Promise.resolve()
       await Promise.resolve()
       expect((await getSettings()).pip.subtitleBackground).toBe('dark')
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('persists a PiP subtitle shortcut result after PiP closes', async () => {
+    const { pipWindow, cleanup } = createDocumentPipFixture()
+
+    try {
+      let respondToSubtitleToggle: ((response: unknown) => void) | undefined
+      vi.mocked(chrome.runtime.sendMessage).mockImplementation((message, callback) => {
+        const request = message as unknown as { action?: string }
+        if (request.action === 'toggleSubtitles' && typeof callback === 'function') {
+          respondToSubtitleToggle = callback as (response: unknown) => void
+        }
+        return undefined as never
+      })
+
+      const video = document.createElement('video')
+      document.body.appendChild(video)
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          code: 'KeyP',
+          key: 'P',
+          shiftKey: true,
+          bubbles: true,
+          cancelable: true,
+        })
+      )
+      await Promise.resolve()
+      await Promise.resolve()
+
+      pipWindow.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          code: 'KeyC',
+          key: 'c',
+          bubbles: true,
+          cancelable: true,
+        })
+      )
+      expect(respondToSubtitleToggle).toBeTypeOf('function')
+
+      pipWindow.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          code: 'KeyP',
+          key: 'P',
+          shiftKey: true,
+          bubbles: true,
+          cancelable: true,
+        })
+      )
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(video.parentElement).toBe(document.body)
+
+      respondToSubtitleToggle?.({
+        success: true,
+        result: {
+          action: 'toggleSubtitles',
+          playerApiFound: true,
+          playerFound: true,
+          seekCalled: false,
+          sessionIds: ['session-id'],
+          subtitleToggleCalled: true,
+          subtitlesEnabled: false,
+        },
+      })
+
+      await vi.waitFor(async () => {
+        expect((await getSettings()).pip.subtitlesEnabled).toBe(false)
+      })
     } finally {
       cleanup()
     }

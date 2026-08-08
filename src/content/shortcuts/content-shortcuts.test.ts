@@ -332,4 +332,26 @@ describe('content media shortcuts', () => {
     expect(requestFullscreen).toHaveBeenCalledTimes(1)
     expect(document.getElementById('shortcut-override-media-hint')).toBeNull()
   })
+
+  it('routes the default C shortcut to the Netflix subtitle API', () => {
+    const video = document.createElement('video')
+    document.body.append(video)
+    const event = new KeyboardEvent('keydown', {
+      code: 'KeyC',
+      key: 'c',
+      bubbles: true,
+      cancelable: true,
+    })
+
+    window.dispatchEvent(event)
+
+    expect(event.defaultPrevented).toBe(true)
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+      {
+        type: 'EXECUTE_NETFLIX_API',
+        action: 'toggleSubtitles',
+      },
+      expect.any(Function)
+    )
+  })
 })

@@ -1,6 +1,5 @@
 import { findSkipIntroButton, findVideo, toggleFullscreen } from '@/content/dom-utils'
 import {
-  createHintIcon,
   getHintManager,
   mediaHintIcons as icons,
   type HintIcon,
@@ -19,6 +18,8 @@ import type { CommandContext, ShortcutCommand } from './shortcut-command-types'
 import { resolveNextPlaybackRate } from '@/shared/playback-speed'
 import type { ShortcutAction, ShortcutSettings } from '@/shared/shortcut-types'
 
+const SUBTITLES_OFF_HINT_COLOR = 'rgba(255, 255, 255, 0.62)'
+
 export type ShortcutCommandController = SpaceInteractionController & {
   execute(action: ShortcutAction, targetDoc: Document): boolean
   setVolume(volume: number, targetDoc: Document): boolean
@@ -26,6 +27,7 @@ export type ShortcutCommandController = SpaceInteractionController & {
 
 type ShortcutCommandControllerOptions = {
   onSeekRequested?: () => void
+  onSubtitlesToggled?: (enabled: boolean, targetDoc: Document) => void
 }
 
 const formatPlaybackRate = (rate: number): string =>
@@ -35,24 +37,24 @@ const showHintRequest = (context: CommandContext, request: HintRequest): void =>
   getHintManager(context.targetDoc).show(request)
 }
 
-const showVolume = (context: CommandContext, icon: HintIcon | string, label: string): void =>
+const showVolume = (context: CommandContext, icon: HintIcon, label: string): void =>
   showHintRequest(context, {
     type: 'volume',
-    icon: typeof icon === 'string' ? createHintIcon(icon) : icon,
+    icon,
     label,
   })
 
 const showCommandFailure = (
   context: CommandContext,
   completion: Promise<PlaybackCommandResult>,
-  icon: HintIcon | string
+  icon: HintIcon
 ): void => {
   void completion.then(result => {
     if (!result.failureLabel || !context.isCurrentAction()) return
 
     showHintRequest(context, {
       type: 'media',
-      icon: typeof icon === 'string' ? createHintIcon(icon) : icon,
+      icon,
       label: result.failureLabel,
     })
   })
@@ -64,7 +66,7 @@ const showPlaybackRate = (
   rate: number,
   context: CommandContext,
   displayHint = true,
-  icon: HintIcon = createHintIcon(icons.speed)
+  icon: HintIcon = icons.speed
 ) => {
   showCommandFailure(context, playbackSession.setPlaybackRate(video, rate), icon)
   if (displayHint) {
@@ -95,10 +97,7 @@ const seekCommand =
       if (result.failureLabel) {
         showHintRequest(context, {
           type: 'media',
-          icon:
-            typeof failureIcon === 'string'
-              ? createHintIcon(failureIcon)
-              : failureIcon,
+          icon: failureIcon,
           label: result.failureLabel,
         })
       }
@@ -115,13 +114,42 @@ const togglePlayback = (
   const completion = playbackSession.togglePlayback(video)
   showHintRequest(context, {
     type: 'playback',
-    icon: createHintIcon(wasPaused ? icons.playbackPlay : icons.playbackPause),
+    icon: wasPaused ? icons.playbackPlay : icons.playbackPause,
   })
   showCommandFailure(
     context,
     completion,
     wasPaused ? icons.playbackPlay : icons.playbackPause
   )
+}
+
+const toggleSubtitles = (
+  playbackSession: NetflixPlaybackSession,
+  context: CommandContext,
+  onSubtitlesToggled?: ShortcutCommandControllerOptions['onSubtitlesToggled']
+): void => {
+  void playbackSession.toggleSubtitles().then(result => {
+    const enabled = result.response.result?.subtitlesEnabled
+    if (!result.failureLabel && typeof enabled === 'boolean') {
+      onSubtitlesToggled?.(enabled, context.targetDoc)
+    }
+    if (!context.isCurrentAction()) return
+
+    if (result.failureLabel || typeof enabled !== 'boolean') {
+      showHintRequest(context, {
+        type: 'media',
+        icon: icons.subtitles,
+        label: result.failureLabel ?? 'Unable to toggle subtitles',
+      })
+      return
+    }
+
+    showHintRequest(context, {
+      type: 'playback',
+      icon: icons.subtitles,
+      ...(enabled ? {} : { color: SUBTITLES_OFF_HINT_COLOR }),
+    })
+  })
 }
 
 const createCommandMap = (
@@ -164,6 +192,10 @@ const createCommandMap = (
     showCommandFailure(context, state.completion, icon)
     return true
   },
+  toggleSubtitles: context => {
+    toggleSubtitles(playbackSession, context, options.onSubtitlesToggled)
+    return true
+  },
   fullscreen: context => {
     toggleFullscreen(context.targetDoc)
     return true
@@ -185,7 +217,7 @@ const createCommandMap = (
       resolveNextPlaybackRate(video.playbackRate, 1, context.settings.speed),
       context,
       true,
-      createHintIcon(icons.speedUp)
+      icons.speedUp
     )
     return true
   },
@@ -198,7 +230,7 @@ const createCommandMap = (
       resolveNextPlaybackRate(video.playbackRate, -1, context.settings.speed),
       context,
       true,
-      createHintIcon(icons.speedDown)
+      icons.speedDown
     )
     return true
   },
@@ -211,7 +243,7 @@ const createCommandMap = (
       1,
       context,
       true,
-      createHintIcon(icons.playbackPlay)
+      icons.playbackPlay
     )
     return true
   },

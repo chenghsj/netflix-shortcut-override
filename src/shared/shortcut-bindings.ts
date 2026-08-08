@@ -13,6 +13,7 @@ export const DEFAULT_KEY_BINDINGS: Record<ShortcutAction, KeyBinding> = {
   volumeUp: { code: 'ArrowUp', key: 'ArrowUp', ctrl: false, alt: false, shift: false, meta: false },
   volumeDown: { code: 'ArrowDown', key: 'ArrowDown', ctrl: false, alt: false, shift: false, meta: false },
   mute: { code: 'KeyM', key: 'm', ctrl: false, alt: false, shift: false, meta: false },
+  toggleSubtitles: { code: 'KeyC', key: 'c', ctrl: false, alt: false, shift: false, meta: false },
   fullscreen: { code: 'KeyF', key: 'f', ctrl: false, alt: false, shift: false, meta: false },
   pictureInPicture: {
     code: 'KeyP',

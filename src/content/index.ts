@@ -7,6 +7,7 @@ import {
   isTypingTarget,
 } from '@/content/dom-utils'
 import { PipManager } from '@/content/pip/pip-manager'
+import { isPipDocument } from '@/content/pip/pip-document'
 import { createNetflixPlaybackSession } from '@/content/netflix-playback-session'
 import { createShortcutCommandController } from '@/content/shortcuts/shortcut-command-controller'
 import {
@@ -31,7 +32,19 @@ const playbackSession = createNetflixPlaybackSession()
 const commandController = createShortcutCommandController(
   () => settings,
   playbackSession,
-  { onSeekRequested: () => pipManager?.recordUserSeek() }
+  {
+    onSeekRequested: () => pipManager?.recordUserSeek(),
+    onSubtitlesToggled: (subtitlesEnabled, targetDoc) => {
+      if (!isPipDocument(targetDoc)) return
+
+      const nextSettings = normalizeSettings({
+        ...settings,
+        pip: { ...settings.pip, subtitlesEnabled },
+      })
+      applySettings(nextSettings, true)
+      void saveSettings(nextSettings).catch(() => undefined)
+    },
+  }
 )
 
 const clearSpaceHoldOnWindowBlur = () => {
@@ -158,10 +171,14 @@ pipManager = new PipManager({
     void saveSettings(normalizedSettings).catch(() => undefined)
   },
 })
-const applySettings = (nextSettings: ShortcutSettings) => {
+const applySettings = (
+  nextSettings: ShortcutSettings,
+  subtitleStateConfirmed = false
+) => {
   settings = nextSettings
   settingsLoaded = true
-  pipManager?.updateSettings(nextSettings)
+  if (subtitleStateConfirmed) pipManager?.confirmSubtitleState(nextSettings)
+  else pipManager?.updateSettings(nextSettings)
 }
 
 void getSettings()

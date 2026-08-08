@@ -16,6 +16,9 @@ type BridgeResponse = {
     seekCalled?: boolean
     currentTime?: number
     targetTime?: number
+    subtitleToggleCalled?: boolean
+    subtitlesEnabled?: boolean
+    subtitleTrack?: string
   }
 }
 
@@ -49,6 +52,8 @@ describe('main-world Netflix API bridge', () => {
     delete (window as typeof window & { netflix?: unknown }).netflix
     delete (window as typeof window & { documentPictureInPicture?: unknown })
       .documentPictureInPicture
+    delete (window as typeof window & { __shortcutOverrideSubtitleState?: unknown })
+      .__shortcutOverrideSubtitleState
   })
 
   it('marks the DOM when the page bridge is ready', () => {
@@ -126,6 +131,118 @@ describe('main-world Netflix API bridge', () => {
     expect(response?.result?.currentTime).toBe(30000)
     expect(response?.result?.targetTime).toBe(90000)
     expect(response?.result?.seekCalled).toBe(true)
+  })
+
+  it('turns Netflix subtitles off and restores the previous track', () => {
+    const noneTrack = { id: 'none', displayName: 'Off', isNoneTrack: true }
+    const englishTrack = { id: 'en', displayName: 'English', bcp47: 'en' }
+    let currentTrack = englishTrack
+    const setTextTrack = vi.fn((track: typeof noneTrack | typeof englishTrack) => {
+      currentTrack = track as typeof englishTrack
+    })
+
+    Object.assign(window, {
+      netflix: {
+        appContext: {
+          state: {
+            playerApp: {
+              getAPI: () => ({
+                videoPlayer: {
+                  getAllPlayerSessionIds: () => ['session-id'],
+                  getVideoPlayerBySessionId: () => ({
+                    getCurrentTime: () => 30_000,
+                    getTextTrackList: () => [noneTrack, englishTrack],
+                    getTextTrack: () => currentTrack,
+                    setTextTrack,
+                  }),
+                },
+              }),
+            },
+          },
+        },
+      },
+    })
+
+    const disabled = callBridge('toggleSubtitles')
+    const enabled = callBridge('toggleSubtitles')
+
+    expect(setTextTrack).toHaveBeenNthCalledWith(1, noneTrack)
+    expect(setTextTrack).toHaveBeenNthCalledWith(2, englishTrack)
+    expect(disabled?.result).toEqual(
+      expect.objectContaining({
+        subtitleToggleCalled: true,
+        subtitlesEnabled: false,
+        subtitleTrack: 'Off',
+      })
+    )
+    expect(enabled?.result).toEqual(
+      expect.objectContaining({
+        subtitleToggleCalled: true,
+        subtitlesEnabled: true,
+        subtitleTrack: 'English',
+      })
+    )
+  })
+
+  it('reads the selected Netflix subtitle track without changing it', () => {
+    const englishTrack = { id: 'en', displayName: 'English', bcp47: 'en' }
+    const setTextTrack = vi.fn()
+
+    Object.assign(window, {
+      netflix: {
+        appContext: {
+          state: {
+            playerApp: {
+              getAPI: () => ({
+                videoPlayer: {
+                  getAllPlayerSessionIds: () => ['session-id'],
+                  getVideoPlayerBySessionId: () => ({
+                    getCurrentTime: () => 30_000,
+                    getTextTrackList: () => [englishTrack],
+                    getTextTrack: () => englishTrack,
+                    setTextTrack,
+                  }),
+                },
+              }),
+            },
+          },
+        },
+      },
+    })
+
+    const response = callBridge('getSubtitleState')
+
+    expect(response?.result).toEqual(
+      expect.objectContaining({
+        subtitlesEnabled: true,
+        subtitleTrack: 'English',
+      })
+    )
+    expect(setTextTrack).not.toHaveBeenCalled()
+  })
+
+  it('reports when the Netflix subtitle API is unavailable', () => {
+    Object.assign(window, {
+      netflix: {
+        appContext: {
+          state: {
+            playerApp: {
+              getAPI: () => ({
+                videoPlayer: {
+                  getAllPlayerSessionIds: () => ['session-id'],
+                  getVideoPlayerBySessionId: () => ({ getCurrentTime: () => 30_000 }),
+                },
+              }),
+            },
+          },
+        },
+      },
+    })
+
+    const response = callBridge('toggleSubtitles')
+
+    expect(response?.success).toBe(true)
+    expect(response?.result?.subtitleToggleCalled).not.toBe(true)
   })
 
   it('seeks and resumes the PiP episode instead of the first preview session', () => {

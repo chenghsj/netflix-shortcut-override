@@ -5,6 +5,7 @@ export const SHORTCUT_ACTIONS = [
   'volumeUp',
   'volumeDown',
   'mute',
+  'toggleSubtitles',
   'fullscreen',
   'pictureInPicture',
   'skipIntro',

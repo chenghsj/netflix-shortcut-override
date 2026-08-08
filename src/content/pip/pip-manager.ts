@@ -122,6 +122,11 @@ export class PipManager {
     this.adoptedVideoBinding?.updateSettings(settings)
   }
 
+  confirmSubtitleState(settings: ShortcutSettings): void {
+    this.settings = settings
+    this.adoptedVideoBinding?.confirmSubtitleState(settings)
+  }
+
   recordUserSeek(): void {
     this.videoHandoff?.recordUserSeek()
   }

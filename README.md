@@ -8,8 +8,9 @@
 [![Manifest V3](https://img.shields.io/badge/Manifest-V3-4285F4)](https://developer.chrome.com/docs/extensions/develop/migrate/what-is-mv3)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 
-[![Chrome Web Store](https://img.shields.io/badge/Chrome-Install-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/shortcut-override-for-net/jebnhiecgnchnioahfagmnebdknddbom)
-[![Microsoft Edge Add-ons](https://img.shields.io/badge/Edge-Install-0078D7?logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyByb2xlPSJpbWciIHZpZXdCb3g9IjAgMCAyNCAyNCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48dGl0bGU%2BTWljcm9zb2Z0IEVkZ2U8L3RpdGxlPjxwYXRoIGZpbGw9IndoaXRlIiBkPSJNMjEuODYgMTcuODZxLjE0IDAgLjI1LjEyLjEuMTMuMS4yNXQtLjExLjMzbC0uMzIuNDYtLjQzLjUzLS40NC41cS0uMjEuMjUtLjM4LjQybC0uMjIuMjNxLS41OC41My0xLjM0IDEuMDQtLjc2LjUxLTEuNi45MS0uODYuNC0xLjc0LjY0dC0xLjY3LjI0cS0uOSAwLTEuNjktLjI4LS44LS4yOC0xLjQ4LS43OC0uNjgtLjUtMS4yMi0xLjE3LS41My0uNjYtLjkyLTEuNDQtLjM4LS43Ny0uNTgtMS42LS4yLS44My0uMi0xLjY3IDAtMSAuMzItMS45Ni4zMy0uOTcuODctMS44LjE0Ljk1LjU1IDEuNzcuNDEuODIgMS4wMiAxLjUuNi42OCAxLjM4IDEuMjEuNzguNTQgMS42NC45Ljg2LjM2IDEuNzcuNTYuOTIuMiAxLjguMiAxLjEyIDAgMi4xOC0uMjQgMS4wNi0uMjMgMi4wNi0uNzJsLjItLjEuMi0uMDV6bS0xNS41LTEuMjdxMCAxLjEuMjcgMi4xNS4yNyAxLjA2Ljc4IDIuMDMuNTEuOTYgMS4yNCAxLjc3Ljc0LjgyIDEuNjYgMS40LTEuNDctLjItMi44LS43NC0xLjMzLS41NS0yLjQ4LTEuMzctMS4xNS0uODMtMi4wOC0xLjktLjkyLTEuMDctMS41OC0yLjMzVC4zNiAxNC45NFEwIDEzLjU0IDAgMTIuMDZxMC0uODEuMzItMS40OS4zMS0uNjguODMtMS4yMy41My0uNTUgMS4yLS45Ni42Ni0uNCAxLjM1LS42Ni43NC0uMjcgMS41LS4zOS43OC0uMTIgMS41NS0uMTIuNyAwIDEuNDIuMS43Mi4xMiAxLjQuMzUuNjguMjMgMS4zMi41Ny42My4zNSAxLjE2LjgzLS4zNSAwLS43LjA3LS4zMy4wNy0uNjUuMjN2LS4wMnEtLjYzLjI4LTEuMi43NC0uNTcuNDYtMS4wNSAxLjA0LS40OC41OC0uODcgMS4yNi0uMzguNjctLjY1IDEuMzktLjI3LjcxLS40MiAxLjQ0LS4xNS43Mi0uMTUgMS4zOHpNMTEuOTYuMDZxMS43IDAgMy4zMy4zOSAxLjYzLjM4IDMuMDcgMS4xNSAxLjQzLjc3IDIuNjIgMS45MyAxLjE4IDEuMTYgMS45OCAyLjcuNDkuOTQuNzYgMS45Ni4yOCAxIC4yOCAyLjA4IDAgLjg5LS4yMyAxLjctLjI0LjgtLjY5IDEuNDgtLjQ1LjY4LTEuMSAxLjIyLS42NC41My0xLjQ1Ljg4LS41NC4yNC0xLjExLjM2LS41OC4xMy0xLjE2LjEzLS40MiAwLS45Ny0uMDMtLjU0LS4wMy0xLjEtLjEyLS41NS0uMS0xLjA1LS4yOC0uNS0uMTktLjg0LS41LS4xMi0uMDktLjIzLS4yNC0uMS0uMTYtLjEtLjMzIDAtLjE1LjE2LS4zNS4xNi0uMi4zNS0uNS4yLS4yOC4zNi0uNjguMTYtLjQuMTYtLjk1IDAtMS4wNi0uNC0xLjk2LS40LS45MS0xLjA2LTEuNjQtLjY2LS43NC0xLjUyLTEuMjgtLjg2LS41NS0xLjc5LS44OS0uODQtLjMtMS43Mi0uNDQtLjg3LS4xNC0xLjc2LS4xNC0xLjU1IDAtMy4wNi40NVQuOTQgNy41NXEuNzEtMS43NCAxLjgxLTMuMTMgMS4xLTEuMzggMi41Mi0yLjM1UTYuNjggMS4xIDguMzcuNThxMS43LS41MiAzLjU4LS41MloiLz48L3N2Zz4%3D)](https://microsoftedge.microsoft.com/addons/detail/shortcut-override-for-net/ddfnieehcebicbmnejlafjphppdjmdhi)
+[![Chrome Web Store](docs/assets/chrome.svg)](https://chromewebstore.google.com/detail/shortcut-override-for-net/jebnhiecgnchnioahfagmnebdknddbom)
+[![Microsoft Edge Add-ons](docs/assets/edge.svg)](https://microsoftedge.microsoft.com/addons/detail/shortcut-override-for-net/ddfnieehcebicbmnejlafjphppdjmdhi)
+[![Firefox install](docs/assets/firefox.svg)](https://addons.mozilla.org/firefox/addon/70ea1dc7212746bd96bd/)
 
 Customize Netflix playback shortcuts with a small unofficial browser extension.
 
@@ -35,7 +36,7 @@ This project is not affiliated with, endorsed by, or sponsored by Netflix.
 - Follow the browser UI language automatically when supported, or choose the options UI language manually.
 - Rewind and fast-forward by a configurable interval.
 - Configure the rewind and fast-forward interval.
-- Control play/pause, volume, mute, fullscreen, skip intro, and playback speed.
+- Control play/pause, volume, mute, Netflix subtitles, fullscreen, skip intro, and playback speed.
 - Toggle a Document Picture-in-Picture player with Netflix subtitle mirroring on Chrome and Edge Chromium.
 - Use the same configurable shortcut to enter or exit Picture-in-Picture on supported Chromium browsers.
 - When Netflix automatically advances to the next episode, close Picture-in-Picture and leave the next episode's playback state to Netflix and the profile's autoplay setting.
@@ -44,7 +45,7 @@ This project is not affiliated with, endorsed by, or sponsored by Netflix.
 - Use the PiP overlay for timeline seeking, playback transport, volume, mute, and subtitle appearance settings; it hides after three seconds of pointer idle.
 - In Chromium's subtitle-mirrored Picture-in-Picture, Space is handled by the extension because Netflix cannot receive the focused window's native key event.
 - Hold Space to temporarily switch to a configurable playback speed, then restore on release.
-- Persist settings with `chrome.storage`.
+- Persist settings with `chrome.storage.sync`.
 - Build as a Manifest V3 browser extension.
 
 ## Default Shortcuts
@@ -57,12 +58,15 @@ This project is not affiliated with, endorsed by, or sponsored by Netflix.
 | Volume up | `Up` |
 | Volume down | `Down` |
 | Mute | `M` |
+| Toggle Netflix subtitles | `C` |
 | Fullscreen | `F` |
 | Picture-in-Picture | `Shift + P` |
 | Skip intro | `S` |
 | Increase playback speed | `Shift + .` |
 | Decrease playback speed | `Shift + ,` |
 | Reset playback speed | `Shift + /` |
+
+Press `C` to turn Netflix's native subtitles off or on. The extension restores the previously selected subtitle track when it remains available; otherwise, it selects the first available subtitle track. In the extension-managed PiP window, the shortcut and subtitle switch stay synchronized.
 
 Space has two behaviors:
 
@@ -135,7 +139,7 @@ Use this path if you just want to install the extension without building it from
 
 For local use, download the Firefox zip from the [GitHub Releases page](https://github.com/chenghsj/netflix-shortcut-override/releases/latest). Open `about:debugging#/runtime/this-firefox`, choose "Load Temporary Add-on…", and select the downloaded zip. Firefox removes a temporary add-on after the browser restarts.
 
-For persistent installation and automatic updates, install the Mozilla-signed version from Firefox Add-ons after it is approved. The Firefox Picture-in-Picture setting is disabled and marked unsupported; `Shift+P` passes through without being intercepted.
+For persistent installation and automatic updates, install the [Mozilla-signed version from Firefox Add-ons](https://addons.mozilla.org/firefox/addon/70ea1dc7212746bd96bd/). The Firefox Picture-in-Picture setting is disabled and marked unsupported; `Shift+P` passes through without being intercepted.
 
 ## Install From Source
 
@@ -382,7 +386,7 @@ Commit messages that follow Conventional Commits are grouped into sections such 
 - Shortcuts only run in Netflix playback contexts: watch pages or pages with a visible Netflix player.
 - Shortcut handling is skipped while typing in inputs, textareas, or editable content.
 - Skip intro only works when Netflix renders a visible skip intro button.
-- Seeking uses Netflix's internal player API. If Netflix changes that API, rewind and fast-forward may need an extension update.
+- Seeking and subtitle toggling use Netflix's internal player API. If Netflix changes that API, these actions may need an extension update.
 - Browser extension pages and content scripts may need a manual reload after manifest, service worker, or content script changes.
 
 ## Bug Reports

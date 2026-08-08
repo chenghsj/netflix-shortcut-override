@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createNetflixPlaybackSession } from '@/content/netflix-playback-session'
 import { findVideo } from '@/content/dom-utils'
 import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
+import type { NetflixApiAction } from '@/shared/netflix-api'
 import { PipManager } from './pip-manager'
 import { VideoPlacement } from './video-placement'
 
@@ -140,7 +141,24 @@ describe('PipManager', () => {
   })
 
   it('keeps PiP command routing and settings changes behind the manager', async () => {
-    const transport = vi.fn().mockResolvedValue({ success: true })
+    const transport = vi.fn((action: NetflixApiAction) =>
+      Promise.resolve(
+        action === 'toggleSubtitles'
+          ? {
+              success: true,
+              result: {
+                action,
+                playerApiFound: true,
+                playerFound: true,
+                seekCalled: false,
+                sessionIds: ['session-id'],
+                subtitleToggleCalled: true,
+                subtitlesEnabled: false,
+              },
+            }
+          : { success: true }
+      )
+    )
     const onSettingsChange = vi.fn()
     manager = new PipManager({
       onKeydown: vi.fn(),
@@ -202,6 +220,9 @@ describe('PipManager', () => {
     pipWindow.document
       .querySelector<HTMLButtonElement>('[data-pip-control="subtitle-switch"]')
       ?.click()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(transport).toHaveBeenCalledWith('toggleSubtitles')
     expect(onSettingsChange).toHaveBeenCalledWith(
       expect.objectContaining({
         pip: {
@@ -252,7 +273,11 @@ describe('PipManager', () => {
     await Promise.resolve()
     await Promise.resolve()
 
-    expect(transport.mock.calls.map(([action]) => action)).toEqual(['seekTo', 'play'])
+    expect(
+      transport.mock.calls
+        .map(([action]) => action)
+        .filter(action => action !== 'getSubtitleState')
+    ).toEqual(['seekTo', 'play'])
   })
 
   it('cancels an ended-episode resume when PiP closes during a seek', async () => {
@@ -296,7 +321,11 @@ describe('PipManager', () => {
     await Promise.resolve()
     await Promise.resolve()
 
-    expect(transport.mock.calls.map(([action]) => action)).toEqual(['seekTo'])
+    expect(
+      transport.mock.calls
+        .map(([action]) => action)
+        .filter(action => action !== 'getSubtitleState')
+    ).toEqual(['seekTo'])
   })
 
   it('restores PiP shortcuts after the timeline is released', async () => {
@@ -1363,7 +1392,8 @@ describe('PipManager', () => {
     await Promise.resolve()
 
     expect(pause).not.toHaveBeenCalled()
-    expect(transport).not.toHaveBeenCalled()
+    expect(transport).toHaveBeenCalledTimes(1)
+    expect(transport).toHaveBeenCalledWith('getSubtitleState')
     expect(manager.isActive).toBe(true)
     expect(pipWindow.close).not.toHaveBeenCalled()
   })

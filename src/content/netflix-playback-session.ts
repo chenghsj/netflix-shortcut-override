@@ -35,6 +35,8 @@ export type NetflixPlaybackSession = {
   setVolume: (video: HTMLVideoElement, volume: number) => PlaybackVolumeCommand
   adjustVolume: (video: HTMLVideoElement, delta: number) => PlaybackVolumeCommand
   toggleMute: (video: HTMLVideoElement) => PlaybackVolumeCommand
+  getSubtitleState: () => Promise<PlaybackCommandResult>
+  toggleSubtitles: () => Promise<PlaybackCommandResult>
   setPlaybackRate: (
     video: HTMLVideoElement,
     rate: number
@@ -82,6 +84,19 @@ const getCommandFailureLabel = (
   if (action === 'seek' || action === 'seekTo') return getSeekFailureLabel(response)
   if (!response.success) return `${action} failed: ${response.error ?? 'background error'}`
   if (response.result?.error) return `${action} failed: ${response.result.error}`
+  if (
+    action === 'getSubtitleState' &&
+    typeof response.result?.subtitlesEnabled !== 'boolean'
+  ) {
+    if (response.result?.playerApiFound === false) return 'getSubtitleState failed: no Netflix API'
+    if (response.result?.playerFound === false) return 'getSubtitleState failed: no Netflix player'
+    return 'getSubtitleState failed: no subtitle state'
+  }
+  if (action === 'toggleSubtitles' && response.result?.subtitleToggleCalled !== true) {
+    if (response.result?.playerApiFound === false) return 'toggleSubtitles failed: no Netflix API'
+    if (response.result?.playerFound === false) return 'toggleSubtitles failed: no Netflix player'
+    return 'toggleSubtitles failed: no subtitle API call'
+  }
   return null
 }
 
@@ -101,6 +116,8 @@ const combineCommandResults = (
 export const createNetflixPlaybackSession = (
   transport: NetflixPlaybackTransport = sendNetflixApi
 ): NetflixPlaybackSession => {
+  let subtitleToggleQueue: Promise<PlaybackCommandResult> | null = null
+
   const execute = async (
     action: NetflixApiAction,
     value?: number
@@ -122,6 +139,21 @@ export const createNetflixPlaybackSession = (
       response,
       failureLabel: getCommandFailureLabel(action, response),
     }
+  }
+
+  const toggleSubtitles = (): Promise<PlaybackCommandResult> => {
+    const request = subtitleToggleQueue
+      ? subtitleToggleQueue.then(
+          () => execute('toggleSubtitles'),
+          () => execute('toggleSubtitles')
+        )
+      : execute('toggleSubtitles')
+    subtitleToggleQueue = request
+    const clearCompletedRequest = () => {
+      if (subtitleToggleQueue === request) subtitleToggleQueue = null
+    }
+    void request.then(clearCompletedRequest, clearCompletedRequest)
+    return request
   }
 
   const play = (video: HTMLVideoElement): Promise<PlaybackCommandResult> => {
@@ -218,6 +250,8 @@ export const createNetflixPlaybackSession = (
       mirrorAudioState(video, { muted: true })
       return { volume: clampNetflixVolume(video.volume), muted: true, completion }
     },
+    getSubtitleState: () => execute('getSubtitleState'),
+    toggleSubtitles,
     setPlaybackRate: (video, rate) => {
       video.playbackRate = rate
       video.defaultPlaybackRate = rate

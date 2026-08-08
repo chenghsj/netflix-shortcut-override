@@ -40,6 +40,7 @@ const POPUP_SHORTCUT_ACTIONS: ShortcutAction[] = [
   'volumeUp',
   'volumeDown',
   'mute',
+  'toggleSubtitles',
   'fullscreen',
   'pictureInPicture',
   'skipIntro',

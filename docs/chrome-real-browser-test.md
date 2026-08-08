@@ -141,6 +141,7 @@ Run these against the real Netflix watch page:
 - `ArrowUp`: volume up.
 - `ArrowDown`: volume down.
 - `M`: mute/unmute.
+- `C`: turn Netflix subtitles off; press it again to restore the previously selected track when available.
 - `F`: fullscreen.
 - `Shift+P`: enter Picture-in-Picture; press it again to exit.
 - `S`: Skip Intro when the Netflix button is visible.
@@ -152,7 +153,10 @@ Expected:
 
 - Netflix playback responds to each shortcut.
 - Media hints appear near the video center after handled shortcut actions.
+- The subtitle shortcut changes Netflix's active native subtitle track rather than inferring state from visible subtitle text.
+- The subtitle hint uses the PiP subtitle-settings icon, shown white when subtitles are enabled and dimmed when disabled.
 - PiP keeps Netflix subtitles visible and updates them when the subtitle line or language changes.
+- Pressing `C` inside PiP updates the PiP subtitle switch and persists its resulting state; changing the switch also updates Netflix's native subtitle track.
 - Pressing `Shift+P` inside the PiP window exits PiP without returning to the Netflix tab first.
 - Resizing the PiP window keeps the subtitle overlay aligned with the video.
 
@@ -204,6 +208,7 @@ Computer Use -> get_app_state({ app: "Google Chrome" })
 ```text
 space
 m
+c
 Right
 Left
 Up

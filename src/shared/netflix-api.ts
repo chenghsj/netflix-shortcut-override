@@ -10,6 +10,8 @@ export const NETFLIX_API_ACTIONS = [
   'setMuted',
   'unmuteWithVolume',
   'setPlaybackRate',
+  'getSubtitleState',
+  'toggleSubtitles',
 ] as const
 
 export type NetflixApiAction = (typeof NETFLIX_API_ACTIONS)[number]
@@ -35,6 +37,9 @@ export type NetflixPageResult = {
   sessionId?: string
   playerFound: boolean
   seekCalled: boolean
+  subtitleToggleCalled?: boolean
+  subtitlesEnabled?: boolean
+  subtitleTrack?: string
   currentTime?: number
   targetTime?: number
   error?: string
