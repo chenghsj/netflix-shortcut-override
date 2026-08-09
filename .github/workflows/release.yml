@@ -115,9 +115,6 @@ jobs:
       - name: Build extension
         run: npm run build
 
-      - name: Prepare Firefox extension
-        run: npm run prepare:firefox
-
       - name: Lint Firefox extension
         run: npm run lint:firefox
 
