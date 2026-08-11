@@ -44,9 +44,6 @@ jobs:
       - name: Build extension
         run: npm run build
 
-      - name: Prepare Firefox extension
-        run: npm run prepare:firefox
-
       - name: Lint Firefox extension
         run: npm run lint:firefox
 
@@ -54,6 +51,8 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: extension-dist
-          path: dist
+          path: |
+            dist
+            firefox-dist
           if-no-files-found: error
           retention-days: 7
