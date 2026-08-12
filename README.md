@@ -202,15 +202,15 @@ Keep this terminal running while testing the unpacked extension. If the dev serv
 
 Reload the extension in `chrome://extensions` after changes that affect the manifest, service worker startup, or content script registration. UI-only changes should usually update through CRXJS HMR.
 
-For Firefox, run `npm run build:firefox` and load the generated `firefox-dist/manifest.json` as a temporary add-on from `about:debugging`. Firefox uses the same source code and settings; the Picture-in-Picture shortcut is disabled and passes through.
+The default `npm run build` command also creates the Firefox-specific output. Load `firefox-dist/manifest.json` as a temporary add-on from `about:debugging`. Firefox uses the same source code and settings; the Picture-in-Picture shortcut is disabled and passes through.
 
 ## Scripts
 
 | Command | Description |
 | --- | --- |
 | `npm run dev` | Remove `dist` and start the CRXJS/Vite dev server with HMR. |
-| `npm run build` | Type-check, build, and patch the production extension output. |
-| `npm run build:firefox` | Build the production extension and prepare the Firefox-specific output. |
+| `npm run build` | Type-check and build Chromium `dist/`, then prepare Firefox `firefox-dist/`. |
+| `npm run build:firefox` | Compatibility alias for `npm run build`. |
 | `npm run prepare:firefox` | Convert the Chromium build output into a Firefox-compatible manifest. |
 | `npm run lint:firefox` | Run `web-ext lint` against `firefox-dist`. |
 | `npm run package:chromium` | Create the keyless Chromium ZIP and checksum. |
