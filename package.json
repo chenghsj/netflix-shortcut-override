@@ -16,6 +16,7 @@
     "build:firefox": "npm run build",
     "package:chromium": "node scripts/build-chromium-package.mjs",
     "package:firefox": "node scripts/build-firefox-package.mjs",
+    "package:checksums": "node scripts/generate-release-checksums.mjs",
     "prepare:firefox": "node scripts/prepare-firefox-dist.mjs",
     "lint:firefox": "web-ext lint --source-dir firefox-dist",
     "lint": "eslint .",

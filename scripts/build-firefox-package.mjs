@@ -3,11 +3,7 @@ import { mkdir, readFile, rm } from 'node:fs/promises'
 import path from 'node:path'
 
 import { prepareFirefoxDist } from './prepare-firefox-dist.mjs'
-import {
-  createZipArchive,
-  withTemporaryDirectory,
-  writeSha256,
-} from './package-utils.mjs'
+import { createZipArchive, withTemporaryDirectory } from './package-utils.mjs'
 
 const rootDir = process.cwd()
 const distDir = path.join(rootDir, 'dist')
@@ -31,9 +27,7 @@ await withTemporaryDirectory({
     await mkdir(releaseAssetsDir, { recursive: true })
     await Promise.all([
       rm(firefoxZipPath, { force: true }),
-      rm(`${firefoxZipPath}.sha256`, { force: true }),
       rm(sourceZipPath, { force: true }),
-      rm(`${sourceZipPath}.sha256`, { force: true }),
     ])
 
     createZipArchive({ sourceDir: firefoxDistDir, archivePath: firefoxZipPath })
@@ -49,14 +43,7 @@ await withTemporaryDirectory({
       throw new Error(`git archive exited with status ${archiveResult.status}`)
     }
 
-    await Promise.all([
-      writeSha256({ filePath: firefoxZipPath, rootDir }),
-      writeSha256({ filePath: sourceZipPath, rootDir }),
-    ])
-
     console.log(`Created ${path.relative(rootDir, firefoxZipPath)}`)
-    console.log(`Created ${path.relative(rootDir, `${firefoxZipPath}.sha256`)}`)
     console.log(`Created ${path.relative(rootDir, sourceZipPath)}`)
-    console.log(`Created ${path.relative(rootDir, `${sourceZipPath}.sha256`)}`)
   },
 })

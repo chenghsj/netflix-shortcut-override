@@ -213,8 +213,9 @@ The default `npm run build` command also creates the Firefox-specific output. Lo
 | `npm run build:firefox` | Compatibility alias for `npm run build`. |
 | `npm run prepare:firefox` | Convert the Chromium build output into a Firefox-compatible manifest. |
 | `npm run lint:firefox` | Run `web-ext lint` against `firefox-dist`. |
-| `npm run package:chromium` | Create the keyless Chromium ZIP and checksum. |
-| `npm run package:firefox` | Create Firefox extension/source ZIPs and checksums for local use or manual AMO upload. |
+| `npm run package:chromium` | Create the keyless Chromium ZIP. |
+| `npm run package:firefox` | Create Firefox extension/source ZIPs for local use or manual AMO upload. |
+| `npm run package:checksums` | Create `SHA256SUMS` for all three release ZIPs. |
 | `npm run lint` | Run ESLint. |
 | `npm test` | Run Vitest tests. |
 | `npm run test:coverage` | Run the complete test suite with enforced coverage thresholds. |
@@ -352,16 +353,18 @@ The release workflow will:
 7. Generate release notes.
 8. Package a Chromium zip file without the manifest `key` field.
 9. Package Firefox extension and source ZIPs for local use or manual AMO upload.
-10. Publish or update the GitHub Release with all browser packages.
+10. Generate one `SHA256SUMS` file for all three ZIPs.
+11. Publish or update the GitHub Release with all browser packages.
 
 The generated release assets are:
 
 - `shortcut-override-for-netflix-chromium-<version>.zip`
-- `shortcut-override-for-netflix-chromium-<version>.zip.sha256`
 - `shortcut-override-for-netflix-firefox-<version>.zip`
-- `shortcut-override-for-netflix-firefox-<version>.zip.sha256`
 - `shortcut-override-for-netflix-source-<version>.zip`
-- `shortcut-override-for-netflix-source-<version>.zip.sha256`
+- `SHA256SUMS`
+
+Place `SHA256SUMS` beside the three downloaded ZIP files, then verify them with
+`sha256sum -c SHA256SUMS` on Linux or `shasum -a 256 -c SHA256SUMS` on macOS.
 
 No AMO credentials are required by the release workflow. To publish Firefox manually:
 

@@ -127,6 +127,9 @@ jobs:
       - name: Package Firefox extension and source
         run: npm run package:firefox
 
+      - name: Generate SHA-256 checksums
+        run: npm run package:checksums
+
       - name: Publish GitHub Release
         shell: bash
         env:

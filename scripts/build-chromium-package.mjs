@@ -5,7 +5,6 @@ import {
   createZipArchive,
   preparePackageDirectory,
   withTemporaryDirectory,
-  writeSha256,
 } from './package-utils.mjs'
 
 const rootDir = process.cwd()
@@ -32,14 +31,11 @@ await withTemporaryDirectory({
     const zipName = `shortcut-override-for-netflix-chromium-${manifest.version}.zip`
     const zipPath = path.join(releaseAssetsDir, zipName)
     await rm(zipPath, { force: true })
-    await rm(`${zipPath}.sha256`, { force: true })
 
     createZipArchive({ sourceDir: packageDir, archivePath: zipPath })
-    await writeSha256({ filePath: zipPath, rootDir })
 
     const relativeZipPath = path.relative(rootDir, zipPath)
 
     console.log(`Created ${relativeZipPath}`)
-    console.log(`Created ${path.relative(rootDir, `${zipPath}.sha256`)}`)
   },
 })

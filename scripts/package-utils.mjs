@@ -68,11 +68,20 @@ export const createZipArchive = ({ sourceDir, archivePath }) => {
   }
 }
 
-export const writeSha256 = async ({ filePath, rootDir }) => {
-  const hash = createHash('sha256').update(await readFile(filePath)).digest('hex')
-  const relativePath = path.relative(rootDir, filePath)
-  const checksumPath = `${filePath}.sha256`
-  await writeFile(checksumPath, `${hash}  ${relativePath}\n`)
+export const writeSha256Sums = async ({ filePaths, outputPath }) => {
+  const sortedFilePaths = [...filePaths].sort((left, right) =>
+    path.basename(left).localeCompare(path.basename(right))
+  )
+  const checksums = await Promise.all(
+    sortedFilePaths.map(async filePath => {
+      const hash = createHash('sha256')
+        .update(await readFile(filePath))
+        .digest('hex')
+      return `${hash}  ${path.basename(filePath)}`
+    })
+  )
 
-  return checksumPath
+  await writeFile(outputPath, `${checksums.join('\n')}\n`)
+
+  return outputPath
 }
