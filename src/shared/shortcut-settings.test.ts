@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest'
 
 import {
   DEFAULT_SETTINGS,
+  HOLD_SPEED_LIMITS,
   SEEK_LIMITS,
-  SPACE_HOLD_LIMITS,
   SPEED_LIMITS,
+  normalizeHoldSpeedSettings,
   normalizeSeekSettings,
   normalizePipSettings,
-  normalizeSpaceHoldSettings,
   normalizeSpeedSettings,
   normalizeSettings,
 } from '@/shared/shortcut-settings'
@@ -20,8 +20,9 @@ describe('shortcut settings', () => {
       min: 0.25,
       max: 3,
       step: 0.25,
+      preferred: 1.5,
     })
-    expect(DEFAULT_SETTINGS.spaceHold).toEqual({
+    expect(DEFAULT_SETTINGS.holdSpeed).toEqual({
       enabled: true,
       speed: 2,
       showHint: true,
@@ -68,7 +69,7 @@ describe('shortcut settings', () => {
     expect(normalized.bindings.pictureInPicture.key).toEqual(
       DEFAULT_SETTINGS.bindings.pictureInPicture.key
     )
-    expect(normalized.version).toBe(9)
+    expect(normalized.version).toBe(10)
   })
 
   it('adds the subtitle toggle binding when normalizing older settings', () => {
@@ -158,28 +159,54 @@ describe('shortcut settings', () => {
       min: 0.25,
       max: 4,
       step: 0.05,
+      preferred: 1.5,
     })
     expect(normalizeSpeedSettings({ step: 8 }).step).toBe(4)
   })
 
-  it('normalizes long-press Space settings independently', () => {
-    expect(SPACE_HOLD_LIMITS.speed.inputStep).toBe(0.05)
-    expect(normalizeSpaceHoldSettings({ enabled: false, speed: 2.35 })).toEqual({
+  it('normalizes preferred and hold speeds independently', () => {
+    expect(normalizeSpeedSettings({ preferred: 2.35 }).preferred).toBe(2.35)
+    expect(normalizeSpeedSettings({ preferred: 0.1 }).preferred).toBe(0.25)
+    expect(normalizeSpeedSettings({ preferred: 8 }).preferred).toBe(4)
+    expect(HOLD_SPEED_LIMITS.speed.inputStep).toBe(0.05)
+    expect(normalizeHoldSpeedSettings({ enabled: false, speed: 2.35 })).toEqual({
       enabled: false,
       speed: 2.35,
       showHint: true,
     })
-    expect(normalizeSpaceHoldSettings({ speed: 0.1 }).speed).toBe(0.25)
-    expect(normalizeSpaceHoldSettings({ speed: 8 }).speed).toBe(4)
+    expect(normalizeHoldSpeedSettings({ speed: 0.1 }).speed).toBe(0.25)
+    expect(normalizeHoldSpeedSettings({ speed: 8 }).speed).toBe(4)
   })
 
-  it('migrates the legacy long-press Space speed without changing its enabled state', () => {
+  it('migrates legacy hold-speed settings and adds the preferred speed', () => {
     const normalized = normalizeSettings({
-      version: 2,
+      version: 9,
+      spaceHold: { enabled: false, speed: 2.35, showHint: false },
       speed: { min: 0.25, max: 3, step: 0.25, hold: 2.35 },
     })
 
-    expect(normalized.spaceHold).toEqual({ enabled: true, speed: 2.35, showHint: true })
+    expect(normalized.holdSpeed).toEqual({ enabled: false, speed: 2.35, showHint: false })
+    expect(normalized.speed.preferred).toBe(1.5)
+    expect(normalized).not.toHaveProperty('spaceHold')
+  })
+
+  it('disables the new preferred-speed binding when its default key is already assigned', () => {
+    const normalized = normalizeSettings({
+      version: 9,
+      bindings: {
+        ...DEFAULT_SETTINGS.bindings,
+        setPreferredSpeed: undefined,
+        fullscreen: {
+          enabled: true,
+          key: DEFAULT_SETTINGS.bindings.setPreferredSpeed.key,
+        },
+      },
+    })
+
+    expect(normalized.bindings.setPreferredSpeed).toEqual({
+      enabled: false,
+      key: DEFAULT_SETTINGS.bindings.setPreferredSpeed.key,
+    })
   })
 
   it('normalizes seek seconds into safe whole-second bounds', () => {

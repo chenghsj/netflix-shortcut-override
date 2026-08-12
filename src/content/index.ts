@@ -3,7 +3,6 @@ import {
   findVideo,
   getTargetDocument,
   interceptShortcutEvent,
-  isPlainSpaceEvent,
   isTypingTarget,
 } from '@/content/dom-utils'
 import { PipManager } from '@/content/pip/pip-manager'
@@ -47,15 +46,20 @@ const commandController = createShortcutCommandController(
   }
 )
 
-const clearSpaceHoldOnWindowBlur = () => {
-  commandController.clearSpaceInteraction()
+const clearHoldSpeedOnWindowBlur = () => {
+  commandController.clearHoldSpeedInteraction()
+}
+
+const clearHoldSpeedOnVisibilityChange = () => {
+  if (document.visibilityState === 'hidden') commandController.clearHoldSpeedInteraction()
 }
 
 const stopContentListeners = () => {
   window.removeEventListener('keydown', handleKeydown, true)
   window.removeEventListener('keyup', handleKeyup, true)
-  window.removeEventListener('blur', clearSpaceHoldOnWindowBlur)
-  commandController.clearSpaceInteraction()
+  window.removeEventListener('blur', clearHoldSpeedOnWindowBlur)
+  document.removeEventListener('visibilitychange', clearHoldSpeedOnVisibilityChange)
+  commandController.clearHoldSpeedInteraction()
   pipManager?.destroy()
 }
 
@@ -69,6 +73,11 @@ const handleKeydown = (event: KeyboardEvent, explicitTargetDoc?: Document) => {
   const targetDoc = explicitTargetDoc ?? getTargetDocument(event)
   if (isTypingTarget(targetDoc)) return
   if (!settings.enabled) return
+
+  if (event.repeat && commandController.shouldInterceptHoldSpeedRepeat(event.code)) {
+    interceptShortcutEvent(event)
+    return
+  }
 
   const action = findActionForKey(settings, event)
   const remappedNetflixNativeAction = findRemappedNetflixNativeActionForKey(settings, event)
@@ -89,32 +98,31 @@ const handleKeydown = (event: KeyboardEvent, explicitTargetDoc?: Document) => {
 
   if (!canHandlePlaybackShortcut(targetDoc)) return
 
-  const isSpaceInteraction = isPlainSpaceEvent(event) && (action === null || action === 'playPause')
-  if (isSpaceInteraction) {
+  if (action === 'playPause') {
     const video = findVideo(targetDoc)
     if (!video) return
 
     if (event.repeat) {
-      if (commandController.shouldInterceptSpaceRepeat()) interceptShortcutEvent(event)
+      interceptShortcutEvent(event)
       return
     }
 
-    const isPipSpace = pipManager?.isPipDocument(targetDoc) === true
-    const shouldTrackSpace = action === 'playPause' || isPipSpace || settings.spaceHold.enabled
-    if (!shouldTrackSpace) return
-    const handleShortPress = action === 'playPause' || isPipSpace
-    commandController.beginSpaceInteraction(
-      targetDoc,
-      video,
-      settings.spaceHold.enabled,
-      handleShortPress
-    )
-    if (handleShortPress) interceptShortcutEvent(event)
+    if (settings.holdSpeed.enabled) {
+      commandController.beginHoldSpeedInteraction(targetDoc, video, event.code)
+    } else {
+      commandController.execute('playPause', targetDoc)
+    }
+    interceptShortcutEvent(event)
     return
   }
 
   if (!action) {
     if (remappedNetflixNativeAction) interceptShortcutEvent(event)
+    return
+  }
+
+  if (action === 'setPreferredSpeed' && event.repeat) {
+    interceptShortcutEvent(event)
     return
   }
 
@@ -141,13 +149,11 @@ const handleKeyup = (event: KeyboardEvent) => {
   }
 
   if (!settingsLoaded || !settings.enabled) {
-    commandController.clearSpaceInteraction()
+    commandController.clearHoldSpeedInteraction()
     return
   }
 
-  if (!isPlainSpaceEvent(event)) return
-
-  if (commandController.completeSpaceInteraction()) interceptShortcutEvent(event)
+  if (commandController.completeHoldSpeedInteraction(event.code)) interceptShortcutEvent(event)
 }
 
 pipManager = new PipManager({
@@ -156,7 +162,7 @@ pipManager = new PipManager({
   commands: commandController,
   onKeydown: (event, targetDoc) => handleKeydown(event, targetDoc),
   onKeyup: event => handleKeyup(event),
-  onBlur: () => commandController.clearSpaceInteraction(),
+  onBlur: () => commandController.clearHoldSpeedInteraction(),
   onClick: (event, targetDoc) => {
     if (!settingsLoaded || !settings.enabled) return
     event.preventDefault()
@@ -238,4 +244,5 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
 
 window.addEventListener('keydown', handleKeydown, true)
 window.addEventListener('keyup', handleKeyup, true)
-window.addEventListener('blur', clearSpaceHoldOnWindowBlur)
+window.addEventListener('blur', clearHoldSpeedOnWindowBlur)
+document.addEventListener('visibilitychange', clearHoldSpeedOnVisibilityChange)

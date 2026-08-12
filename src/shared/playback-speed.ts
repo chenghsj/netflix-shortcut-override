@@ -3,10 +3,13 @@ import type { SpeedSettings } from './shortcut-types'
 
 const BASE_PLAYBACK_RATE = 1
 
+export const formatPlaybackRate = (rate: number): string =>
+  `${rate.toFixed(2).replace(/\.00$/, '').replace(/0$/, '')}x`
+
 export const resolveNextPlaybackRate = (
   currentRate: number,
   direction: -1 | 1,
-  speed: SpeedSettings
+  speed: Pick<SpeedSettings, 'min' | 'max' | 'step'>
 ): number => {
   const normalizedSpeed = normalizeSpeedSettings(speed)
   const safeCurrent = Number.isFinite(currentRate) && currentRate > 0 ? currentRate : 1

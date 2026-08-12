@@ -2,7 +2,7 @@
 
 Shortcut Override for Netflix does not collect, sell, share, or transfer user data.
 
-The extension only stores user preferences needed for its single purpose: customizing playback keyboard shortcuts in Netflix playback contexts. These preferences may include shortcut settings, enabled or disabled state, language and theme preferences, seek interval, Space-hold settings, playback speed settings, and Picture-in-Picture subtitle appearance settings.
+The extension only stores user preferences needed for its single purpose: customizing playback keyboard shortcuts in Netflix playback contexts. These preferences may include shortcut settings, enabled or disabled state, language and theme preferences, seek interval, hold-speed settings, playback speed settings, and Picture-in-Picture subtitle appearance settings.
 
 These settings are stored using browser sync storage (`chrome.storage.sync`) and are used only by the extension to provide its shortcut customization features.
 

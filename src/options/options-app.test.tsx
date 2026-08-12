@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { OptionsApp } from '@/options/options-app'
 import { EXTERNAL_LINKS } from '@/shared/external-links'
 import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
+import { createSettingsBackup, serializeSettingsBackup } from '@/shared/settings-backup'
 import { saveSettings } from '@/shared/storage'
 
 describe('OptionsApp', () => {
@@ -38,13 +39,13 @@ describe('OptionsApp', () => {
     expect(enabledInfo).toBeInTheDocument()
     fireEvent.focus(enabledInfo)
     expect(await screen.findByRole('tooltip')).toHaveTextContent(
-      'When off, extension shortcuts—including Space-hold speed—are disabled.'
+      'When off, all extension shortcuts are disabled.'
     )
     const pictureInPictureInfo = screen.getByRole('button', { name: 'Picture-in-Picture info' })
     expect(pictureInPictureInfo).toBeInTheDocument()
     fireEvent.focus(pictureInPictureInfo)
     expect(await screen.findByRole('tooltip')).toHaveTextContent(
-      'Picture-in-Picture is a separate window, so Netflix native shortcuts cannot run there. Space remains available through this extension; other disabled shortcuts are unavailable in Picture-in-Picture.'
+      'Picture-in-Picture is a separate window, so Netflix native shortcuts cannot run there. Only extension shortcuts enabled on this page can be used in Picture-in-Picture.'
     )
     expect(
       screen.queryByText('When disabled, every key is handled by Netflix, including Space-hold speed.')
@@ -54,37 +55,88 @@ describe('OptionsApp', () => {
     expect(screen.queryByText('Set how far the rewind and forward shortcuts move playback.')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Reset speed settings' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Reset seek settings' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Reset Space hold speed' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reset Play / Pause hold speed' })).toBeInTheDocument()
     const subtitleRow = screen.getByText('Toggle subtitles').closest('tr')
     expect(subtitleRow).not.toBeNull()
     expect(within(subtitleRow as HTMLElement).getByText('C')).toBeInTheDocument()
-    const stepInput = screen.getByLabelText('Speed change')
+    const stepInput = screen.getByLabelText('Speed adjustment amount')
+    const preferredInput = screen.getByLabelText('Preferred speed')
     const holdInput = screen.getByLabelText('Hold speed')
     const seekInput = screen.getByLabelText('Seconds per seek')
     expect(stepInput).toHaveAttribute('type', 'number')
     expect(stepInput).toHaveAttribute('step', '0.05')
     expect(stepInput).toHaveValue(0.25)
+    expect(preferredInput).toHaveValue(1.5)
     expect(holdInput).toHaveAttribute('min', '0.25')
     expect(holdInput).toHaveAttribute('step', '0.05')
     expect(holdInput).toHaveValue(2)
-    expect(screen.getByRole('switch', { name: 'Space hold speed: Enabled' })).toHaveAttribute(
+    const holdSpeedInfo = screen.getByRole('button', { name: 'Hold speed info' })
+    fireEvent.focus(holdSpeedInfo)
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      'Hold the configured Play / Pause shortcut to temporarily use this speed. Release it to restore the previous speed and playback state. Range 0.25x-4.0x.'
+    )
+    expect(screen.getByRole('switch', { name: 'Play / Pause hold speed: Enabled' })).toHaveAttribute(
       'aria-checked',
       'true'
     )
     expect(
-      screen.getByRole('switch', { name: 'Space hold speed: Show speed hint' })
+      screen.getByRole('switch', { name: 'Play / Pause hold speed: Show speed hint' })
     ).toHaveAttribute('aria-checked', 'true')
     expect(screen.queryByRole('button', { name: 'Enabled info' })).not.toBeInTheDocument()
     expect(seekInput).toHaveAttribute('min', '1')
     expect(seekInput).toHaveAttribute('max', '60')
     expect(seekInput).toHaveValue(10)
-    const speedCard = screen.getByText('Speed shortcuts').closest('[data-slot="card"]')
+    const speedCard = screen.getByText('Playback speed').closest('[data-slot="card"]')
     expect(speedCard).not.toBeNull()
     expect(within(speedCard as HTMLElement).queryByLabelText('Seconds per seek')).not.toBeInTheDocument()
     const seekCard = screen.getByText('Seek shortcuts').closest('[data-slot="card"]')
     expect(seekCard).not.toBeNull()
     expect(within(seekCard as HTMLElement).getByLabelText('Seconds per seek')).toBe(
       seekInput
+    )
+    const holdSpeedCard = screen
+      .getByText('Play / Pause hold speed')
+      .closest('[data-slot="card"]')
+    const backupCard = screen.getByText('Backup and restore').closest('[data-slot="card"]')
+    expect(holdSpeedCard).not.toBeNull()
+    expect(backupCard).not.toBeNull()
+    expect(backupCard?.parentElement).toBe(holdSpeedCard?.parentElement)
+    expect(holdSpeedCard?.compareDocumentPosition(backupCard as HTMLElement)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    )
+  })
+
+  it('shows which Netflix keys an enabled remapped shortcut replaces', async () => {
+    await saveSettings({
+      ...DEFAULT_SETTINGS,
+      bindings: {
+        ...DEFAULT_SETTINGS.bindings,
+        playPause: {
+          ...DEFAULT_SETTINGS.bindings.playPause,
+          key: { code: 'KeyX', key: 'x', ctrl: false, alt: false, shift: false, meta: false },
+        },
+        toggleSubtitles: {
+          ...DEFAULT_SETTINGS.bindings.toggleSubtitles,
+          key: { code: 'KeyV', key: 'v', ctrl: false, alt: false, shift: false, meta: false },
+        },
+      },
+    })
+    render(<OptionsApp />)
+
+    const playPauseRow = (await screen.findByText('Play / Pause (hold for speed)')).closest('tr')
+    const subtitleRow = screen.getByText('Toggle subtitles').closest('tr')
+    expect(playPauseRow).not.toBeNull()
+    expect(subtitleRow).not.toBeNull()
+    expect(
+      within(playPauseRow as HTMLElement).getByText('Replaces Netflix: Space')
+    ).toBeInTheDocument()
+    expect(
+      within(subtitleRow as HTMLElement).getByText('Replaces Netflix: C')
+    ).toBeInTheDocument()
+
+    fireEvent.click(within(playPauseRow as HTMLElement).getByRole('button', { name: 'Edit' }))
+    expect(screen.getByRole('dialog')).toHaveTextContent(
+      'Saving will disable the Netflix keys: Space'
     )
   })
 
@@ -126,14 +178,41 @@ describe('OptionsApp', () => {
   it('persists step changes using 0.05 increments', async () => {
     render(<OptionsApp />)
 
-    const stepInput = await screen.findByLabelText('Speed change')
+    const stepInput = await screen.findByLabelText('Speed adjustment amount')
     fireEvent.change(stepInput, { target: { value: '0.35' } })
     fireEvent.blur(stepInput)
 
     await waitFor(() => expect(stepInput).toHaveValue(0.35))
   })
 
-  it('persists long-press Space speed changes', async () => {
+  it('persists preferred speed independently from the step range', async () => {
+    render(<OptionsApp />)
+
+    const preferredInput = await screen.findByLabelText('Preferred speed')
+    fireEvent.change(preferredInput, { target: { value: '3.35' } })
+    fireEvent.blur(preferredInput)
+
+    await waitFor(() => expect(preferredInput).toHaveValue(3.35))
+  })
+
+  it('restores and clamps preferred-speed input values', async () => {
+    render(<OptionsApp />)
+
+    const preferredInput = await screen.findByLabelText('Preferred speed')
+    fireEvent.change(preferredInput, { target: { value: '' } })
+    fireEvent.blur(preferredInput)
+    await waitFor(() => expect(preferredInput).toHaveValue(1.5))
+
+    fireEvent.change(preferredInput, { target: { value: '8' } })
+    fireEvent.blur(preferredInput)
+    await waitFor(() => expect(preferredInput).toHaveValue(4))
+
+    fireEvent.change(preferredInput, { target: { value: '0.1' } })
+    fireEvent.blur(preferredInput)
+    await waitFor(() => expect(preferredInput).toHaveValue(0.25))
+  })
+
+  it('persists long-press play/pause speed changes', async () => {
     render(<OptionsApp />)
 
     const holdInput = await screen.findByLabelText('Hold speed')
@@ -165,11 +244,11 @@ describe('OptionsApp', () => {
     })
   })
 
-  it('persists the Space hold rate hint setting', async () => {
+  it('persists the hold-speed hint setting', async () => {
     render(<OptionsApp />)
 
     const hintSwitch = await screen.findByRole('switch', {
-      name: 'Space hold speed: Show speed hint',
+      name: 'Play / Pause hold speed: Show speed hint',
     })
     fireEvent.click(hintSwitch)
 
@@ -222,9 +301,60 @@ describe('OptionsApp', () => {
         'aria-checked',
         'false'
       )
-      expect(screen.getByLabelText('每次調整倍速')).toHaveValue(0.5)
+      expect(screen.getByLabelText('倍速調整幅度')).toHaveValue(0.5)
       expect(screen.getByLabelText('每次跳轉秒數')).toHaveValue(20)
     })
+  })
+
+  it('imports a complete backup and synchronizes all form drafts', async () => {
+    render(<OptionsApp />)
+    const importedSettings = {
+      ...DEFAULT_SETTINGS,
+      enabled: false,
+      locale: 'zh-TW' as const,
+      theme: 'dark' as const,
+      speed: {
+        min: 0.5,
+        max: 4,
+        step: 0.5,
+        preferred: 2.5,
+      },
+      holdSpeed: { enabled: true, speed: 3, showHint: false },
+      seek: { seconds: 20 },
+      bindings: {
+        ...DEFAULT_SETTINGS.bindings,
+        mute: { ...DEFAULT_SETTINGS.bindings.mute, enabled: false },
+      },
+    }
+    const backup = createSettingsBackup(importedSettings, {
+      extensionVersion: '0.5.1',
+      exportedAt: new Date('2026-08-12T03:04:05.000Z'),
+    })
+    const input = await screen.findByLabelText('Import settings')
+
+    fireEvent.change(input, {
+      target: {
+        files: [new File([serializeSettingsBackup(backup)], 'settings.json')],
+      },
+    })
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Replace settings' }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent('設定已成功匯入。')
+    expect(screen.getByRole('combobox', { name: '語言' })).toHaveTextContent('繁中')
+    expect(screen.getByRole('combobox', { name: '主題' })).toHaveTextContent('深色')
+    expect(screen.getByRole('switch', { name: '啟用快捷鍵覆寫' })).toHaveAttribute(
+      'aria-checked',
+      'false'
+    )
+    expect(screen.getByLabelText('常用倍速')).toHaveValue(2.5)
+    expect(screen.getByLabelText('倍速調整幅度')).toHaveValue(0.5)
+    expect(screen.getByLabelText('每次跳轉秒數')).toHaveValue(20)
+    expect(screen.getByLabelText('長按倍速')).toHaveValue(3)
+    expect(screen.getByRole('switch', { name: '靜音 啟用' })).toHaveAttribute(
+      'aria-checked',
+      'false'
+    )
   })
 
   it('allows speed number inputs to be cleared before entering a new value', async () => {
@@ -263,24 +393,25 @@ describe('OptionsApp', () => {
       name: 'Enable shortcut override',
     })
     const playPauseSwitch = screen.getByRole('switch', {
-      name: 'Play / Pause Enabled',
+      name: 'Play / Pause (hold for speed) Enabled',
     })
-    const stepInput = screen.getByLabelText('Speed change')
+    const stepInput = screen.getByLabelText('Speed adjustment amount')
     const holdInput = screen.getByLabelText('Hold speed')
     const seekInput = screen.getByLabelText('Seconds per seek')
 
     fireEvent.click(globalSwitch)
-    fireEvent.click(playPauseSwitch)
     fireEvent.change(stepInput, { target: { value: '0.35' } })
     fireEvent.blur(stepInput)
     fireEvent.change(holdInput, { target: { value: '2.5' } })
     fireEvent.blur(holdInput)
     fireEvent.change(seekInput, { target: { value: '15' } })
     fireEvent.blur(seekInput)
+    fireEvent.click(playPauseSwitch)
 
     await waitFor(() => {
       expect(globalSwitch).toHaveAttribute('aria-checked', 'false')
       expect(playPauseSwitch).toHaveAttribute('aria-checked', 'false')
+      expect(holdInput).toBeDisabled()
       expect(stepInput).toHaveValue(0.35)
       expect(holdInput).toHaveValue(2.5)
       expect(seekInput).toHaveValue(15)
@@ -290,6 +421,7 @@ describe('OptionsApp', () => {
 
     await waitFor(() => {
       expect(playPauseSwitch).toHaveAttribute('aria-checked', 'true')
+      expect(holdInput).not.toBeDisabled()
       expect(globalSwitch).toHaveAttribute('aria-checked', 'false')
       expect(stepInput).toHaveValue(0.35)
       expect(holdInput).toHaveValue(2.5)
@@ -297,12 +429,13 @@ describe('OptionsApp', () => {
     })
   })
 
-  it('resets speed, seek, and Space hold settings independently', async () => {
+  it('resets speed, seek, and hold-speed settings independently', async () => {
     render(<OptionsApp />)
 
     const minInput = await screen.findByLabelText('Lowest speed')
     const maxInput = screen.getByLabelText('Highest speed')
-    const stepInput = screen.getByLabelText('Speed change')
+    const stepInput = screen.getByLabelText('Speed adjustment amount')
+    const preferredInput = screen.getByLabelText('Preferred speed')
     const holdInput = screen.getByLabelText('Hold speed')
     const seekInput = screen.getByLabelText('Seconds per seek')
 
@@ -312,6 +445,8 @@ describe('OptionsApp', () => {
     fireEvent.blur(maxInput)
     fireEvent.change(stepInput, { target: { value: '0.5' } })
     fireEvent.blur(stepInput)
+    fireEvent.change(preferredInput, { target: { value: '2.5' } })
+    fireEvent.blur(preferredInput)
     fireEvent.change(holdInput, { target: { value: '3' } })
     fireEvent.blur(holdInput)
     fireEvent.change(seekInput, { target: { value: '20' } })
@@ -321,6 +456,7 @@ describe('OptionsApp', () => {
       expect(minInput).toHaveValue(0.5)
       expect(maxInput).toHaveValue(4)
       expect(stepInput).toHaveValue(0.5)
+      expect(preferredInput).toHaveValue(2.5)
       expect(holdInput).toHaveValue(3)
       expect(seekInput).toHaveValue(20)
     })
@@ -331,6 +467,7 @@ describe('OptionsApp', () => {
       expect(minInput).toHaveValue(0.25)
       expect(maxInput).toHaveValue(3)
       expect(stepInput).toHaveValue(0.25)
+      expect(preferredInput).toHaveValue(1.5)
       expect(holdInput).toHaveValue(3)
       expect(seekInput).toHaveValue(20)
     })
@@ -341,7 +478,7 @@ describe('OptionsApp', () => {
       expect(seekInput).toHaveValue(10)
     })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Reset Space hold speed' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Reset Play / Pause hold speed' }))
 
     await waitFor(() => {
       expect(holdInput).toHaveValue(2)
@@ -374,7 +511,11 @@ describe('OptionsApp', () => {
 
     expect(within(dialog).getByTitle('Q')).toBeInTheDocument()
 
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Restore Play / Pause' }))
+    fireEvent.click(
+      within(dialog).getByRole('button', {
+        name: 'Restore Play / Pause (hold for speed)',
+      })
+    )
 
     expect(within(dialog).getByTitle('P')).toBeInTheDocument()
 

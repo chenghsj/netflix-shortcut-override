@@ -311,7 +311,7 @@ describe('HintManager', () => {
     iframe.remove()
   })
 
-  it('renders the PiP space-hold hint below mirrored subtitles', () => {
+  it('renders the PiP hold-speed hint below mirrored subtitles', () => {
     const iframe = document.createElement('iframe')
     document.body.append(iframe)
     const pipDoc = iframe.contentDocument
@@ -321,9 +321,9 @@ describe('HintManager', () => {
     pipDoc.body.append(pipDoc.createElement('video'))
 
     const manager = getHintManager(pipDoc)
-    manager.show({ type: 'spaceHold', label: '2x' })
+    manager.show({ type: 'holdSpeed', label: '2x' })
 
-    const hint = pipDoc.getElementById('shortcut-override-space-hold-hint')
+    const hint = pipDoc.getElementById('shortcut-override-hold-speed-hint')
     const icon = hint?.lastElementChild as HTMLElement | null
     expect(hint?.style.zIndex).toBe('9')
     expect(hint?.style.minHeight).toBe('32px')
@@ -414,10 +414,10 @@ describe('HintManager', () => {
     iframe.remove()
   })
 
-  it('keeps a space-hold hint visible until explicitly hidden', () => {
+  it('keeps a hold-speed hint visible until explicitly hidden', () => {
     const manager = getHintManager(document)
-    manager.show({ type: 'spaceHold', label: '2x' })
-    const hint = document.getElementById('shortcut-override-space-hold-hint')
+    manager.show({ type: 'holdSpeed', label: '2x' })
+    const hint = document.getElementById('shortcut-override-hold-speed-hint')
 
     expect(hint?.style.opacity).toBe('1')
     expect(hint?.style.minHeight).toBe('32px')
@@ -427,7 +427,20 @@ describe('HintManager', () => {
     manager.hide()
 
     expect(hint?.style.opacity).toBe('0')
-    expect(document.getElementById('shortcut-override-space-hold-hint')).toBeNull()
+    expect(document.getElementById('shortcut-override-hold-speed-hint')).toBeNull()
+  })
+
+  it('hides hold-speed feedback without removing an active seek hint', () => {
+    const manager = getHintManager(document)
+    manager.show({ type: 'holdSpeed', label: '2x' })
+    manager.show({ type: 'seek', direction: 1, seconds: 10 })
+    const seekHint = document.getElementById('shortcut-override-seek-hint')
+
+    manager.hideHoldSpeed()
+
+    expect(document.getElementById('shortcut-override-hold-speed-hint')).toBeNull()
+    expect(document.getElementById('shortcut-override-seek-hint')).toBe(seekHint)
+    expect(seekHint?.style.opacity).toBe('1')
   })
 
   it('keeps seek hints inside the configured edge inset', () => {

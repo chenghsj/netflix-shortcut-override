@@ -20,10 +20,10 @@ import {
   SEEK_HINT_EXIT_TRANSITION,
   SEEK_HINT_ID,
   SEEK_HINT_OUTER_TRANSFORM,
-  SPACE_HOLD_HINT_ENTER_TRANSITION,
-  SPACE_HOLD_HINT_HIDDEN_TRANSFORM,
-  SPACE_HOLD_HINT_ID,
-  SPACE_HOLD_HINT_VISIBLE_TRANSFORM,
+  HOLD_SPEED_HINT_ENTER_TRANSITION,
+  HOLD_SPEED_HINT_HIDDEN_TRANSFORM,
+  HOLD_SPEED_HINT_ID,
+  HOLD_SPEED_HINT_VISIBLE_TRANSFORM,
   SPEED_HINT_ID,
   SPEED_HINT_LABEL_ID,
   TRANSIENT_HINT_VISIBLE_DURATION_MS,
@@ -47,7 +47,7 @@ import {
   positionCenteredHint,
   positionLabeledHintLabel,
   positionSeekHint,
-  positionSpaceHoldHint,
+  positionHoldSpeedHint,
   setStyles,
   type StyleMap,
 } from './hint-layout'
@@ -496,15 +496,15 @@ export const renderSeekHint = (
   return nextSeries
 }
 
-export const renderSpaceHoldHint = (
+export const renderHoldSpeedHint = (
   context: HintRendererContext,
-  request: Extract<HintRequest, { type: 'spaceHold' }>
+  request: Extract<HintRequest, { type: 'holdSpeed' }>
 ): void => {
-  const root = context.createRoot(SPACE_HOLD_HINT_ID, {
+  const root = context.createRoot(HOLD_SPEED_HINT_ID, {
     position: 'fixed',
     top: '0',
     left: '0',
-    transform: getTransform(context, SPACE_HOLD_HINT_HIDDEN_TRANSFORM),
+    transform: getTransform(context, HOLD_SPEED_HINT_HIDDEN_TRANSFORM),
     transformOrigin: 'top center',
     display: 'flex',
     alignItems: 'center',
@@ -524,7 +524,7 @@ export const renderSpaceHoldHint = (
     pointerEvents: 'none',
     zIndex: context.responsive ? '9' : '2147483647',
     opacity: '0',
-    transition: SPACE_HOLD_HINT_ENTER_TRANSITION,
+    transition: HOLD_SPEED_HINT_ENTER_TRANSITION,
     willChange: 'opacity,transform',
   })
   const label = context.renderDoc.createElement('span')
@@ -539,11 +539,11 @@ export const renderSpaceHoldHint = (
     transformOrigin: 'center',
   })
   root.replaceChildren(label, icon)
-  positionSpaceHoldHint(root, context.renderDoc)
+  positionHoldSpeedHint(root, context.renderDoc)
   root.style.visibility = 'visible'
   root.style.opacity = '0'
-  root.style.transform = getTransform(context, SPACE_HOLD_HINT_HIDDEN_TRANSFORM)
+  root.style.transform = getTransform(context, HOLD_SPEED_HINT_HIDDEN_TRANSFORM)
   void root.offsetWidth
   root.style.opacity = HINT_VISIBLE_OPACITY
-  root.style.transform = getTransform(context, SPACE_HOLD_HINT_VISIBLE_TRANSFORM)
+  root.style.transform = getTransform(context, HOLD_SPEED_HINT_VISIBLE_TRANSFORM)
 }

@@ -1,12 +1,34 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
 import { saveSettings } from '@/shared/storage'
 
 import { setupContentIndexTests } from './content-script.test-support'
 
-describe('content Space shortcuts', () => {
+describe('content Play / Pause hold shortcuts', () => {
   setupContentIndexTests()
+
+  beforeEach(() => {
+    vi.mocked(chrome.runtime.sendMessage).mockImplementation((message, callback) => {
+      const apiMessage = message as { action?: unknown }
+      const action =
+        typeof apiMessage.action === 'string'
+          ? apiMessage.action
+          : 'diagnose'
+      if (typeof callback === 'function') {
+        callback({
+          success: true,
+          result: {
+            action,
+            playerApiFound: true,
+            playerFound: true,
+            seekCalled: false,
+            sessionIds: ['session-id'],
+          },
+        })
+      }
+    })
+  })
 
   it('returns short Space presses to Netflix when play/pause is disabled, even if hold speed is enabled', async () => {
     vi.useFakeTimers()
@@ -53,7 +75,7 @@ describe('content Space shortcuts', () => {
     expect(nativeKeyupHandler).toHaveBeenCalledOnce()
     expect(video.playbackRate).toBe(1)
     expect(document.getElementById('shortcut-override-playback-hint')).toBeNull()
-    expect(document.getElementById('shortcut-override-space-hold-hint')).toBeNull()
+    expect(document.getElementById('shortcut-override-hold-speed-hint')).toBeNull()
     expect(chrome.runtime.sendMessage).not.toHaveBeenCalled()
   })
 
@@ -100,10 +122,10 @@ describe('content Space shortcuts', () => {
     expect(document.getElementById('shortcut-override-playback-hint')).toBeNull()
   })
 
-  it('does not track or intercept Space when both native play/pause and Space hold are enabled off', async () => {
+  it('does not track or intercept Space when play/pause and hold speed are disabled', async () => {
     await saveSettings({
       ...DEFAULT_SETTINGS,
-      spaceHold: { ...DEFAULT_SETTINGS.spaceHold, enabled: false },
+      holdSpeed: { ...DEFAULT_SETTINGS.holdSpeed, enabled: false },
       bindings: {
         ...DEFAULT_SETTINGS.bindings,
         playPause: {
@@ -154,7 +176,7 @@ describe('content Space shortcuts', () => {
     expect(chrome.runtime.sendMessage).not.toHaveBeenCalled()
   })
 
-  it('keeps long-press Space speed active when play/pause is disabled', async () => {
+  it('does not activate hold speed when play/pause is disabled', async () => {
     vi.useFakeTimers()
     await saveSettings({
       ...DEFAULT_SETTINGS,
@@ -169,48 +191,21 @@ describe('content Space shortcuts', () => {
     await Promise.resolve()
 
     const video = document.createElement('video')
-    let paused = false
-    const pause = vi.fn(() => {
-      paused = true
-    })
-    const play = vi.fn(() => {
-      paused = false
-      return Promise.resolve()
-    })
-    Object.defineProperty(video, 'paused', { configurable: true, get: () => paused })
-    Object.defineProperty(video, 'pause', { value: pause, configurable: true })
-    Object.defineProperty(video, 'play', { value: play, configurable: true })
     video.playbackRate = 1
     document.body.append(video)
-    const nativeKeyHandler = vi.fn(() => {
-      if (paused) void play()
-      else pause()
-    })
+    const nativeKeyHandler = vi.fn()
     const nativeKeyupHandler = vi.fn()
     window.addEventListener('keydown', nativeKeyHandler, true)
     window.addEventListener('keyup', nativeKeyupHandler, true)
 
-    window.dispatchEvent(
-      new KeyboardEvent('keydown', {
-        code: 'Space',
-        key: ' ',
-        bubbles: true,
-        cancelable: true,
-      })
-    )
-    vi.advanceTimersByTime(250)
-
-    expect(video.playbackRate).toBe(2)
-    expect(document.getElementById('shortcut-override-space-hold-hint')).not.toBeNull()
-
-    const repeatedKeydown = new KeyboardEvent('keydown', {
+    const keydown = new KeyboardEvent('keydown', {
       code: 'Space',
       key: ' ',
-      repeat: true,
       bubbles: true,
       cancelable: true,
     })
-    window.dispatchEvent(repeatedKeydown)
+    window.dispatchEvent(keydown)
+    await vi.advanceTimersByTimeAsync(250)
 
     const keyup = new KeyboardEvent('keyup', {
       code: 'Space',
@@ -218,18 +213,14 @@ describe('content Space shortcuts', () => {
       bubbles: true,
       cancelable: true,
     })
-    expect(repeatedKeydown.defaultPrevented).toBe(true)
-    expect(nativeKeyHandler).toHaveBeenCalledOnce()
-
     window.dispatchEvent(keyup)
 
     expect(video.playbackRate).toBe(1)
-    expect(keyup.defaultPrevented).toBe(true)
+    expect(keydown.defaultPrevented).toBe(false)
+    expect(keyup.defaultPrevented).toBe(false)
     expect(nativeKeyHandler).toHaveBeenCalledOnce()
-    expect(nativeKeyupHandler).not.toHaveBeenCalled()
-    expect(play).toHaveBeenCalledOnce()
-    expect(pause).toHaveBeenCalledOnce()
-    expect(paused).toBe(false)
+    expect(nativeKeyupHandler).toHaveBeenCalledOnce()
+    expect(document.getElementById('shortcut-override-hold-speed-hint')).toBeNull()
     window.removeEventListener('keydown', nativeKeyHandler, true)
     window.removeEventListener('keyup', nativeKeyupHandler, true)
   })
@@ -290,7 +281,7 @@ describe('content Space shortcuts', () => {
     expect(playbackHint?.style.opacity).toBe('0')
   })
 
-  it('keeps long-press Space speed independent from the play/pause binding', async () => {
+  it('moves hold speed with the configured play/pause binding', async () => {
     vi.useFakeTimers()
     await saveSettings({
       ...DEFAULT_SETTINGS,
@@ -301,7 +292,8 @@ describe('content Space shortcuts', () => {
           key: {
             ...DEFAULT_SETTINGS.bindings.playPause.key,
             code: 'KeyX',
-            key: 'x',
+            key: 'X',
+            shift: true,
           },
         },
       },
@@ -313,23 +305,37 @@ describe('content Space shortcuts', () => {
     video.playbackRate = 1
     document.body.append(video)
 
-    const keydown = new KeyboardEvent('keydown', {
+    const oldKeydown = new KeyboardEvent('keydown', {
       code: 'Space',
       key: ' ',
       bubbles: true,
       cancelable: true,
     })
-    window.dispatchEvent(keydown)
-    vi.advanceTimersByTime(250)
+    window.dispatchEvent(oldKeydown)
+    await vi.advanceTimersByTimeAsync(250)
 
-    expect(keydown.defaultPrevented).toBe(false)
+    expect(oldKeydown.defaultPrevented).toBe(true)
+    expect(video.playbackRate).toBe(1)
+
+    const keydown = new KeyboardEvent('keydown', {
+      code: 'KeyX',
+      key: 'X',
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    })
+    window.dispatchEvent(keydown)
+    await vi.advanceTimersByTimeAsync(250)
+
+    expect(keydown.defaultPrevented).toBe(true)
     expect(video.playbackRate).toBe(2)
-    expect(document.getElementById('shortcut-override-space-hold-hint')).not.toBeNull()
+    expect(document.getElementById('shortcut-override-hold-speed-hint')).not.toBeNull()
 
     window.dispatchEvent(
       new KeyboardEvent('keyup', {
-        code: 'Space',
-        key: ' ',
+        code: 'KeyX',
+        key: 'x',
+        shiftKey: false,
         bubbles: true,
         cancelable: true,
       })
@@ -337,4 +343,199 @@ describe('content Space shortcuts', () => {
 
     expect(video.playbackRate).toBe(1)
   })
+
+  it('keeps modifier-release repeats inside the active hold interaction', async () => {
+    vi.useFakeTimers()
+    await saveSettings({
+      ...DEFAULT_SETTINGS,
+      bindings: {
+        ...DEFAULT_SETTINGS.bindings,
+        playPause: {
+          ...DEFAULT_SETTINGS.bindings.playPause,
+          key: {
+            code: 'ArrowRight',
+            key: 'ArrowRight',
+            ctrl: false,
+            alt: false,
+            shift: true,
+            meta: false,
+          },
+        },
+      },
+    })
+    await Promise.resolve()
+
+    const video = document.createElement('video')
+    Object.defineProperty(video, 'paused', { value: false, configurable: true })
+    video.playbackRate = 1
+    document.body.append(video)
+
+    window.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        code: 'ArrowRight',
+        key: 'ArrowRight',
+        shiftKey: true,
+        bubbles: true,
+        cancelable: true,
+      })
+    )
+    await vi.advanceTimersByTimeAsync(250)
+    expect(video.playbackRate).toBe(2)
+    vi.mocked(chrome.runtime.sendMessage).mockClear()
+
+    window.dispatchEvent(
+      new KeyboardEvent('keyup', {
+        code: 'ShiftLeft',
+        key: 'Shift',
+        bubbles: true,
+        cancelable: true,
+      })
+    )
+    const repeatedKeydown = new KeyboardEvent('keydown', {
+      code: 'ArrowRight',
+      key: 'ArrowRight',
+      repeat: true,
+      bubbles: true,
+      cancelable: true,
+    })
+    window.dispatchEvent(repeatedKeydown)
+
+    expect(repeatedKeydown.defaultPrevented).toBe(true)
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalled()
+    expect(video.playbackRate).toBe(2)
+
+    window.dispatchEvent(
+      new KeyboardEvent('keyup', {
+        code: 'ArrowRight',
+        key: 'ArrowRight',
+        bubbles: true,
+        cancelable: true,
+      })
+    )
+    expect(video.playbackRate).toBe(1)
+  })
+
+  it('restores hold speed when the playback document becomes hidden', async () => {
+    vi.useFakeTimers()
+    const video = document.createElement('video')
+    Object.defineProperty(video, 'paused', { value: false, configurable: true })
+    video.playbackRate = 1
+    document.body.append(video)
+
+    window.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        code: 'Space',
+        key: ' ',
+        bubbles: true,
+        cancelable: true,
+      })
+    )
+    await vi.advanceTimersByTimeAsync(250)
+    expect(video.playbackRate).toBe(2)
+
+    const visibilityState = vi
+      .spyOn(document, 'visibilityState', 'get')
+      .mockReturnValue('hidden')
+    document.dispatchEvent(new Event('visibilitychange'))
+
+    expect(video.playbackRate).toBe(1)
+    expect(document.getElementById('shortcut-override-hold-speed-hint')).toBeNull()
+    visibilityState.mockRestore()
+  })
+
+  it('ends hold speed when reset speed is pressed and keeps 1x after release', async () => {
+    vi.useFakeTimers()
+    const video = document.createElement('video')
+    Object.defineProperty(video, 'paused', { value: false, configurable: true })
+    video.playbackRate = 1.5
+    document.body.append(video)
+
+    window.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        code: 'Space',
+        key: ' ',
+        bubbles: true,
+        cancelable: true,
+      })
+    )
+    await vi.advanceTimersByTimeAsync(250)
+    expect(video.playbackRate).toBe(2)
+    expect(document.getElementById('shortcut-override-hold-speed-hint')).not.toBeNull()
+
+    const resetKeydown = new KeyboardEvent('keydown', {
+      code: 'Slash',
+      key: '?',
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    })
+    window.dispatchEvent(resetKeydown)
+
+    expect(resetKeydown.defaultPrevented).toBe(true)
+    expect(video.playbackRate).toBe(1)
+    expect(document.getElementById('shortcut-override-hold-speed-hint')).toBeNull()
+    expect(document.getElementById('shortcut-override-speed-hint')).toHaveTextContent('1x')
+
+    const playPauseKeyup = new KeyboardEvent('keyup', {
+      code: 'Space',
+      key: ' ',
+      bubbles: true,
+      cancelable: true,
+    })
+    window.dispatchEvent(playPauseKeyup)
+
+    expect(playPauseKeyup.defaultPrevented).toBe(true)
+    expect(video.playbackRate).toBe(1)
+    expect(document.getElementById('shortcut-override-playback-hint')).toBeNull()
+  })
+
+  it.each([
+    ['increase', 'Period', '>', 1.75],
+    ['decrease', 'Comma', '<', 1.25],
+    ['preferred', 'Quote', '"', 1.5],
+  ] as const)(
+    'ends hold speed when speed %s is pressed and keeps the new rate after release',
+    async (_direction, code, key, expectedRate) => {
+      vi.useFakeTimers()
+      const video = document.createElement('video')
+      Object.defineProperty(video, 'paused', { value: false, configurable: true })
+      video.playbackRate = 1.5
+      document.body.append(video)
+
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          code: 'Space',
+          key: ' ',
+          bubbles: true,
+          cancelable: true,
+        })
+      )
+      await vi.advanceTimersByTimeAsync(250)
+      expect(video.playbackRate).toBe(2)
+
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          code,
+          key,
+          shiftKey: true,
+          bubbles: true,
+          cancelable: true,
+        })
+      )
+
+      expect(video.playbackRate).toBe(expectedRate)
+      expect(document.getElementById('shortcut-override-hold-speed-hint')).toBeNull()
+
+      const playPauseKeyup = new KeyboardEvent('keyup', {
+        code: 'Space',
+        key: ' ',
+        bubbles: true,
+        cancelable: true,
+      })
+      window.dispatchEvent(playPauseKeyup)
+
+      expect(playPauseKeyup.defaultPrevented).toBe(true)
+      expect(video.playbackRate).toBe(expectedRate)
+    }
+  )
 })

@@ -11,6 +11,7 @@ export const SHORTCUT_ACTIONS = [
   'skipIntro',
   'speedUp',
   'speedDown',
+  'setPreferredSpeed',
   'speedReset',
 ] as const
 
@@ -52,9 +53,10 @@ export type SpeedSettings = {
   min: number
   max: number
   step: number
+  preferred: number
 }
 
-export type SpaceHoldSettings = {
+export type HoldSpeedSettings = {
   enabled: boolean
   speed: number
   showHint: boolean
@@ -82,7 +84,7 @@ export type ShortcutSettings = {
   locale: LocalePreference
   theme: ThemeMode
   speed: SpeedSettings
-  spaceHold: SpaceHoldSettings
+  holdSpeed: HoldSpeedSettings
   seek: SeekSettings
   pip: PipSettings
   bindings: Record<ShortcutAction, ShortcutBinding>

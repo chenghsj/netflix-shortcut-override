@@ -93,7 +93,7 @@ export const positionLabeledHintLabel = (element: HTMLElement): void => {
   element.style.top = '10%'
 }
 
-export const positionSpaceHoldHint = (element: HTMLElement, renderDoc: Document): void => {
+export const positionHoldSpeedHint = (element: HTMLElement, renderDoc: Document): void => {
   const anchorRect = getHintAnchor(renderDoc)?.getBoundingClientRect()
   const video = renderDoc.querySelector('video')
   const videoRect = video?.getBoundingClientRect() ?? null

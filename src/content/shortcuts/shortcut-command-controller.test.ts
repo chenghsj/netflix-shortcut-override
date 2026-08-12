@@ -17,7 +17,7 @@ describe('ShortcutCommandController', () => {
     vi.useRealTimers()
   })
 
-  it('routes keyboard, Space-hold, and PiP commands through one playback session', async () => {
+  it('routes keyboard, hold-speed, and PiP commands through one playback session', async () => {
     vi.useFakeTimers()
     const transport = vi.fn().mockResolvedValue({
       success: true,
@@ -37,9 +37,9 @@ describe('ShortcutCommandController', () => {
     document.body.append(video)
 
     controller.execute('seekForward', document)
-    controller.beginSpaceInteraction(document, video, true)
+    controller.beginHoldSpeedInteraction(document, video, 'Space')
     vi.advanceTimersByTime(250)
-    controller.completeSpaceInteraction()
+    controller.completeHoldSpeedInteraction('Space')
 
     const videoArea = document.createElement('div')
     document.body.append(videoArea)
@@ -121,6 +121,21 @@ describe('ShortcutCommandController', () => {
     )
     expect(document.querySelector('[data-hint-icon="speed-up"]')).toBeNull()
     expect(document.querySelector('[data-hint-icon="speed-down"]')).toBeNull()
+  })
+
+  it('sets the configured preferred speed without toggling', () => {
+    const video = document.createElement('video')
+    video.playbackRate = 0.75
+    document.body.append(video)
+    const controller = createShortcutCommandController(() => DEFAULT_SETTINGS)
+
+    expect(controller.execute('setPreferredSpeed', document)).toBe(true)
+    expect(video.playbackRate).toBe(1.5)
+    expect(document.getElementById('shortcut-override-speed-hint')).toHaveTextContent('1.5x')
+    expect(document.querySelector('[data-hint-icon="speed-up"]')).toBeInTheDocument()
+
+    expect(controller.execute('setPreferredSpeed', document)).toBe(true)
+    expect(video.playbackRate).toBe(1.5)
   })
 
   it('toggles Netflix subtitles and shows the shared icon in the standard circular hint', async () => {
@@ -215,29 +230,53 @@ describe('ShortcutCommandController', () => {
     })
   })
 
-  it('restores the playback rate and hides the hold hint on completion', () => {
+  it('restores the playback rate and hides the hold hint on completion', async () => {
     vi.useFakeTimers()
     const video = document.createElement('video')
     Object.defineProperty(video, 'paused', { value: false, configurable: true })
     video.playbackRate = 1
     document.body.append(video)
-    const controller = createShortcutCommandController(() => DEFAULT_SETTINGS)
+    const controller = createShortcutCommandController(
+      () => DEFAULT_SETTINGS,
+      createNetflixPlaybackSession(vi.fn().mockResolvedValue({ success: true }))
+    )
 
-    controller.beginSpaceInteraction(document, video, true)
-    expect(controller.shouldInterceptSpaceRepeat()).toBe(true)
+    controller.beginHoldSpeedInteraction(document, video, 'Space')
+    expect(controller.shouldInterceptHoldSpeedRepeat('Space')).toBe(true)
+    await vi.advanceTimersByTimeAsync(250)
+
+    expect(video.playbackRate).toBe(2)
+    expect(document.getElementById('shortcut-override-hold-speed-hint')).not.toBeNull()
+
+    expect(controller.completeHoldSpeedInteraction('Space')).toBe(true)
+
+    expect(video.playbackRate).toBe(1)
+    expect(controller.shouldInterceptHoldSpeedRepeat('Space')).toBe(false)
+    expect(document.getElementById('shortcut-override-hold-speed-hint')).toBeNull()
+  })
+
+  it('shows the hold hint while Netflix confirmation is still pending', () => {
+    vi.useFakeTimers()
+    const transport = vi.fn(() => new Promise<NetflixApiResponse>(() => undefined))
+    const video = document.createElement('video')
+    Object.defineProperty(video, 'paused', { value: false, configurable: true })
+    video.playbackRate = 1
+    document.body.append(video)
+    const controller = createShortcutCommandController(
+      () => DEFAULT_SETTINGS,
+      createNetflixPlaybackSession(transport)
+    )
+
+    controller.beginHoldSpeedInteraction(document, video, 'Space')
     vi.advanceTimersByTime(250)
 
     expect(video.playbackRate).toBe(2)
-    expect(document.getElementById('shortcut-override-space-hold-hint')).not.toBeNull()
+    expect(document.getElementById('shortcut-override-hold-speed-hint')).toHaveTextContent('2x')
 
-    expect(controller.completeSpaceInteraction()).toBe(true)
-
-    expect(video.playbackRate).toBe(1)
-    expect(controller.shouldInterceptSpaceRepeat()).toBe(false)
-    expect(document.getElementById('shortcut-override-space-hold-hint')).toBeNull()
+    controller.completeHoldSpeedInteraction('Space')
   })
 
-  it('does not show the Space hold rate hint when it is disabled', () => {
+  it('does not show the hold-speed rate hint when it is disabled', () => {
     vi.useFakeTimers()
     const video = document.createElement('video')
     Object.defineProperty(video, 'paused', { value: false, configurable: true })
@@ -245,46 +284,75 @@ describe('ShortcutCommandController', () => {
     document.body.append(video)
     const settings = {
       ...DEFAULT_SETTINGS,
-      spaceHold: { ...DEFAULT_SETTINGS.spaceHold, showHint: false },
+      holdSpeed: { ...DEFAULT_SETTINGS.holdSpeed, showHint: false },
     }
     const controller = createShortcutCommandController(() => settings)
 
-    controller.beginSpaceInteraction(document, video, true)
+    controller.beginHoldSpeedInteraction(document, video, 'Space')
     vi.advanceTimersByTime(250)
 
     expect(video.playbackRate).toBe(2)
-    expect(document.getElementById('shortcut-override-space-hold-hint')).toBeNull()
+    expect(document.getElementById('shortcut-override-hold-speed-hint')).toBeNull()
 
-    controller.completeSpaceInteraction()
+    controller.completeHoldSpeedInteraction('Space')
   })
 
-  it('does not restore the hold hint after a seek hint while Space remains pressed', () => {
+  it('does not present hold speed as active when Netflix rejects the rate change', async () => {
+    vi.useFakeTimers()
+    const transport = vi.fn().mockResolvedValue({
+      success: false,
+      error: 'Netflix player unavailable',
+    })
+    const playbackSession = createNetflixPlaybackSession(transport)
+    const video = document.createElement('video')
+    Object.defineProperty(video, 'paused', { value: false, configurable: true })
+    video.playbackRate = 1
+    document.body.append(video)
+    const controller = createShortcutCommandController(
+      () => DEFAULT_SETTINGS,
+      playbackSession
+    )
+
+    controller.beginHoldSpeedInteraction(document, video, 'Space')
+    await vi.advanceTimersByTimeAsync(250)
+
+    expect(video.playbackRate).toBe(1)
+    expect(document.getElementById('shortcut-override-hold-speed-hint')).toBeNull()
+  })
+
+  it('keeps the hold hint visible during a seek hint while the play key remains pressed', async () => {
     vi.useFakeTimers()
     const video = document.createElement('video')
     Object.defineProperty(video, 'paused', { value: false, configurable: true })
     video.playbackRate = 1
     document.body.append(video)
-    const controller = createShortcutCommandController(() => DEFAULT_SETTINGS)
+    const controller = createShortcutCommandController(
+      () => DEFAULT_SETTINGS,
+      createNetflixPlaybackSession(vi.fn().mockResolvedValue({ success: true }))
+    )
 
-    controller.beginSpaceInteraction(document, video, true)
-    vi.advanceTimersByTime(250)
+    controller.beginHoldSpeedInteraction(document, video, 'Space')
+    await vi.advanceTimersByTimeAsync(250)
+    const holdHint = document.getElementById('shortcut-override-hold-speed-hint')
+    expect(holdHint).not.toBeNull()
     controller.execute('seekForward', document)
 
-    expect(document.getElementById('shortcut-override-space-hold-hint')).toBeNull()
+    expect(document.getElementById('shortcut-override-hold-speed-hint')).toBe(holdHint)
+    expect(holdHint?.style.opacity).toBe('1')
     expect(document.getElementById('shortcut-override-seek-hint')).not.toBeNull()
 
     vi.advanceTimersByTime(720)
 
-    expect(document.getElementById('shortcut-override-space-hold-hint')).toBeNull()
-    expect(document.getElementById('shortcut-override-seek-hint')?.style.opacity).toBe('0')
+    expect(document.getElementById('shortcut-override-hold-speed-hint')).toBe(holdHint)
+    expect(holdHint?.style.opacity).toBe('1')
 
-    controller.completeSpaceInteraction()
+    controller.completeHoldSpeedInteraction('Space')
 
-    expect(document.getElementById('shortcut-override-space-hold-hint')).toBeNull()
-    expect(document.getElementById('shortcut-override-seek-hint')).toBeNull()
+    expect(document.getElementById('shortcut-override-hold-speed-hint')).toBeNull()
+    expect(document.getElementById('shortcut-override-seek-hint')).not.toBeNull()
   })
 
-  it('toggles playback on a short Space interaction', () => {
+  it('toggles playback on a short play-key interaction', () => {
     vi.useFakeTimers()
     const video = document.createElement('video')
     const pause = vi.fn()
@@ -293,14 +361,33 @@ describe('ShortcutCommandController', () => {
     document.body.append(video)
     const controller = createShortcutCommandController(() => DEFAULT_SETTINGS)
 
-    controller.beginSpaceInteraction(document, video, true)
-    expect(controller.completeSpaceInteraction()).toBe(true)
+    controller.beginHoldSpeedInteraction(document, video, 'Space')
+    expect(controller.completeHoldSpeedInteraction('Space')).toBe(true)
 
     expect(pause).toHaveBeenCalledOnce()
     expect(video.playbackRate).toBe(1)
   })
 
-  it('restores the pre-press paused state after a Space hold', () => {
+  it('ignores unrelated keyup events during a hold interaction', () => {
+    vi.useFakeTimers()
+    const video = document.createElement('video')
+    Object.defineProperty(video, 'paused', { value: false, configurable: true })
+    video.playbackRate = 1
+    document.body.append(video)
+    const controller = createShortcutCommandController(() => DEFAULT_SETTINGS)
+
+    controller.beginHoldSpeedInteraction(document, video, 'KeyX')
+
+    expect(controller.completeHoldSpeedInteraction('ShiftLeft')).toBe(false)
+    expect(controller.shouldInterceptHoldSpeedRepeat('KeyX')).toBe(true)
+    vi.advanceTimersByTime(250)
+    expect(video.playbackRate).toBe(2)
+
+    expect(controller.completeHoldSpeedInteraction('KeyX')).toBe(true)
+    expect(video.playbackRate).toBe(1)
+  })
+
+  it('restores the pre-press paused state after a play-key hold', () => {
     vi.useFakeTimers()
     const video = document.createElement('video')
     let paused = true
@@ -318,11 +405,11 @@ describe('ShortcutCommandController', () => {
     document.body.append(video)
     const controller = createShortcutCommandController(() => DEFAULT_SETTINGS)
 
-    controller.beginSpaceInteraction(document, video, true)
+    controller.beginHoldSpeedInteraction(document, video, 'Space')
     vi.advanceTimersByTime(250)
 
     expect(video.playbackRate).toBe(2)
-    expect(controller.completeSpaceInteraction()).toBe(true)
+    expect(controller.completeHoldSpeedInteraction('Space')).toBe(true)
     expect(video.playbackRate).toBe(1)
     expect(paused).toBe(true)
     expect(pause).toHaveBeenCalledOnce()

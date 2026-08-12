@@ -79,6 +79,7 @@ describe('PopupApp', () => {
       screen.queryByText('Shortcuts only run in Netflix playback contexts.')
     ).not.toBeInTheDocument()
     expect(screen.getByText('Space')).toBeInTheDocument()
+    expect(screen.getByText('Play / Pause (hold for speed)')).toBeInTheDocument()
     expect(screen.getByText('Space').closest('[data-slot="kbd"]')).toBeInTheDocument()
     const subtitleShortcut = screen.getByText('Toggle subtitles').closest('div')
     expect(subtitleShortcut).not.toBeNull()
@@ -94,20 +95,21 @@ describe('PopupApp', () => {
     )
     expect(screen.getByLabelText('Lowest speed')).toHaveValue(0.25)
     expect(screen.getByLabelText('Highest speed')).toHaveValue(3)
-    expect(screen.getByLabelText('Speed change')).toHaveValue(0.25)
+    expect(screen.getByLabelText('Speed adjustment amount')).toHaveValue(0.25)
+    expect(screen.getByLabelText('Preferred speed')).toHaveValue(1.5)
     expect(screen.getByLabelText('Hold speed')).toHaveValue(2)
-    expect(screen.getByRole('switch', { name: 'Space hold speed: Enabled' })).toHaveAttribute(
+    expect(screen.getByRole('switch', { name: 'Play / Pause hold speed: Enabled' })).toHaveAttribute(
       'aria-checked',
       'true'
     )
     expect(
-      screen.getByRole('switch', { name: 'Space hold speed: Show speed hint' })
+      screen.getByRole('switch', { name: 'Play / Pause hold speed: Show speed hint' })
     ).toHaveAttribute('aria-checked', 'true')
     expect(screen.queryByRole('button', { name: 'Enabled info' })).not.toBeInTheDocument()
     const seekInput = screen.getByLabelText('Seconds per seek')
     expect(seekInput).toHaveValue(10)
     expect(seekInput).toHaveAttribute('max', '60')
-    const speedSection = screen.getByText('Speed shortcuts').closest('section')
+    const speedSection = screen.getByText('Playback speed').closest('section')
     expect(speedSection).not.toBeNull()
     expect(within(speedSection as HTMLElement).queryByLabelText('Seconds per seek')).not.toBeInTheDocument()
     const seekSection = screen.getByText('Seek shortcuts').closest('section')
@@ -118,7 +120,9 @@ describe('PopupApp', () => {
     expect(screen.getByRole('button', { name: 'Enable shortcut override info' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Lowest speed info' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Highest speed info' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Speed change info' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Speed adjustment amount info' })
+    ).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Hold speed info' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Seconds per seek info' })).toBeInTheDocument()
     expect(localeCombobox).toHaveTextContent('Auto')
@@ -174,11 +178,21 @@ describe('PopupApp', () => {
   it('persists popup speed changes', async () => {
     render(<PopupApp />)
 
-    const stepInput = await screen.findByLabelText('Speed change')
+    const stepInput = await screen.findByLabelText('Speed adjustment amount')
     fireEvent.change(stepInput, { target: { value: '0.35' } })
     fireEvent.blur(stepInput)
 
     await waitFor(() => expect(stepInput).toHaveValue(0.35))
+  })
+
+  it('persists the popup preferred speed', async () => {
+    render(<PopupApp />)
+
+    const preferredInput = await screen.findByLabelText('Preferred speed')
+    fireEvent.change(preferredInput, { target: { value: '2.25' } })
+    fireEvent.blur(preferredInput)
+
+    await waitFor(() => expect(preferredInput).toHaveValue(2.25))
   })
 
   it('persists popup seek second changes', async () => {

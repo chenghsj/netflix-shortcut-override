@@ -11,16 +11,22 @@ import {
   type NetflixPlaybackSession,
 } from '@/content/netflix-playback-session'
 import {
-  createSpaceInteractionController,
-  type SpaceInteractionController,
-} from './space-interaction-controller'
+  createHoldSpeedInteractionController,
+  type HoldSpeedInteractionController,
+} from './hold-speed-interaction-controller'
 import type { CommandContext, ShortcutCommand } from './shortcut-command-types'
-import { resolveNextPlaybackRate } from '@/shared/playback-speed'
+import { formatPlaybackRate, resolveNextPlaybackRate } from '@/shared/playback-speed'
 import type { ShortcutAction, ShortcutSettings } from '@/shared/shortcut-types'
 
 const SUBTITLES_OFF_HINT_COLOR = 'rgba(255, 255, 255, 0.62)'
+const EXPLICIT_SPEED_ACTIONS = new Set<ShortcutAction>([
+  'speedUp',
+  'speedDown',
+  'setPreferredSpeed',
+  'speedReset',
+])
 
-export type ShortcutCommandController = SpaceInteractionController & {
+export type ShortcutCommandController = HoldSpeedInteractionController & {
   execute(action: ShortcutAction, targetDoc: Document): boolean
   setVolume(volume: number, targetDoc: Document): boolean
 }
@@ -29,9 +35,6 @@ type ShortcutCommandControllerOptions = {
   onSeekRequested?: () => void
   onSubtitlesToggled?: (enabled: boolean, targetDoc: Document) => void
 }
-
-const formatPlaybackRate = (rate: number): string =>
-  `${rate.toFixed(2).replace(/\.00$/, '').replace(/0$/, '')}x`
 
 const showHintRequest = (context: CommandContext, request: HintRequest): void => {
   getHintManager(context.targetDoc).show(request)
@@ -234,6 +237,19 @@ const createCommandMap = (
     )
     return true
   },
+  setPreferredSpeed: context => {
+    const video = findVideo(context.targetDoc)
+    if (!video) return false
+    showPlaybackRate(
+      playbackSession,
+      video,
+      context.settings.speed.preferred,
+      context,
+      true,
+      icons.speedUp
+    )
+    return true
+  },
   speedReset: context => {
     const video = findVideo(context.targetDoc)
     if (!video) return false
@@ -256,6 +272,7 @@ export const createShortcutCommandController = (
 ): ShortcutCommandController => {
   let currentActionToken = 0
   const commands = createCommandMap(playbackSession, options)
+  let holdSpeedInteraction: HoldSpeedInteractionController | null = null
 
   const createContext = (targetDoc: Document, actionToken = currentActionToken): CommandContext => ({
     settings: getSettings(),
@@ -269,6 +286,9 @@ export const createShortcutCommandController = (
   }
 
   const execute = (action: ShortcutAction, targetDoc: Document): boolean => {
+    if (EXPLICIT_SPEED_ACTIONS.has(action)) {
+      holdSpeedInteraction?.cancelHoldSpeedInteraction()
+    }
     const actionToken = startAction()
     return commands[action](createContext(targetDoc, actionToken))
   }
@@ -292,19 +312,19 @@ export const createShortcutCommandController = (
     return true
   }
 
-  const spaceInteraction = createSpaceInteractionController({
+  holdSpeedInteraction = createHoldSpeedInteractionController({
     createContext,
     startAction,
     executeShortPress: targetDoc => execute('playPause', targetDoc),
-    hideHints: targetDoc => getHintManager(targetDoc).hide(),
+    hideHoldSpeedHint: targetDoc => getHintManager(targetDoc).hideHoldSpeed(),
     playbackSession,
-    showSpaceHoldHint: (context, label) => {
-      showHintRequest(context, { type: 'spaceHold', label })
+    showHoldSpeedHint: (context, label) => {
+      showHintRequest(context, { type: 'holdSpeed', label })
     },
   })
 
   return {
-    ...spaceInteraction,
+    ...holdSpeedInteraction,
     execute,
     setVolume,
   }

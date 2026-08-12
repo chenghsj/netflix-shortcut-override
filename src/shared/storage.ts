@@ -11,6 +11,15 @@ const hasChromeStorage = (): boolean =>
 const normalizeStoredSettings = (raw: unknown): ShortcutSettings =>
   normalizeSettings(raw ?? DEFAULT_SETTINGS)
 
+const toPersistedSettings = (settings: ShortcutSettings) => {
+  const normalized = normalizeSettings(settings)
+  return {
+    ...normalized,
+    // Keep this alias while v0.5.x installations may share sync storage with v0.6.x.
+    spaceHold: normalized.holdSpeed,
+  }
+}
+
 export const getSettings = async (): Promise<ShortcutSettings> => {
   if (!hasChromeStorage()) {
     const raw = globalThis.localStorage?.getItem(SETTINGS_STORAGE_KEY)
@@ -32,14 +41,15 @@ export const getSettings = async (): Promise<ShortcutSettings> => {
 
 export const saveSettings = async (settings: ShortcutSettings): Promise<ShortcutSettings> => {
   const normalized = normalizeSettings(settings)
+  const persisted = toPersistedSettings(normalized)
 
   if (!hasChromeStorage()) {
-    globalThis.localStorage?.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(normalized))
+    globalThis.localStorage?.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(persisted))
     return normalized
   }
 
   return new Promise((resolve, reject) => {
-    chrome.storage.sync.set({ [SETTINGS_STORAGE_KEY]: normalized }, () => {
+    chrome.storage.sync.set({ [SETTINGS_STORAGE_KEY]: persisted }, () => {
       const error = chrome.runtime.lastError?.message
       if (error) {
         reject(new Error(error))

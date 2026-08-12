@@ -84,6 +84,14 @@ const getCommandFailureLabel = (
   if (action === 'seek' || action === 'seekTo') return getSeekFailureLabel(response)
   if (!response.success) return `${action} failed: ${response.error ?? 'background error'}`
   if (response.result?.error) return `${action} failed: ${response.result.error}`
+  if (action === 'setPlaybackRate') {
+    if (response.result?.playerApiFound === false) {
+      return 'setPlaybackRate failed: no Netflix API'
+    }
+    if (response.result?.playerFound === false) {
+      return 'setPlaybackRate failed: no Netflix player'
+    }
+  }
   if (
     action === 'getSubtitleState' &&
     typeof response.result?.subtitlesEnabled !== 'boolean'

@@ -3,6 +3,7 @@ import {
   type KeyBinding,
   type KeyEventLike,
   type ShortcutAction,
+  type ShortcutBinding,
   type ShortcutSettings,
 } from './shortcut-types'
 
@@ -26,6 +27,14 @@ export const DEFAULT_KEY_BINDINGS: Record<ShortcutAction, KeyBinding> = {
   skipIntro: { code: 'KeyS', key: 's', ctrl: false, alt: false, shift: false, meta: false },
   speedUp: { code: 'Period', key: '>', ctrl: false, alt: false, shift: true, meta: false },
   speedDown: { code: 'Comma', key: '<', ctrl: false, alt: false, shift: true, meta: false },
+  setPreferredSpeed: {
+    code: 'Quote',
+    key: '"',
+    ctrl: false,
+    alt: false,
+    shift: true,
+    meta: false,
+  },
   speedReset: { code: 'Slash', key: '?', ctrl: false, alt: false, shift: true, meta: false },
 }
 
@@ -36,6 +45,7 @@ const NETFLIX_NATIVE_SHORTCUT_ACTIONS = [
   'volumeUp',
   'volumeDown',
   'mute',
+  'toggleSubtitles',
   'fullscreen',
   'skipIntro',
 ] as const satisfies readonly ShortcutAction[]
@@ -44,15 +54,13 @@ const NETFLIX_NATIVE_KEY_BINDINGS: Record<
   (typeof NETFLIX_NATIVE_SHORTCUT_ACTIONS)[number],
   readonly KeyBinding[]
 > = {
-  playPause: [
-    DEFAULT_KEY_BINDINGS.playPause,
-    { code: 'Enter', key: 'Enter', ctrl: false, alt: false, shift: false, meta: false },
-  ],
+  playPause: [DEFAULT_KEY_BINDINGS.playPause],
   seekBackward: [DEFAULT_KEY_BINDINGS.seekBackward],
   seekForward: [DEFAULT_KEY_BINDINGS.seekForward],
   volumeUp: [DEFAULT_KEY_BINDINGS.volumeUp],
   volumeDown: [DEFAULT_KEY_BINDINGS.volumeDown],
   mute: [DEFAULT_KEY_BINDINGS.mute],
+  toggleSubtitles: [DEFAULT_KEY_BINDINGS.toggleSubtitles],
   fullscreen: [DEFAULT_KEY_BINDINGS.fullscreen],
   skipIntro: [DEFAULT_KEY_BINDINGS.skipIntro],
 }
@@ -103,19 +111,34 @@ export const findActionForKey = (
   return match ?? null
 }
 
+export const getReplacedNetflixNativeKeyBindings = (
+  action: ShortcutAction,
+  binding: ShortcutBinding
+): readonly KeyBinding[] => {
+  if (
+    !NETFLIX_NATIVE_SHORTCUT_ACTIONS.includes(
+      action as (typeof NETFLIX_NATIVE_SHORTCUT_ACTIONS)[number]
+    )
+  ) {
+    return []
+  }
+
+  const nativeAction = action as (typeof NETFLIX_NATIVE_SHORTCUT_ACTIONS)[number]
+  if (!binding.enabled || keyBindingsEqual(binding.key, DEFAULT_KEY_BINDINGS[nativeAction])) {
+    return []
+  }
+
+  return NETFLIX_NATIVE_KEY_BINDINGS[nativeAction]
+}
+
 export const findRemappedNetflixNativeActionForKey = (
   settings: ShortcutSettings,
   event: KeyEventLike
 ): ShortcutAction | null => {
   const pressed = keyBindingFromEvent(event)
   const action = NETFLIX_NATIVE_SHORTCUT_ACTIONS.find(candidate => {
-    const binding = settings.bindings[candidate]
-    return (
-      binding.enabled &&
-      !keyBindingsEqual(binding.key, DEFAULT_KEY_BINDINGS[candidate]) &&
-      NETFLIX_NATIVE_KEY_BINDINGS[candidate].some(nativeBinding =>
-        keyBindingsEqual(nativeBinding, pressed)
-      )
+    return getReplacedNetflixNativeKeyBindings(candidate, settings.bindings[candidate]).some(
+      nativeBinding => keyBindingsEqual(nativeBinding, pressed)
     )
   })
 

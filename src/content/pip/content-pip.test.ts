@@ -230,7 +230,7 @@ describe('content PiP shortcuts', () => {
     }
   })
 
-  it('handles Space in PiP even when play/pause and Space hold are disabled on the main page', async () => {
+  it('does not keep a Space fallback in PiP when play/pause is disabled', async () => {
     const { pipWindow, cleanup } = createDocumentPipFixture()
 
     try {
@@ -257,7 +257,7 @@ describe('content PiP shortcuts', () => {
 
       await saveSettings({
         ...DEFAULT_SETTINGS,
-        spaceHold: { ...DEFAULT_SETTINGS.spaceHold, enabled: false },
+        holdSpeed: { ...DEFAULT_SETTINGS.holdSpeed, enabled: false },
         bindings: {
           ...DEFAULT_SETTINGS.bindings,
           playPause: { ...DEFAULT_SETTINGS.bindings.playPause, enabled: false },
@@ -280,13 +280,84 @@ describe('content PiP shortcuts', () => {
       pipWindow.dispatchEvent(keydown)
       pipWindow.dispatchEvent(keyup)
 
-      expect(keydown.defaultPrevented).toBe(true)
-      expect(keyup.defaultPrevented).toBe(true)
-      expect(pause).toHaveBeenCalledOnce()
-      expect(paused).toBe(true)
+      expect(keydown.defaultPrevented).toBe(false)
+      expect(keyup.defaultPrevented).toBe(false)
+      expect(pause).not.toHaveBeenCalled()
+      expect(paused).toBe(false)
       expect(
         pipWindow.document.getElementById('shortcut-override-playback-hint')
-      ).not.toBeNull()
+      ).toBeNull()
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('uses the configured play/pause key in PiP without a Space fallback', async () => {
+    const { pipWindow, cleanup } = createDocumentPipFixture()
+
+    try {
+      const video = document.createElement('video')
+      let paused = false
+      const pause = vi.fn(() => {
+        paused = true
+      })
+      Object.defineProperty(video, 'paused', { configurable: true, get: () => paused })
+      Object.defineProperty(video, 'pause', { configurable: true, value: pause })
+      document.body.appendChild(video)
+
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          code: 'KeyP',
+          key: 'P',
+          shiftKey: true,
+          bubbles: true,
+          cancelable: true,
+        })
+      )
+      await Promise.resolve()
+      await Promise.resolve()
+
+      await saveSettings({
+        ...DEFAULT_SETTINGS,
+        holdSpeed: { ...DEFAULT_SETTINGS.holdSpeed, enabled: false },
+        bindings: {
+          ...DEFAULT_SETTINGS.bindings,
+          playPause: {
+            enabled: true,
+            key: {
+              code: 'KeyX',
+              key: 'x',
+              ctrl: false,
+              alt: false,
+              shift: false,
+              meta: false,
+            },
+          },
+        },
+      })
+      await Promise.resolve()
+
+      const space = new KeyboardEvent('keydown', {
+        code: 'Space',
+        key: ' ',
+        bubbles: true,
+        cancelable: true,
+      })
+      pipWindow.dispatchEvent(space)
+      expect(space.defaultPrevented).toBe(true)
+      expect(pause).not.toHaveBeenCalled()
+
+      const configuredKey = new KeyboardEvent('keydown', {
+        code: 'KeyX',
+        key: 'x',
+        bubbles: true,
+        cancelable: true,
+      })
+      pipWindow.dispatchEvent(configuredKey)
+
+      expect(configuredKey.defaultPrevented).toBe(true)
+      expect(pause).toHaveBeenCalledOnce()
+      expect(paused).toBe(true)
     } finally {
       cleanup()
     }

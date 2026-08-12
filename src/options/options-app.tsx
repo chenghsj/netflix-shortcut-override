@@ -8,7 +8,7 @@ import {
   SettingsIcon,
   StarIcon,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, type ComponentProps } from 'react'
 
 import { GitHubIcon } from '@/components/github-icon'
 import { HoldSpeedIcon } from '@/components/hold-speed-icon'
@@ -16,6 +16,7 @@ import { KeyBindingKbd } from '@/components/key-binding-kbd'
 import { LanguageCombobox } from '@/components/language-combobox'
 import { NumericSettingField } from '@/components/numeric-setting-field'
 import { OtherProjectsSelect } from '@/components/other-projects-select'
+import { SettingsTransferCard } from '@/options/settings-transfer-card'
 import { SettingLabelWithTooltip } from '@/components/setting-label-with-tooltip'
 import { SettingsSaveStatus } from '@/components/settings-save-status'
 import { ThemeCombobox } from '@/components/theme-combobox'
@@ -57,18 +58,21 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { cn } from '@/lib/utils'
 import { getCopy } from '@/shared/i18n'
 import { resolveLocalePreference } from '@/shared/browser-locale'
 import { getBrowserCapabilities } from '@/shared/browser-capabilities'
 import {
   DEFAULT_KEY_BINDINGS,
   findBindingConflict,
+  formatKeyBinding,
+  getReplacedNetflixNativeKeyBindings,
   keyBindingFromEvent,
   keyBindingsEqual,
 } from '@/shared/shortcut-bindings'
 import {
+  HOLD_SPEED_LIMITS,
   SEEK_LIMITS,
-  SPACE_HOLD_LIMITS,
   SPEED_LIMITS,
 } from '@/shared/shortcut-settings'
 import {
@@ -97,19 +101,44 @@ type RecorderState = {
   savedKey: KeyBinding
 } | null
 
+type NetflixNativeKeyReplacementProps = ComponentProps<'p'> & {
+  bindings: readonly KeyBinding[]
+  template: string
+}
+
+function NetflixNativeKeyReplacement({
+  bindings,
+  template,
+  className,
+  ...props
+}: NetflixNativeKeyReplacementProps) {
+  if (bindings.length === 0) return null
+
+  return (
+    <p className={cn('text-xs text-muted-foreground', className)} {...props}>
+      {template.replace(
+        '{keys}',
+        bindings.map(binding => formatKeyBinding(binding)).join(' · ')
+      )}
+    </p>
+  )
+}
+
 export function OptionsApp() {
   const {
     settings,
     loaded,
     saveError,
     updateSettings,
+    replaceSettings,
     resetShortcutBindings,
     speed: speedForm,
     seek: seekForm,
-    spaceHold: spaceHoldForm,
+    holdSpeed: holdSpeedForm,
   } = useShortcutSettingsForm()
   const [recorder, setRecorder] = useState<RecorderState>(null)
-  const copy = getCopy(resolveLocalePreference(settings.locale))
+  const resolvedLocale = resolveLocalePreference(settings.locale)
+  const copy = getCopy(resolvedLocale)
   const browserCapabilities = getBrowserCapabilities()
   useTheme(settings.theme)
 
@@ -125,6 +154,13 @@ export function OptionsApp() {
   const canRestoreDraft = Boolean(
     recorder?.draft && !keyBindingsEqual(recorder.draft, recorder.savedKey)
   )
+  const recorderReplacedNetflixKeys =
+    recorder?.draft && !activeConflict
+      ? getReplacedNetflixNativeKeyBindings(recorder.action, {
+          ...settings.bindings[recorder.action],
+          key: recorder.draft,
+        })
+      : []
 
   const saveDraft = () => {
     if (!recorder?.draft || activeConflict) return
@@ -293,6 +329,10 @@ export function OptionsApp() {
                     <TableBody>
                       {SHORTCUT_ACTIONS.map(action => {
                         const binding = settings.bindings[action]
+                        const replacedNetflixKeys = getReplacedNetflixNativeKeyBindings(
+                          action,
+                          binding
+                        )
                         const actionSupported =
                           action !== 'pictureInPicture' ||
                           browserCapabilities.supportsSubtitlePreservingPip
@@ -326,7 +366,13 @@ export function OptionsApp() {
                               </div>
                             </TableCell>
                             <TableCell>
-                              <KeyBindingKbd binding={binding.key} />
+                              <div className="flex flex-col items-start gap-1">
+                                <KeyBindingKbd binding={binding.key} />
+                                <NetflixNativeKeyReplacement
+                                  bindings={replacedNetflixKeys}
+                                  template={copy.replacedNetflixKeys}
+                                />
+                              </div>
                             </TableCell>
                             <TableCell>
                                 <Switch
@@ -410,6 +456,19 @@ export function OptionsApp() {
                 </CardHeader>
                 <CardContent>
                   <FieldGroup>
+                    <NumericSettingField
+                        id="preferred-speed"
+                        label={copy.preferredSpeed}
+                        tooltip={copy.preferredSpeedTooltip}
+                        min={SPEED_LIMITS.preferred.min}
+                        max={SPEED_LIMITS.preferred.max}
+                        step={SPEED_LIMITS.preferred.inputStep}
+                        value={speedForm.draft.preferred}
+                        data-speed-field="preferred"
+                        onValueChange={value => speedForm.setField('preferred', value)}
+                        onBlur={() => speedForm.commitField('preferred')}
+                        onKeyDown={speedForm.handleKeyDown}
+                    />
                     <NumericSettingField
                         id="min-speed"
                         label={copy.minSpeed}
@@ -497,7 +556,7 @@ export function OptionsApp() {
                   <CardAction className="row-span-1 self-center">
                     <Button
                       variant="outline"
-                      onClick={spaceHoldForm.reset}
+                      onClick={holdSpeedForm.reset}
                       aria-label={`${copy.reset} ${copy.holdSpeed}`}
                     >
                       <RotateCcwIcon data-icon="inline-start" />
@@ -508,30 +567,22 @@ export function OptionsApp() {
                 <CardContent>
                   <FieldGroup>
                     <div className="flex items-center justify-between gap-3">
-                      <FieldLabel htmlFor="enable-space-hold">{copy.holdSpeedEnabled}</FieldLabel>
+                      <FieldLabel htmlFor="enable-hold-speed">{copy.holdSpeedEnabled}</FieldLabel>
                       <Switch
-                        id="enable-space-hold"
-                        checked={settings.spaceHold.enabled}
-                        onCheckedChange={enabled =>
-                          updateSettings(current => ({
-                            ...current,
-                            spaceHold: { ...current.spaceHold, enabled },
-                          }))
-                        }
+                        id="enable-hold-speed"
+                        checked={holdSpeedForm.enabled}
+                        disabled={holdSpeedForm.enableControlDisabled}
+                        onCheckedChange={holdSpeedForm.setEnabled}
                         aria-label={`${copy.holdSpeed}: ${copy.holdSpeedEnabled}`}
                       />
                     </div>
                     <div className="flex items-center justify-between gap-3">
-                      <FieldLabel htmlFor="show-space-hold-hint">{copy.holdSpeedHint}</FieldLabel>
+                      <FieldLabel htmlFor="show-hold-speed-hint">{copy.holdSpeedHint}</FieldLabel>
                       <Switch
-                        id="show-space-hold-hint"
-                        checked={settings.spaceHold.showHint}
-                        onCheckedChange={showHint =>
-                          updateSettings(current => ({
-                            ...current,
-                            spaceHold: { ...current.spaceHold, showHint },
-                          }))
-                        }
+                        id="show-hold-speed-hint"
+                        checked={holdSpeedForm.showHint}
+                        disabled={holdSpeedForm.detailsDisabled}
+                        onCheckedChange={holdSpeedForm.setShowHint}
                         aria-label={`${copy.holdSpeed}: ${copy.holdSpeedHint}`}
                       />
                     </div>
@@ -539,18 +590,25 @@ export function OptionsApp() {
                         id="hold-speed"
                         label={copy.holdSpeedRate}
                         tooltip={copy.holdSpeedTooltip}
-                        min={SPACE_HOLD_LIMITS.speed.min}
-                        max={SPACE_HOLD_LIMITS.speed.max}
-                        step={SPACE_HOLD_LIMITS.speed.inputStep}
-                        value={spaceHoldForm.draft.speed}
-                        disabled={!settings.spaceHold.enabled}
-                        onValueChange={spaceHoldForm.setSpeed}
-                        onBlur={spaceHoldForm.commit}
-                        onKeyDown={spaceHoldForm.handleKeyDown}
+                        min={HOLD_SPEED_LIMITS.speed.min}
+                        max={HOLD_SPEED_LIMITS.speed.max}
+                        step={HOLD_SPEED_LIMITS.speed.inputStep}
+                        value={holdSpeedForm.draft.speed}
+                        disabled={holdSpeedForm.detailsDisabled}
+                        onValueChange={holdSpeedForm.setSpeed}
+                        onBlur={holdSpeedForm.commit}
+                        onKeyDown={holdSpeedForm.handleKeyDown}
                     />
                   </FieldGroup>
                 </CardContent>
               </Card>
+
+              <SettingsTransferCard
+                copy={copy}
+                locale={resolvedLocale}
+                settings={settings}
+                onImport={replaceSettings}
+              />
 
             </aside>
           </section>
@@ -590,6 +648,12 @@ export function OptionsApp() {
                 </AlertTitle>
               </Alert>
             )}
+            <NetflixNativeKeyReplacement
+              bindings={recorderReplacedNetflixKeys}
+              template={copy.willReplaceNetflixKeys}
+              className="text-center"
+              aria-live="polite"
+            />
           </div>
 
           <Separator />

@@ -5,6 +5,7 @@ import {
   findRemappedNetflixNativeActionForKey,
   formatKeyBinding,
   getKeyBindingLabels,
+  getReplacedNetflixNativeKeyBindings,
 } from '@/shared/shortcut-bindings'
 import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
 
@@ -82,13 +83,53 @@ describe('shortcut bindings', () => {
         },
         new KeyboardEvent('keydown', { code: 'Enter', key: 'Enter' })
       )
-    ).toBe('playPause')
+    ).toBeNull()
     expect(
       findRemappedNetflixNativeActionForKey(
         DEFAULT_SETTINGS,
         new KeyboardEvent('keydown', { code: 'ArrowUp', key: 'ArrowUp' })
       )
     ).toBeNull()
+  })
+
+  it('lists the Netflix keys replaced by each enabled remapped action', () => {
+    const remappedPlayPause = {
+      ...DEFAULT_SETTINGS.bindings.playPause,
+      key: { code: 'KeyX', key: 'x', ctrl: false, alt: false, shift: false, meta: false },
+    }
+    const remappedSubtitles = {
+      ...DEFAULT_SETTINGS.bindings.toggleSubtitles,
+      key: { code: 'KeyV', key: 'v', ctrl: false, alt: false, shift: false, meta: false },
+    }
+
+    expect(
+      getReplacedNetflixNativeKeyBindings('playPause', remappedPlayPause).map(binding =>
+        formatKeyBinding(binding)
+      )
+    ).toEqual(['Space'])
+    expect(
+      getReplacedNetflixNativeKeyBindings('toggleSubtitles', remappedSubtitles).map(
+        binding => formatKeyBinding(binding)
+      )
+    ).toEqual(['C'])
+    expect(
+      getReplacedNetflixNativeKeyBindings('playPause', {
+        ...remappedPlayPause,
+        enabled: false,
+      })
+    ).toEqual([])
+    expect(
+      getReplacedNetflixNativeKeyBindings(
+        'playPause',
+        DEFAULT_SETTINGS.bindings.playPause
+      )
+    ).toEqual([])
+    expect(
+      getReplacedNetflixNativeKeyBindings(
+        'speedUp',
+        DEFAULT_SETTINGS.bindings.speedUp
+      )
+    ).toEqual([])
   })
 
   it('uses platform-native labels for the Meta modifier', () => {
@@ -136,5 +177,13 @@ describe('shortcut bindings', () => {
     expect(getKeyBindingLabels(specialKey('Home', 'Home'))).toEqual(['Home'])
     expect(getKeyBindingLabels(specialKey('End', 'End'))).toEqual(['End'])
     expect(getKeyBindingLabels(specialKey('Tab', 'Tab'))).toEqual(['Tab'])
+  })
+
+  it('uses Shift plus quote for the preferred-speed default', () => {
+    expect(
+      getKeyBindingLabels(DEFAULT_SETTINGS.bindings.setPreferredSpeed.key, {
+        platform: 'Win32',
+      })
+    ).toEqual(['Shift', '"'])
   })
 })

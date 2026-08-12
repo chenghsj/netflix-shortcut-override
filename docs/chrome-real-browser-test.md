@@ -134,8 +134,8 @@ Select the shield-shaped diagnostics button in the title bar and verify:
 
 Run these against the real Netflix watch page:
 
-- `Space`: play/pause.
-- Hold `Space`: temporary hold speed, then restore on release.
+- Configured Play / Pause key (`Space` by default): play/pause.
+- Hold the configured Play / Pause key: temporary hold speed, then restore on release.
 - `ArrowRight`: seek forward by configured seconds.
 - `ArrowLeft`: seek backward by configured seconds.
 - `ArrowUp`: volume up.
@@ -147,6 +147,7 @@ Run these against the real Netflix watch page:
 - `S`: Skip Intro when the Netflix button is visible.
 - `Shift+.`: speed up.
 - `Shift+,`: speed down.
+- `Shift+"`: set the configured preferred speed directly; repeated presses keep that speed.
 - `Shift+/`: reset speed.
 
 Expected:

@@ -43,8 +43,9 @@ This project is not affiliated with, endorsed by, or sponsored by Netflix.
 - Firefox supports the shortcut, popup, and options features; the subtitle-preserving Picture-in-Picture setting is disabled because Firefox is not supported.
 - In Chromium's subtitle-mirrored Picture-in-Picture window, the first primary click immediately plays or pauses the video while allowing the browser to focus the window.
 - Use the PiP overlay for timeline seeking, playback transport, volume, mute, and subtitle appearance settings; it hides after three seconds of pointer idle.
-- In Chromium's subtitle-mirrored Picture-in-Picture, Space is handled by the extension because Netflix cannot receive the focused window's native key event.
-- Hold Space to temporarily switch to a configurable playback speed, then restore on release.
+- In Chromium's subtitle-mirrored Picture-in-Picture window, enabled shortcuts use their configured keys for supported actions; fullscreen remains available only on the Netflix page.
+- Hold the configured Play / Pause shortcut to temporarily switch to a configurable playback speed, then restore on release.
+- Export complete settings backups and review them before confirming an import; malformed, incomplete, or newer-version backups are rejected before replacement.
 - Persist settings with `chrome.storage.sync`.
 - Build as a Manifest V3 browser extension.
 
@@ -64,14 +65,15 @@ This project is not affiliated with, endorsed by, or sponsored by Netflix.
 | Skip intro | `S` |
 | Increase playback speed | `Shift + .` |
 | Decrease playback speed | `Shift + ,` |
+| Set preferred playback speed | `Shift + "` |
 | Reset playback speed | `Shift + /` |
 
 Press `C` to turn Netflix's native subtitles off or on. The extension restores the previously selected subtitle track when it remains available; otherwise, it selects the first available subtitle track. In the extension-managed PiP window, the shortcut and subtitle switch stay synchronized.
 
-Space has two behaviors:
+The configured Play / Pause shortcut has two behaviors when hold speed is enabled:
 
-- Tap `Space` to play or pause.
-- Hold `Space` for roughly 250 ms to temporarily switch to the configured hold speed. The default hold speed is `2x`.
+- Tap the key to play or pause.
+- Hold it for roughly 250 ms to temporarily switch to the configured hold speed. The default hold speed is `2x`.
 
 ## Speed Settings
 
@@ -82,7 +84,8 @@ The options page exposes these playback speed settings:
 | Lowest speed | `0.25x` | `0.25x` to `1.0x` |
 | Highest speed | `3x` | `1.0x` to `4.0x` |
 | Speed change | `0.25x` | `0.05x` to `4.0x` |
-| Space hold speed | `2x` | `0.25x` to `4.0x`; while enabled, the extension handles both Space tap and hold |
+| Preferred speed | `1.5x` | `0.25x` to `4.0x` |
+| Play / Pause hold speed | `2x` | `0.25x` to `4.0x`; follows the configured Play / Pause shortcut |
 
 Values are normalized to `0.05x` increments.
 
@@ -258,7 +261,7 @@ Key areas:
 - `CONTEXT.md`: canonical domain terminology for playback, compatibility, and PiP behavior.
 - `docs/behavior-spec.md`: observable product requirements and recovery policies.
 - `src/content/index.ts`: keyboard interception and routing between the shortcut, PiP, and hint domains.
-- `src/content/shortcuts/`: media command handling and Space hold interaction state.
+- `src/content/shortcuts/`: media command handling and Play / Pause hold interaction state.
 - `src/content/hints/`: hint overlay rendering, layout, icons, and timing.
 - `src/content/pip/`: Document Picture-in-Picture lifecycle, subtitle mirroring, and PiP keyboard routing.
 - `src/content/netflix-api-bridge.ts`: page-world bridge for Netflix player API access.
@@ -286,7 +289,7 @@ The extension requests:
 
 | Permission | Why it is needed |
 | --- | --- |
-| `storage` | Save shortcut, language, playback speed, seek, and Space-hold settings. |
+| `storage` | Save shortcut, language, playback speed, seek, and hold-speed settings. |
 | `scripting` | Execute Netflix player API operations and restore focus to the visible playback context after the popup closes. |
 | `activeTab` | Check the active Netflix tab, request local compatibility status, restore playback focus, and reload that tab when the user selects the recovery action. |
 | `*://*.netflix.com/*` | Run the extension only on Netflix pages. |
@@ -295,7 +298,7 @@ The extension requests:
 
 - No remote analytics or tracking code is included.
 - No external API calls are made by the extension.
-- Shortcut, enabled state, language, theme, playback speed, seek, Space-hold, and PiP subtitle settings are stored with `chrome.storage.sync`.
+- Shortcut, enabled state, language, theme, playback speed, seek, hold-speed, and PiP subtitle settings are stored with `chrome.storage.sync`.
 - A pending popup focus handoff is stored temporarily in `chrome.storage.session` for at most 30 seconds. It contains only tab/window identifiers, an opaque request identifier, and a deadline.
 - Content scripts only run on pages matching `*://*.netflix.com/*`.
 - The toolbar popup checks the active tab only after it is opened. It uses that tab to show page status, request locally generated compatibility diagnostics, restore keyboard focus to a still-visible playback context after dismissal, and reload the Netflix page only when the user selects the recovery action.

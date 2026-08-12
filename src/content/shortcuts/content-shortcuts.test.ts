@@ -98,6 +98,7 @@ describe('content media shortcuts', () => {
     ['volumeUp', 'ArrowUp', 'ArrowUp'],
     ['volumeDown', 'ArrowDown', 'ArrowDown'],
     ['mute', 'KeyM', 'm'],
+    ['toggleSubtitles', 'KeyC', 'c'],
     ['fullscreen', 'KeyF', 'f'],
     ['skipIntro', 'KeyS', 's'],
   ] as const)('blocks the original Netflix key after %s is remapped', async (action, code, key) => {
@@ -126,7 +127,7 @@ describe('content media shortcuts', () => {
     expect(nativeKeyHandler).not.toHaveBeenCalled()
   })
 
-  it('blocks Enter after play/pause is remapped', async () => {
+  it('leaves Enter to Netflix after play/pause is remapped', async () => {
     await saveSettings({
       ...DEFAULT_SETTINGS,
       bindings: {
@@ -153,8 +154,72 @@ describe('content media shortcuts', () => {
     window.dispatchEvent(event)
 
     window.removeEventListener('keydown', nativeKeyHandler, true)
-    expect(event.defaultPrevented).toBe(true)
-    expect(nativeKeyHandler).not.toHaveBeenCalled()
+    expect(event.defaultPrevented).toBe(false)
+    expect(nativeKeyHandler).toHaveBeenCalledOnce()
+  })
+
+  it('sets preferred speed once and ignores keyboard repeat', () => {
+    const video = document.createElement('video')
+    video.playbackRate = 0.75
+    document.body.append(video)
+
+    const keydown = new KeyboardEvent('keydown', {
+      code: 'Quote',
+      key: '"',
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    })
+    window.dispatchEvent(keydown)
+
+    expect(keydown.defaultPrevented).toBe(true)
+    expect(video.playbackRate).toBe(1.5)
+    expect(document.getElementById('shortcut-override-speed-hint')).toHaveTextContent('1.5x')
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledTimes(1)
+
+    const repeatedKeydown = new KeyboardEvent('keydown', {
+      code: 'Quote',
+      key: '"',
+      shiftKey: true,
+      repeat: true,
+      bubbles: true,
+      cancelable: true,
+    })
+    window.dispatchEvent(repeatedKeydown)
+
+    expect(repeatedKeydown.defaultPrevented).toBe(true)
+    expect(video.playbackRate).toBe(1.5)
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not intercept the preferred-speed key when its action is disabled', async () => {
+    await saveSettings({
+      ...DEFAULT_SETTINGS,
+      bindings: {
+        ...DEFAULT_SETTINGS.bindings,
+        setPreferredSpeed: {
+          ...DEFAULT_SETTINGS.bindings.setPreferredSpeed,
+          enabled: false,
+        },
+      },
+    })
+    await Promise.resolve()
+
+    const video = document.createElement('video')
+    video.playbackRate = 0.75
+    document.body.append(video)
+    const keydown = new KeyboardEvent('keydown', {
+      code: 'Quote',
+      key: '"',
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    })
+    window.dispatchEvent(keydown)
+
+    expect(keydown.defaultPrevented).toBe(false)
+    expect(video.playbackRate).toBe(0.75)
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalled()
   })
 
   it('maps ArrowRight and ArrowLeft to the configured seek interval', async () => {

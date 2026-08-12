@@ -1,5 +1,6 @@
 import {
   HINT_IDS,
+  HOLD_SPEED_HINT_ID,
   SPEED_HINT_LABEL_ID,
   VOLUME_HINT_LABEL_ID,
 } from './hint-constants'
@@ -16,7 +17,7 @@ import {
   positionCenteredHint,
   positionLabeledHintLabel,
   positionSeekHint,
-  positionSpaceHoldHint,
+  positionHoldSpeedHint,
   updateHintScale,
   type StyleMap,
 } from './hint-layout'
@@ -25,7 +26,7 @@ import {
   renderMediaHint,
   renderPlaybackHint,
   renderSeekHint,
-  renderSpaceHoldHint,
+  renderHoldSpeedHint,
   renderSpeedHint,
   renderVolumeHint,
   type HintRendererContext,
@@ -42,6 +43,7 @@ export {
 
 class DocumentHintManager implements HintManager {
   private root: HTMLElement | null = null
+  private holdSpeedRoot: HTMLElement | null = null
   private timer: number | null = null
   private generation = 0
   private activeRequest: HintRequest | null = null
@@ -57,10 +59,15 @@ class DocumentHintManager implements HintManager {
   }
 
   show(request: HintRequest): void {
+    this.attachResizeListener()
+    if (request.type === 'holdSpeed') {
+      renderHoldSpeedHint(this.holdSpeedRendererContext, request)
+      return
+    }
+
     this.clearTimer()
     if (request.type !== 'seek') this.seekSeries = null
     this.activeRequest = request
-    this.attachResizeListener()
 
     switch (request.type) {
       case 'media':
@@ -78,10 +85,16 @@ class DocumentHintManager implements HintManager {
       case 'seek':
         this.seekSeries = renderSeekHint(this.rendererContext, request, this.seekSeries)
         return
-      case 'spaceHold':
-        renderSpaceHoldHint(this.rendererContext, request)
-        return
     }
+  }
+
+  hideHoldSpeed(): void {
+    this.holdSpeedRoot?.style.setProperty('opacity', '0')
+    this.holdSpeedRoot?.style.setProperty('visibility', 'hidden')
+    this.renderDoc
+      .querySelectorAll<HTMLElement>(`[id="${HOLD_SPEED_HINT_ID}"]`)
+      .forEach(node => node.remove())
+    this.holdSpeedRoot = null
   }
 
   hide(): void {
@@ -90,7 +103,10 @@ class DocumentHintManager implements HintManager {
     this.seekSeries = null
     this.root?.style.setProperty('opacity', '0')
     this.root?.style.setProperty('visibility', 'hidden')
+    this.holdSpeedRoot?.style.setProperty('opacity', '0')
+    this.holdSpeedRoot?.style.setProperty('visibility', 'hidden')
     this.root = null
+    this.holdSpeedRoot = null
     this.removeAllHintNodes()
   }
 
@@ -113,6 +129,16 @@ class DocumentHintManager implements HintManager {
     }
   }
 
+  private get holdSpeedRendererContext(): HintRendererContext {
+    return {
+      renderDoc: this.renderDoc,
+      responsive: this.responsive,
+      getRoot: () => this.holdSpeedRoot,
+      createRoot: (id, styles) => this.createHoldSpeedRoot(id, styles),
+      scheduleExit: (delay, callback) => this.scheduleExit(delay, callback),
+    }
+  }
+
   private attachResizeListener(): void {
     if (!this.responsive || this.resizeHandler) return
 
@@ -127,11 +153,14 @@ class DocumentHintManager implements HintManager {
   }
 
   private updateScale(): void {
-    if (!this.responsive || !this.root) return
-    updateHintScale(this.root, this.renderDoc, true)
+    if (!this.responsive) return
+    if (this.root) updateHintScale(this.root, this.renderDoc, true)
+    if (this.holdSpeedRoot) updateHintScale(this.holdSpeedRoot, this.renderDoc, true)
   }
 
   private repositionActiveHint(): void {
+    if (this.holdSpeedRoot) positionHoldSpeedHint(this.holdSpeedRoot, this.renderDoc)
+
     const root = this.root
     const request = this.activeRequest
     if (!root || !request) return
@@ -156,8 +185,8 @@ class DocumentHintManager implements HintManager {
       case 'seek':
         positionSeekHint(root, this.renderDoc, this.responsive, request.direction)
         return
-      case 'spaceHold':
-        positionSpaceHoldHint(root, this.renderDoc)
+      case 'holdSpeed':
+        positionHoldSpeedHint(root, this.renderDoc)
         return
     }
   }
@@ -191,6 +220,7 @@ class DocumentHintManager implements HintManager {
       })
     }
     this.root = null
+    this.holdSpeedRoot = null
   }
 
   private createRoot(id: string, styles: StyleMap): HTMLElement {
@@ -198,6 +228,7 @@ class DocumentHintManager implements HintManager {
     let root: HTMLElement | null = null
 
     for (const hintId of HINT_IDS) {
+      if (hintId === HOLD_SPEED_HINT_ID) continue
       for (const node of this.renderDoc.querySelectorAll<HTMLElement>(`[id="${hintId}"]`)) {
         if (hintId === id && root === null) {
           root = node
@@ -217,6 +248,30 @@ class DocumentHintManager implements HintManager {
     updateHintScale(root, this.renderDoc, this.responsive)
     if (root.parentElement !== host) host.appendChild(root)
     this.root = root
+    return root
+  }
+
+  private createHoldSpeedRoot(id: string, styles: StyleMap): HTMLElement {
+    const host = getHintRenderHost(this.renderDoc)
+    let root: HTMLElement | null = null
+
+    for (const node of this.renderDoc.querySelectorAll<HTMLElement>(
+      `[id="${HOLD_SPEED_HINT_ID}"]`
+    )) {
+      if (root === null) {
+        root = node
+        continue
+      }
+
+      node.remove()
+    }
+
+    if (root === null) root = this.renderDoc.createElement('div')
+    root.id = id
+    Object.assign(root.style, styles)
+    updateHintScale(root, this.renderDoc, this.responsive)
+    if (root.parentElement !== host) host.appendChild(root)
+    this.holdSpeedRoot = root
     return root
   }
 }

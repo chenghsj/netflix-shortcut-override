@@ -29,7 +29,7 @@ import { EXTERNAL_LINKS, getShortcutOverrideRatingUrl } from '@/shared/external-
 import { resolveLocalePreference } from '@/shared/browser-locale'
 import { getBrowserCapabilities } from '@/shared/browser-capabilities'
 import { getCopy } from '@/shared/i18n'
-import { SEEK_LIMITS, SPACE_HOLD_LIMITS, SPEED_LIMITS } from '@/shared/shortcut-settings'
+import { HOLD_SPEED_LIMITS, SEEK_LIMITS, SPEED_LIMITS } from '@/shared/shortcut-settings'
 import type { ShortcutAction } from '@/shared/shortcut-types'
 import { useShortcutSettingsForm } from '@/shared/use-shortcut-settings-form'
 import { useTheme } from '@/shared/use-theme'
@@ -47,6 +47,7 @@ const POPUP_SHORTCUT_ACTIONS: ShortcutAction[] = [
   'skipIntro',
   'speedUp',
   'speedDown',
+  'setPreferredSpeed',
   'speedReset',
 ]
 
@@ -71,7 +72,7 @@ export function PopupApp() {
     updateSettings,
     speed: speedForm,
     seek: seekForm,
-    spaceHold: spaceHoldForm,
+    holdSpeed: holdSpeedForm,
   } = useShortcutSettingsForm()
   const {
     pageStatus,
@@ -273,6 +274,23 @@ export function PopupApp() {
             </h2>
             <div className="flex flex-col gap-2">
               <NumericSettingField
+                  id="popup-preferred-speed"
+                  label={copy.preferredSpeed}
+                  tooltip={copy.preferredSpeedTooltip}
+                  orientation="horizontal"
+                  fieldClassName="items-center justify-between gap-3"
+                  labelClassName="min-w-0 truncate text-xs"
+                  min={SPEED_LIMITS.preferred.min}
+                  max={SPEED_LIMITS.preferred.max}
+                  step={SPEED_LIMITS.preferred.inputStep}
+                  value={speedForm.draft.preferred}
+                  data-speed-field="preferred"
+                  inputClassName={popupSpeedInputClassName}
+                  onValueChange={value => speedForm.setField('preferred', value)}
+                  onBlur={() => speedForm.commitField('preferred')}
+                  onKeyDown={speedForm.handleKeyDown}
+              />
+              <NumericSettingField
                   id="popup-min-speed"
                   label={copy.minSpeed}
                   tooltip={copy.minSpeedTooltip}
@@ -358,37 +376,29 @@ export function PopupApp() {
             </h2>
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between gap-3">
-                <label htmlFor="popup-enable-space-hold" className="min-w-0 text-xs font-medium">
+                <label htmlFor="popup-enable-hold-speed" className="min-w-0 text-xs font-medium">
                   {copy.holdSpeedEnabled}
                 </label>
                 <Switch
-                  id="popup-enable-space-hold"
-                  checked={settings.spaceHold.enabled}
-                  onCheckedChange={enabled =>
-                    updateSettings(current => ({
-                      ...current,
-                      spaceHold: { ...current.spaceHold, enabled },
-                    }))
-                  }
+                  id="popup-enable-hold-speed"
+                  checked={holdSpeedForm.enabled}
+                  disabled={holdSpeedForm.enableControlDisabled}
+                  onCheckedChange={holdSpeedForm.setEnabled}
                   aria-label={`${copy.holdSpeed}: ${copy.holdSpeedEnabled}`}
                 />
               </div>
               <div className="flex items-center justify-between gap-3">
                 <label
-                  htmlFor="popup-show-space-hold-hint"
+                  htmlFor="popup-show-hold-speed-hint"
                   className="min-w-0 text-xs font-medium"
                 >
                   {copy.holdSpeedHint}
                 </label>
                 <Switch
-                  id="popup-show-space-hold-hint"
-                  checked={settings.spaceHold.showHint}
-                  onCheckedChange={showHint =>
-                    updateSettings(current => ({
-                      ...current,
-                      spaceHold: { ...current.spaceHold, showHint },
-                    }))
-                  }
+                  id="popup-show-hold-speed-hint"
+                  checked={holdSpeedForm.showHint}
+                  disabled={holdSpeedForm.detailsDisabled}
+                  onCheckedChange={holdSpeedForm.setShowHint}
                   aria-label={`${copy.holdSpeed}: ${copy.holdSpeedHint}`}
                 />
               </div>
@@ -399,15 +409,15 @@ export function PopupApp() {
                   orientation="horizontal"
                   fieldClassName="items-center justify-between gap-3"
                   labelClassName="min-w-0 truncate text-xs"
-                  min={SPACE_HOLD_LIMITS.speed.min}
-                  max={SPACE_HOLD_LIMITS.speed.max}
-                  step={SPACE_HOLD_LIMITS.speed.inputStep}
-                  value={spaceHoldForm.draft.speed}
-                  disabled={!settings.spaceHold.enabled}
+                  min={HOLD_SPEED_LIMITS.speed.min}
+                  max={HOLD_SPEED_LIMITS.speed.max}
+                  step={HOLD_SPEED_LIMITS.speed.inputStep}
+                  value={holdSpeedForm.draft.speed}
+                  disabled={holdSpeedForm.detailsDisabled}
                   inputClassName={popupSpeedInputClassName}
-                  onValueChange={spaceHoldForm.setSpeed}
-                  onBlur={spaceHoldForm.commit}
-                  onKeyDown={spaceHoldForm.handleKeyDown}
+                  onValueChange={holdSpeedForm.setSpeed}
+                  onBlur={holdSpeedForm.commit}
+                  onKeyDown={holdSpeedForm.handleKeyDown}
               />
             </div>
           </section>

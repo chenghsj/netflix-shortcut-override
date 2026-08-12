@@ -151,10 +151,3 @@ export const toggleFullscreen = (targetDoc: Document) => {
     void target.requestFullscreen()
   }
 }
-
-export const isPlainSpaceEvent = (event: KeyboardEvent): boolean =>
-  event.code === 'Space' &&
-  !event.ctrlKey &&
-  !event.altKey &&
-  !event.shiftKey &&
-  !event.metaKey

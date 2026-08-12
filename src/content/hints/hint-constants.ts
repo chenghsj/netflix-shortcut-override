@@ -5,7 +5,7 @@ export const VOLUME_HINT_LABEL_ID = 'shortcut-override-volume-hint-label'
 export const SPEED_HINT_ID = 'shortcut-override-speed-hint'
 export const SPEED_HINT_LABEL_ID = 'shortcut-override-speed-hint-label'
 export const SEEK_HINT_ID = 'shortcut-override-seek-hint'
-export const SPACE_HOLD_HINT_ID = 'shortcut-override-space-hold-hint'
+export const HOLD_SPEED_HINT_ID = 'shortcut-override-hold-speed-hint'
 
 export const HINT_IDS = [
   MEDIA_HINT_ID,
@@ -15,7 +15,7 @@ export const HINT_IDS = [
   SPEED_HINT_ID,
   SPEED_HINT_LABEL_ID,
   SEEK_HINT_ID,
-  SPACE_HOLD_HINT_ID,
+  HOLD_SPEED_HINT_ID,
 ] as const
 
 export const TRANSIENT_HINT_VISIBLE_DURATION_MS = 360
@@ -47,9 +47,9 @@ export const SEEK_HINT_EXIT_TRANSITION = 'opacity 180ms ease-out'
 export const SEEK_ACCUMULATION_WINDOW_MS = 700
 export const SEEK_HINT_EDGE_INSET_PX = 48
 export const SEEK_HINT_OUTER_TRANSFORM = 'translateY(-50%)'
-export const SPACE_HOLD_HINT_VISIBLE_TRANSFORM = 'translate(-50%,0)'
-export const SPACE_HOLD_HINT_HIDDEN_TRANSFORM = 'translate(-50%,-6px)'
-export const SPACE_HOLD_HINT_ENTER_TRANSITION =
+export const HOLD_SPEED_HINT_VISIBLE_TRANSFORM = 'translate(-50%,0)'
+export const HOLD_SPEED_HINT_HIDDEN_TRANSFORM = 'translate(-50%,-6px)'
+export const HOLD_SPEED_HINT_ENTER_TRANSITION =
   'opacity 140ms ease,transform 140ms cubic-bezier(0.2,0.8,0.2,1)'
 export const HINT_SCALE_CSS_VAR = '--shortcut-override-hint-scale'
 export const PIP_HINT_COMPACT_SCALE = 0.86

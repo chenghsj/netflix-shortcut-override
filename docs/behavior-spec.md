@@ -47,7 +47,8 @@ This document defines observable product behavior. Domain terms have the meaning
 
 - A handled shortcut may show transient visual feedback without taking focus or blocking playback interaction.
 - Repeated volume or speed actions update the visible feedback in place. Repeated seeks in the same direction accumulate during the feedback window; changing direction starts new feedback.
-- Space-hold feedback remains visible while hold speed is active and disappears after release.
+- Play / Pause hold feedback remains visible while hold speed is active and disappears after release.
+- Using Increase Speed, Decrease Speed, Preferred Speed, or Reset Speed while hold speed is active ends the hold interaction immediately. Its hint disappears, the explicit speed command becomes the new persistent speed, and releasing Play / Pause does not restore the pre-hold speed or toggle playback.
 - Feedback shown in the PiP window scales with the window, stays within the video viewport, and remains visually separate from mirrored subtitles and transport controls.
 
 ## Netflix subtitles
@@ -57,6 +58,13 @@ This document defines observable product behavior. Domain terms have the meaning
 - A successful shortcut shows the same subtitle-settings icon used by PiP controls in the standard circular, text-free transient hint. The icon is white when subtitles are enabled and dimmed when they are disabled. If the Netflix subtitle API is unavailable, it reports failure without guessing from transient subtitle DOM content.
 - When PiP opens, it reads the active Netflix playback session's native subtitle state and uses that state to initialize the subtitle switch and mirrored-subtitle visibility. The extension's last stored PiP subtitle-visibility value is only a fallback when the Netflix API state is unavailable.
 - In PiP, the subtitle switch toggles Netflix's native subtitle track and updates mirrored-subtitle visibility from the API's resulting state. Using the subtitle shortcut inside PiP updates the same switch and stored fallback value. Once a subtitle action is issued from PiP, a successful API result updates the stored fallback even if PiP closes before the result arrives.
+
+## Settings backup and restore
+
+- Export produces a versioned JSON backup containing the complete normalized settings state and source metadata.
+- Import validates the backup format, metadata, supported settings version, and every required field for the current settings schema before previewing or writing anything.
+- Older supported settings versions may be migrated through the same normalization rules used for synced settings. A newer or malformed settings version is rejected.
+- Import shows a summary and requires explicit confirmation before replacing current settings. A validation or storage failure leaves the current settings unchanged and reports the failure.
 
 ## Recoverable video replacement and episode transitions
 

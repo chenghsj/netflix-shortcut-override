@@ -29,6 +29,7 @@ export function NumericSettingField({
   fieldClassName,
   labelClassName,
   inputClassName,
+  onWheel,
   ...inputProps
 }: NumericSettingFieldProps) {
   return (
@@ -46,6 +47,10 @@ export function NumericSettingField({
         value={value}
         className={inputClassName}
         onChange={event => onValueChange(event.target.value)}
+        onWheel={event => {
+          onWheel?.(event)
+          if (!event.defaultPrevented) event.currentTarget.blur()
+        }}
       />
     </Field>
   )

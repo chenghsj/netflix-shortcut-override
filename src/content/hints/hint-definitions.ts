@@ -309,10 +309,11 @@ export type HintRequest =
   | { type: 'volume'; icon: HintIcon; label: string }
   | { type: 'speed'; icon: HintIcon; label: string }
   | { type: 'seek'; direction: -1 | 1; seconds: number }
-  | { type: 'spaceHold'; label: string }
+  | { type: 'holdSpeed'; label: string }
 
 export interface HintManager {
   show(request: HintRequest): void
+  hideHoldSpeed(): void
   hide(): void
   destroy(): void
 }

@@ -50,6 +50,25 @@ describe('Netflix playback session', () => {
     expect(transport).toHaveBeenNthCalledWith(3, 'setPlaybackRate', 1.25)
   })
 
+  it('reports a playback-rate failure when no Netflix player is available', async () => {
+    const transport = vi.fn().mockResolvedValue({
+      success: true,
+      result: {
+        action: 'setPlaybackRate',
+        playerApiFound: true,
+        playerFound: false,
+        seekCalled: false,
+        sessionIds: [],
+      },
+    })
+    const video = document.createElement('video')
+    const session = createNetflixPlaybackSession(transport)
+
+    const result = await session.setPlaybackRate(video, 2)
+
+    expect(result.failureLabel).toBe('setPlaybackRate failed: no Netflix player')
+  })
+
   it('owns volume adjustment and mute restoration state', async () => {
     const transport = createTransport()
     const video = document.createElement('video')
