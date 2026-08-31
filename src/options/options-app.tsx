@@ -3,6 +3,7 @@ import {
   CircleHelpIcon,
   GaugeIcon,
   KeyboardIcon,
+  PencilIcon,
   PlayIcon,
   RotateCcwIcon,
   SettingsIcon,
@@ -391,9 +392,11 @@ export function OptionsApp() {
                               />
                             </TableCell>
                             <TableCell>
-                              <div className="flex justify-end gap-2">
+                              <div className="flex items-center justify-end gap-2">
                                 <Button
-                                  variant="outline"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-muted-foreground hover:text-foreground focus-visible:text-foreground"
                                   disabled={!actionSupported}
                                   onClick={() =>
                                     setRecorder({
@@ -402,12 +405,14 @@ export function OptionsApp() {
                                       savedKey: settings.bindings[action].key,
                                     })
                                   }
+                                  aria-label={`${copy.edit} ${copy.actions[action]}`}
                                 >
-                                  {copy.edit}
+                                  <PencilIcon />
                                 </Button>
                                 <Button
                                   variant="ghost"
                                   size="icon"
+                                  className="text-muted-foreground hover:text-foreground focus-visible:text-foreground"
                                   disabled={!actionSupported}
                                   onClick={() =>
                                     updateSettings(current => ({
@@ -467,6 +472,7 @@ export function OptionsApp() {
                         data-speed-field="preferred"
                         onValueChange={value => speedForm.setField('preferred', value)}
                         onBlur={() => speedForm.commitField('preferred')}
+                        onDragCommit={() => speedForm.commitField('preferred')}
                         onKeyDown={speedForm.handleKeyDown}
                     />
                     <NumericSettingField
@@ -480,6 +486,7 @@ export function OptionsApp() {
                         data-speed-field="min"
                         onValueChange={value => speedForm.setField('min', value)}
                         onBlur={() => speedForm.commitField('min')}
+                        onDragCommit={() => speedForm.commitField('min')}
                         onKeyDown={speedForm.handleKeyDown}
                     />
                     <NumericSettingField
@@ -493,6 +500,7 @@ export function OptionsApp() {
                         data-speed-field="max"
                         onValueChange={value => speedForm.setField('max', value)}
                         onBlur={() => speedForm.commitField('max')}
+                        onDragCommit={() => speedForm.commitField('max')}
                         onKeyDown={speedForm.handleKeyDown}
                     />
                     <NumericSettingField
@@ -506,6 +514,7 @@ export function OptionsApp() {
                         data-speed-field="step"
                         onValueChange={value => speedForm.setField('step', value)}
                         onBlur={() => speedForm.commitField('step')}
+                        onDragCommit={() => speedForm.commitField('step')}
                         onKeyDown={speedForm.handleKeyDown}
                     />
                   </FieldGroup>
@@ -541,6 +550,7 @@ export function OptionsApp() {
                       value={seekForm.draft.seconds}
                       onValueChange={seekForm.setSeconds}
                       onBlur={seekForm.commit}
+                      onDragCommit={seekForm.commit}
                       onKeyDown={seekForm.handleKeyDown}
                     />
                   </FieldGroup>
@@ -567,7 +577,12 @@ export function OptionsApp() {
                 <CardContent>
                   <FieldGroup>
                     <div className="flex items-center justify-between gap-3">
-                      <FieldLabel htmlFor="enable-hold-speed">{copy.holdSpeedEnabled}</FieldLabel>
+                      <FieldLabel
+                        htmlFor="enable-hold-speed"
+                        aria-disabled={holdSpeedForm.enableControlDisabled}
+                      >
+                        {copy.holdSpeedEnabled}
+                      </FieldLabel>
                       <Switch
                         id="enable-hold-speed"
                         checked={holdSpeedForm.enabled}
@@ -577,7 +592,12 @@ export function OptionsApp() {
                       />
                     </div>
                     <div className="flex items-center justify-between gap-3">
-                      <FieldLabel htmlFor="show-hold-speed-hint">{copy.holdSpeedHint}</FieldLabel>
+                      <FieldLabel
+                        htmlFor="show-hold-speed-hint"
+                        aria-disabled={holdSpeedForm.detailsDisabled}
+                      >
+                        {copy.holdSpeedHint}
+                      </FieldLabel>
                       <Switch
                         id="show-hold-speed-hint"
                         checked={holdSpeedForm.showHint}
@@ -597,6 +617,7 @@ export function OptionsApp() {
                         disabled={holdSpeedForm.detailsDisabled}
                         onValueChange={holdSpeedForm.setSpeed}
                         onBlur={holdSpeedForm.commit}
+                        onDragCommit={holdSpeedForm.commit}
                         onKeyDown={holdSpeedForm.handleKeyDown}
                     />
                   </FieldGroup>

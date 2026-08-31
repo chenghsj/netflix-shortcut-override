@@ -1,3 +1,4 @@
+import type { ComponentProps } from 'react'
 import { CircleHelpIcon } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
@@ -14,6 +15,7 @@ type SettingLabelWithTooltipProps = {
   tooltip: string
   className?: string
   labelClassName?: string
+  labelProps?: Omit<ComponentProps<typeof FieldLabel>, 'children' | 'className' | 'htmlFor'>
 }
 
 export function SettingLabelWithTooltip({
@@ -22,10 +24,11 @@ export function SettingLabelWithTooltip({
   tooltip,
   className,
   labelClassName,
+  labelProps,
 }: SettingLabelWithTooltipProps) {
   return (
     <div className={cn('flex min-w-0 items-center gap-1.5', className)}>
-      <FieldLabel htmlFor={htmlFor} className={labelClassName}>
+      <FieldLabel {...labelProps} htmlFor={htmlFor} className={labelClassName}>
         {label}
       </FieldLabel>
       <Tooltip>

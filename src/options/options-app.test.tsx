@@ -5,7 +5,7 @@ import { OptionsApp } from '@/options/options-app'
 import { EXTERNAL_LINKS } from '@/shared/external-links'
 import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
 import { createSettingsBackup, serializeSettingsBackup } from '@/shared/settings-backup'
-import { saveSettings } from '@/shared/storage'
+import { getSettings, saveSettings } from '@/shared/storage'
 
 describe('OptionsApp', () => {
   afterEach(() => {
@@ -134,7 +134,9 @@ describe('OptionsApp', () => {
       within(subtitleRow as HTMLElement).getByText('Replaces Netflix: C')
     ).toBeInTheDocument()
 
-    fireEvent.click(within(playPauseRow as HTMLElement).getByRole('button', { name: 'Edit' }))
+    fireEvent.click(
+      within(playPauseRow as HTMLElement).getByRole('button', { name: /^Edit / })
+    )
     expect(screen.getByRole('dialog')).toHaveTextContent(
       'Saving will disable the Netflix keys: Space'
     )
@@ -163,7 +165,7 @@ describe('OptionsApp', () => {
     )
     render(<OptionsApp />)
 
-    fireEvent.click((await screen.findAllByRole('button', { name: 'Edit' }))[0])
+    fireEvent.click((await screen.findAllByRole('button', { name: /^Edit / }))[0])
     const dialog = screen.getByRole('dialog')
     fireEvent.keyDown(dialog, {
       code: 'KeyP',
@@ -183,6 +185,21 @@ describe('OptionsApp', () => {
     fireEvent.blur(stepInput)
 
     await waitFor(() => expect(stepInput).toHaveValue(0.35))
+  })
+
+  it('persists numeric changes when dragging an input label', async () => {
+    render(<OptionsApp />)
+
+    const label = await screen.findByText('Speed adjustment amount')
+    const stepInput = screen.getByLabelText('Speed adjustment amount')
+    fireEvent.pointerDown(label, { button: 0, clientX: 100, pointerId: 1 })
+    fireEvent.pointerMove(label, { clientX: 108, pointerId: 1 })
+    fireEvent.pointerUp(label, { clientX: 108, pointerId: 1 })
+
+    await waitFor(async () => {
+      expect(stepInput).toHaveValue(0.3)
+      expect((await getSettings()).speed.step).toBe(0.3)
+    })
   })
 
   it('persists preferred speed independently from the step range', async () => {
@@ -395,6 +412,12 @@ describe('OptionsApp', () => {
     const playPauseSwitch = screen.getByRole('switch', {
       name: 'Play / Pause (hold for speed) Enabled',
     })
+    const holdSpeedEnabledLabel = screen.getByText('Enabled', {
+      selector: 'label[for="enable-hold-speed"]',
+    })
+    const holdSpeedHintLabel = screen.getByText('Show speed hint', {
+      selector: 'label[for="show-hold-speed-hint"]',
+    })
     const stepInput = screen.getByLabelText('Speed adjustment amount')
     const holdInput = screen.getByLabelText('Hold speed')
     const seekInput = screen.getByLabelText('Seconds per seek')
@@ -412,6 +435,8 @@ describe('OptionsApp', () => {
       expect(globalSwitch).toHaveAttribute('aria-checked', 'false')
       expect(playPauseSwitch).toHaveAttribute('aria-checked', 'false')
       expect(holdInput).toBeDisabled()
+      expect(holdSpeedEnabledLabel).toHaveAttribute('aria-disabled', 'true')
+      expect(holdSpeedHintLabel).toHaveAttribute('aria-disabled', 'true')
       expect(stepInput).toHaveValue(0.35)
       expect(holdInput).toHaveValue(2.5)
       expect(seekInput).toHaveValue(15)
@@ -422,6 +447,8 @@ describe('OptionsApp', () => {
     await waitFor(() => {
       expect(playPauseSwitch).toHaveAttribute('aria-checked', 'true')
       expect(holdInput).not.toBeDisabled()
+      expect(holdSpeedEnabledLabel).toHaveAttribute('aria-disabled', 'false')
+      expect(holdSpeedHintLabel).toHaveAttribute('aria-disabled', 'false')
       expect(globalSwitch).toHaveAttribute('aria-checked', 'false')
       expect(stepInput).toHaveValue(0.35)
       expect(holdInput).toHaveValue(2.5)
@@ -502,7 +529,7 @@ describe('OptionsApp', () => {
 
     expect(await screen.findByTitle('P')).toBeInTheDocument()
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Edit' })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: /^Edit / })[0])
 
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByTitle('P')).toBeInTheDocument()

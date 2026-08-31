@@ -8,7 +8,7 @@ import {
 } from './package-utils.mjs'
 
 const rootDir = process.cwd()
-const distDir = path.join(rootDir, 'dist')
+const distDir = path.join(rootDir, 'dist', 'chromium')
 const releaseAssetsDir = path.join(rootDir, 'release-assets')
 const manifestPath = path.join(distDir, 'manifest.json')
 const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))

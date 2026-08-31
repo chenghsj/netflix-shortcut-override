@@ -208,7 +208,14 @@ describe('PopupApp', () => {
   it('opens the full options page', async () => {
     render(<PopupApp />)
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Open options' }))
+    const openOptionsButton = await screen.findByRole('button', { name: 'Open options' })
+    expect(openOptionsButton).toHaveAttribute('data-variant', 'ghost')
+    expect(openOptionsButton).toHaveAttribute('data-size', 'icon-sm')
+    expect(openOptionsButton).toHaveAttribute('title', 'Open options')
+    expect(openOptionsButton).toHaveTextContent('')
+    expect(openOptionsButton.querySelector('svg')).toBeInTheDocument()
+
+    fireEvent.click(openOptionsButton)
     await act(async () => {
       window.dispatchEvent(new Event('pagehide'))
       await Promise.resolve()

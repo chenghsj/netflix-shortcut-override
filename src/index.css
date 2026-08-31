@@ -94,6 +94,24 @@ body {
   margin: 0;
 }
 
+:where(
+  a[href],
+  button:not(:disabled),
+  select:not(:disabled),
+  label[for]:not([aria-disabled='true']),
+  [role='button']:not([aria-disabled='true']):not([data-disabled]),
+  [role='link']:not([aria-disabled='true']):not([data-disabled]),
+  [role='menuitem']:not([aria-disabled='true']):not([data-disabled]),
+  [role='option']:not([aria-disabled='true']):not([data-disabled]),
+  [role='switch']:not([aria-disabled='true']):not([data-disabled])
+) {
+  cursor: pointer;
+}
+
+:where(label[for][aria-disabled='true']) {
+  cursor: not-allowed;
+}
+
 body.popup-page[data-scroll-locked] {
   margin-right: 0 !important;
 }

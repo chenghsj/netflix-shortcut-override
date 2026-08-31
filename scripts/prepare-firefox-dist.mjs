@@ -7,8 +7,8 @@ import { preparePackageDirectory } from './package-utils.mjs'
 const rootDir = process.cwd()
 
 export const prepareFirefoxDist = async ({
-  sourceDir = path.join(rootDir, 'dist'),
-  outputDir = path.join(rootDir, 'firefox-dist'),
+  sourceDir = path.join(rootDir, 'dist', 'chromium'),
+  outputDir = path.join(rootDir, 'dist', 'firefox'),
 } = {}) => {
   await preparePackageDirectory({
     sourceDir,

@@ -8,7 +8,7 @@ Use this when validating actual Netflix behavior:
 
 - Real Google Chrome profile.
 - Real logged-in Netflix watch page.
-- Production extension loaded from `dist`, or the currently installed Chrome Web Store extension when validating the shipped version.
+- Production extension loaded from `dist/chromium`, or the currently installed Chrome Web Store extension when validating the shipped version.
 - Real keyboard shortcuts against Netflix playback.
 
 Do not treat a fake page or isolated test browser as a substitute for this check.
@@ -33,13 +33,13 @@ Do not use:
 npm run build
 ```
 
-The unpacked extension directory is `<repository-root>/dist`. For example, from the repository root:
+The unpacked extension directory is `<repository-root>/dist/chromium`. For example, from the repository root:
 
 ```sh
 pwd
 ```
 
-Append `/dist` to the printed path when selecting the unpacked extension.
+Append `/dist/chromium` to the printed path when selecting the unpacked extension.
 
 ## 2. Load the Extension in the Real Chrome Profile
 
@@ -49,10 +49,10 @@ Skip this section only when intentionally testing the Chrome Web Store version t
 2. Go to `chrome://extensions`.
 3. Enable Developer mode.
 4. Click Load unpacked.
-5. Select the `dist` directory inside the repository:
+5. Select the `dist/chromium` directory inside the repository:
 
 ```text
-<repository-root>/dist
+<repository-root>/dist/chromium
 ```
 
 Chrome assigns an ID to this unpacked extension. It may differ from the Chrome Web Store ID:
@@ -238,7 +238,7 @@ Environment:
 
 - Real `/Applications/Google Chrome.app`.
 - Real Netflix watch page.
-- Installed `Shortcut Override for Netflix` was the Chrome Web Store version, not the local `dist` unpacked build.
+- Installed `Shortcut Override for Netflix` was the Chrome Web Store version, not the local `dist/chromium` unpacked build.
 - `@Chrome` could list real tabs, but `browser.user.claimTab(tab)` timed out.
 - Computer Use opened and tested the visible real Chrome tab.
 
@@ -267,7 +267,7 @@ Code follow-up from this run:
 - Added unit test coverage for the current Netflix Traditional Chinese skip intro copy.
 - Verified with `npm run typecheck`, `npm run lint`, `npm test -- --run`, and `npm run build`.
 
-To live-test the patched local build, load or switch to the unpacked `dist` extension in the real Chrome profile first. Do not assume the Chrome Web Store extension uses local source changes.
+To live-test the patched local build, load or switch to the unpacked `dist/chromium` extension in the real Chrome profile first. Do not assume the Chrome Web Store extension uses local source changes.
 
 ## 9. Historical Blocker Observed, 2026-05-18
 

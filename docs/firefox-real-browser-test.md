@@ -8,9 +8,9 @@ Use this checklist to verify the Firefox-specific build locally. It covers Firef
 2. Run `npm run build:firefox`.
 3. In Firefox, open `about:debugging#/runtime/this-firefox`.
 4. Choose "Load Temporary Add-on…".
-5. Select `firefox-dist/manifest.json`.
+5. Select `dist/firefox/manifest.json`.
 
-The generated `firefox-dist` directory is disposable. The Chromium build remains in `dist`.
+The generated `dist/firefox` directory is disposable. The Chromium build remains in `dist/chromium`.
 
 ## Netflix smoke test
 

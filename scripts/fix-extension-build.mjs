@@ -2,7 +2,8 @@ import { readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
 const rootDir = process.cwd()
-const distDir = path.join(rootDir, 'dist')
+const distDir = path.resolve(rootDir, process.argv[2] ?? 'dist')
+const distLabel = path.relative(rootDir, distDir)
 const assetsDir = path.join(distDir, 'assets')
 const serviceWorkerLoader = path.join(distDir, 'service-worker-loader.js')
 const optionsHtml = path.join(distDir, 'options.html')
@@ -80,17 +81,19 @@ await writeFile(serviceWorkerLoader, `import './assets/${backgroundAsset}';\n`)
 
 const optionsSource = await readFile(optionsHtml, 'utf8')
 if (optionsSource.includes('CRXJS DEV MODE') || optionsSource.includes('loading-page')) {
-  throw new Error('dist/options.html was generated as a CRXJS dev loading page.')
+  throw new Error(`${distLabel}/options.html was generated as a CRXJS dev loading page.`)
 }
 
 const popupSource = await readFile(popupHtml, 'utf8')
 if (popupSource.includes('CRXJS DEV MODE') || popupSource.includes('loading-page')) {
-  throw new Error('dist/popup.html was generated as a CRXJS dev loading page.')
+  throw new Error(`${distLabel}/popup.html was generated as a CRXJS dev loading page.`)
 }
 
 const serviceWorkerSource = await readFile(serviceWorkerLoader, 'utf8')
 if (serviceWorkerSource.includes('localhost') || serviceWorkerSource.includes('@vite')) {
-  throw new Error('dist/service-worker-loader.js still points at the Vite dev server.')
+  throw new Error(
+    `${distLabel}/service-worker-loader.js still points at the Vite dev server.`
+  )
 }
 
 const distFiles = await collectFiles(distDir)
@@ -108,7 +111,7 @@ for (const file of textDistFiles) {
 
 if (devBuildMatches.length > 0) {
   throw new Error(
-    `Production dist contains CRXJS/Vite dev-server artifacts:\n${devBuildMatches.join('\n')}`
+    `Production ${distLabel} contains CRXJS/Vite dev-server artifacts:\n${devBuildMatches.join('\n')}`
   )
 }
 

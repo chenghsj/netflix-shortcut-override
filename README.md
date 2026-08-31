@@ -168,11 +168,11 @@ For persistent installation and automatic updates, install the [Mozilla-signed v
 
 5. Click "Load unpacked".
 
-6. Select the generated `dist` directory in this repository.
+6. Select the generated `dist/chromium` directory in this repository.
 
 7. Open the extension options page and configure shortcuts.
 
-Do not load the repository root. Chrome should load `dist`.
+Do not load the repository root. Chrome should load `dist/chromium`.
 
 To test Firefox locally, build its browser-specific directory:
 
@@ -180,7 +180,7 @@ To test Firefox locally, build its browser-specific directory:
 npm run build:firefox
 ```
 
-Then open `about:debugging#/runtime/this-firefox`, choose "Load Temporary Add-on…", and select `firefox-dist/manifest.json`. See [the Firefox browser test guide](docs/firefox-real-browser-test.md) for the smoke-test checklist.
+Then open `about:debugging#/runtime/this-firefox`, choose "Load Temporary Add-on…", and select `dist/firefox/manifest.json`. See [the Firefox browser test guide](docs/firefox-real-browser-test.md) for the smoke-test checklist.
 
 ## Development
 
@@ -202,17 +202,18 @@ Keep this terminal running while testing the unpacked extension. If the dev serv
 
 Reload the extension in `chrome://extensions` after changes that affect the manifest, service worker startup, or content script registration. UI-only changes should usually update through CRXJS HMR.
 
-The default `npm run build` command also creates the Firefox-specific output. Load `firefox-dist/manifest.json` as a temporary add-on from `about:debugging`. Firefox uses the same source code and settings; the Picture-in-Picture shortcut is disabled and passes through.
+The default `npm run build` command creates both browser-specific outputs under `dist`. Load `dist/firefox/manifest.json` as a temporary add-on from `about:debugging`. Firefox uses the same source code and settings; the Picture-in-Picture shortcut is disabled and passes through.
 
 ## Scripts
 
 | Command | Description |
 | --- | --- |
 | `npm run dev` | Remove `dist` and start the CRXJS/Vite dev server with HMR. |
-| `npm run build` | Type-check and build Chromium `dist/`, then prepare Firefox `firefox-dist/`. |
+| `npm run build` | Type-check and build Chromium `dist/chromium`, then prepare Firefox `dist/firefox`. |
+| `npm run build:chromium` | Build the Chromium extension in `dist/chromium`. |
 | `npm run build:firefox` | Compatibility alias for `npm run build`. |
 | `npm run prepare:firefox` | Convert the Chromium build output into a Firefox-compatible manifest. |
-| `npm run lint:firefox` | Run `web-ext lint` against `firefox-dist`. |
+| `npm run lint:firefox` | Run `web-ext lint` against `dist/firefox`. |
 | `npm run package:chromium` | Create the keyless Chromium ZIP. |
 | `npm run package:firefox` | Create Firefox extension/source ZIPs for local use or manual AMO upload. |
 | `npm run package:checksums` | Create `SHA256SUMS` for all three release ZIPs. |
@@ -436,7 +437,7 @@ Then reload the unpacked extension again.
 
 During `npm run dev`, CRXJS HMR should update UI code while the dev server is running. Some extension changes still require a manual reload.
 
-1. Confirm Chrome loaded the `dist` folder.
+1. Confirm Chrome loaded the `dist/chromium` folder for a production build, or `dist` while using `npm run dev`.
 2. Confirm `npm run dev` is still running.
 3. Click reload for the extension in `chrome://extensions` if the change touches the manifest, service worker, or content script registration.
 4. Refresh any open Netflix watch tabs.
@@ -483,13 +484,13 @@ Build first:
 npm run build
 ```
 
-Create a zip from the contents of `dist`:
+Create a zip from the contents of `dist/chromium`:
 
 ```sh
-(cd dist && zip -r ../shortcut-override-for-netflix.zip .)
+(cd dist/chromium && zip -r ../../shortcut-override-for-netflix.zip .)
 ```
 
-The zip root should contain `manifest.json`, not a nested `dist` folder.
+The zip root should contain `manifest.json`, not nested `dist/chromium` folders.
 
 To create the keyless release package for Chrome Web Store or Microsoft Edge Partner Center:
 

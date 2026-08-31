@@ -1,9 +1,9 @@
 import {
   ChevronsLeftRightIcon,
   AlertCircleIcon,
-  ExternalLinkIcon,
   GaugeIcon,
   KeyboardIcon,
+  Settings2Icon,
   SettingsIcon,
   StarIcon,
 } from 'lucide-react'
@@ -123,13 +123,15 @@ export function PopupApp() {
               />
               )}
             <Button
-              variant="outline"
-              size="sm"
+              type="button"
+              variant="ghost"
+              size="icon-sm"
               className="shrink-0"
+              aria-label={copy.openOptions}
+              title={copy.openOptions}
               onClick={() => openOptionsPage(suppressFocusRestoration)}
             >
-              <ExternalLinkIcon data-icon="inline-start" />
-              {copy.openOptions}
+              <Settings2Icon aria-hidden="true" />
             </Button>
           </header>
 
@@ -288,6 +290,7 @@ export function PopupApp() {
                   inputClassName={popupSpeedInputClassName}
                   onValueChange={value => speedForm.setField('preferred', value)}
                   onBlur={() => speedForm.commitField('preferred')}
+                  onDragCommit={() => speedForm.commitField('preferred')}
                   onKeyDown={speedForm.handleKeyDown}
               />
               <NumericSettingField
@@ -305,6 +308,7 @@ export function PopupApp() {
                   inputClassName={popupSpeedInputClassName}
                   onValueChange={value => speedForm.setField('min', value)}
                   onBlur={() => speedForm.commitField('min')}
+                  onDragCommit={() => speedForm.commitField('min')}
                   onKeyDown={speedForm.handleKeyDown}
               />
               <NumericSettingField
@@ -322,6 +326,7 @@ export function PopupApp() {
                   inputClassName={popupSpeedInputClassName}
                   onValueChange={value => speedForm.setField('max', value)}
                   onBlur={() => speedForm.commitField('max')}
+                  onDragCommit={() => speedForm.commitField('max')}
                   onKeyDown={speedForm.handleKeyDown}
               />
               <NumericSettingField
@@ -339,6 +344,7 @@ export function PopupApp() {
                   inputClassName={popupSpeedInputClassName}
                   onValueChange={value => speedForm.setField('step', value)}
                   onBlur={() => speedForm.commitField('step')}
+                  onDragCommit={() => speedForm.commitField('step')}
                   onKeyDown={speedForm.handleKeyDown}
               />
             </div>
@@ -364,6 +370,7 @@ export function PopupApp() {
                 inputClassName={popupSpeedInputClassName}
                 onValueChange={seekForm.setSeconds}
                 onBlur={seekForm.commit}
+                onDragCommit={seekForm.commit}
                 onKeyDown={seekForm.handleKeyDown}
               />
             </div>
@@ -376,7 +383,11 @@ export function PopupApp() {
             </h2>
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between gap-3">
-                <label htmlFor="popup-enable-hold-speed" className="min-w-0 text-xs font-medium">
+                <label
+                  htmlFor="popup-enable-hold-speed"
+                  aria-disabled={holdSpeedForm.enableControlDisabled}
+                  className="min-w-0 text-xs font-medium"
+                >
                   {copy.holdSpeedEnabled}
                 </label>
                 <Switch
@@ -390,6 +401,7 @@ export function PopupApp() {
               <div className="flex items-center justify-between gap-3">
                 <label
                   htmlFor="popup-show-hold-speed-hint"
+                  aria-disabled={holdSpeedForm.detailsDisabled}
                   className="min-w-0 text-xs font-medium"
                 >
                   {copy.holdSpeedHint}
@@ -417,6 +429,7 @@ export function PopupApp() {
                   inputClassName={popupSpeedInputClassName}
                   onValueChange={holdSpeedForm.setSpeed}
                   onBlur={holdSpeedForm.commit}
+                  onDragCommit={holdSpeedForm.commit}
                   onKeyDown={holdSpeedForm.handleKeyDown}
               />
             </div>
