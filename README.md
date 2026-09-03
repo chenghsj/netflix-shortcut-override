@@ -174,10 +174,10 @@ For persistent installation and automatic updates, install the [Mozilla-signed v
 
 Do not load the repository root. Chrome should load `dist/chromium`.
 
-To test Firefox locally, build its browser-specific directory:
+To test Firefox locally, build both browser-specific directories:
 
 ```sh
-npm run build:firefox
+npm run build
 ```
 
 Then open `about:debugging#/runtime/this-firefox`, choose "Load Temporary Add-on…", and select `dist/firefox/manifest.json`. See [the Firefox browser test guide](docs/firefox-real-browser-test.md) for the smoke-test checklist.
@@ -196,7 +196,7 @@ Use the default development command when working on the extension loaded in Chro
 npm run dev
 ```
 
-This matches the CRXJS development flow: it removes the old `dist` directory and starts the CRXJS/Vite dev server with HMR.
+This starts the CRXJS/Vite development server with HMR.
 
 Keep this terminal running while testing the unpacked extension. If the dev server stops, Chrome can show the CRXJS dev loading page for extension pages.
 
@@ -208,19 +208,14 @@ The default `npm run build` command creates both browser-specific outputs under 
 
 | Command | Description |
 | --- | --- |
-| `npm run dev` | Remove `dist` and start the CRXJS/Vite dev server with HMR. |
-| `npm run build` | Type-check and build Chromium `dist/chromium`, then prepare Firefox `dist/firefox`. |
+| `npm run dev` | Start the CRXJS/Vite dev server with HMR. |
+| `npm run build` | Clear `dist`, type-check, and build Chromium `dist/chromium` and Firefox `dist/firefox`. |
 | `npm run build:chromium` | Build the Chromium extension in `dist/chromium`. |
-| `npm run build:firefox` | Compatibility alias for `npm run build`. |
-| `npm run prepare:firefox` | Convert the Chromium build output into a Firefox-compatible manifest. |
+| `npm run build:firefox` | Build the Firefox extension in `dist/firefox`. |
 | `npm run lint:firefox` | Run `web-ext lint` against `dist/firefox`. |
-| `npm run package:chromium` | Create the keyless Chromium ZIP. |
-| `npm run package:firefox` | Create Firefox extension/source ZIPs for local use or manual AMO upload. |
-| `npm run package:checksums` | Create `SHA256SUMS` for all three release ZIPs. |
 | `npm run lint` | Run ESLint. |
 | `npm test` | Run Vitest tests. |
 | `npm run test:coverage` | Run the complete test suite with enforced coverage thresholds. |
-| `npm run version:check` | Confirm the package and manifest versions match. |
 | `npm run icons` | Regenerate PNG icons from `public/icons/icon.svg`. |
 | `npm run changelog` | Generate release notes from git commits. |
 
@@ -232,19 +227,13 @@ The default `npm run build` command creates both browser-specific outputs under 
 |   |-- ci.yml
 |   `-- release.yml
 |-- public
-|   |-- favicon.svg
 |   `-- icons
+|-- manifest.config.ts
 |-- scripts
-|   |-- build-chromium-package.mjs
-|   |-- build-firefox-package.mjs
-|   |-- check-version-consistency.mjs
-|   |-- firefox-config.mjs
-|   |-- fix-extension-build.mjs
 |   |-- generate-icons.mjs
-|   |-- generate-release-notes.mjs
-|   |-- package-utils.mjs
-|   `-- prepare-firefox-dist.mjs
+|   `-- generate-release-notes.mjs
 |-- src
+|   |-- background.ts
 |   |-- background
 |   |-- components
 |   |-- content
@@ -252,7 +241,6 @@ The default `npm run build` command creates both browser-specific outputs under 
 |   |-- options
 |   |-- popup
 |   `-- shared
-|-- manifest.json
 |-- popup.html
 |-- options.html
 `-- vite.config.ts
@@ -274,7 +262,6 @@ Key areas:
 - `src/shared/shortcut-settings.ts`: default settings, validation, and settings normalization.
 - `src/shared/playback-speed.ts`: playback-speed stepping and speed normalization helpers.
 - `src/shared/i18n.ts`: localized options copy and media hint labels.
-- `scripts/fix-extension-build.mjs`: patches and validates the CRXJS production build output.
 
 ## How Shortcut Handling Works
 
@@ -312,7 +299,6 @@ The extension requests:
 Run all local checks:
 
 ```sh
-npm run version:check
 npm run lint
 npm run test:coverage
 npm run build
@@ -329,8 +315,8 @@ The real-Chrome regression flow, including the reload-in-progress popup case, is
 
 Releases are driven by `.github/workflows/release.yml`.
 
-The version in `package.json`, `package-lock.json`, and `manifest.json` must match. For
-example, if the files use version `0.1.0`, the release tag must be:
+The extension version comes from `package.json`. For example, if it is `0.1.0`, the
+release tag must be:
 
 ```text
 v0.1.0
@@ -345,17 +331,15 @@ git push origin v0.1.0
 
 The release workflow will:
 
-1. Validate version consistency.
-2. Install dependencies.
-3. Validate that the tag matches `manifest.json`.
-4. Run lint and tests with coverage thresholds.
-5. Build the extension.
-6. Prepare and lint the Firefox build.
-7. Generate release notes.
-8. Package a Chromium zip file without the manifest `key` field.
-9. Package Firefox extension and source ZIPs for local use or manual AMO upload.
-10. Generate one `SHA256SUMS` file for all three ZIPs.
-11. Publish or update the GitHub Release with all browser packages.
+1. Install dependencies.
+2. Validate that the tag matches `package.json`.
+3. Run lint and tests with coverage thresholds.
+4. Build the extension.
+5. Lint the Firefox build.
+6. Generate release notes.
+7. Package Chromium, Firefox, and source ZIPs.
+8. Generate one `SHA256SUMS` file for all three ZIPs.
+9. Publish or update the GitHub Release with all browser packages.
 
 The generated release assets are:
 
@@ -492,15 +476,9 @@ Create a zip from the contents of `dist/chromium`:
 
 The zip root should contain `manifest.json`, not nested `dist/chromium` folders.
 
-To create the keyless release package for Chrome Web Store or Microsoft Edge Partner Center:
-
-```sh
-npm run package:chromium
-```
-
-That package is written to `release-assets/shortcut-override-for-netflix-chromium-<version>.zip`.
-The same ZIP is used for both stores. Its manifest omits `key`, and the shared
-`short_name` already satisfies Edge validation.
+The same Chromium ZIP is used for Chrome Web Store and Microsoft Edge Partner Center.
+The production manifest omits `key`, and the shared `short_name` already satisfies Edge
+validation. The release workflow also creates the Firefox, source, and checksum assets.
 
 ## License
 

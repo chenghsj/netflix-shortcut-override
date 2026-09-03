@@ -297,7 +297,6 @@ Recommended recovery:
 These checks are useful before manual Netflix validation, but they do not replace it:
 
 ```sh
-npm run version:check
 npm run typecheck
 npm run lint
 npm run test:coverage

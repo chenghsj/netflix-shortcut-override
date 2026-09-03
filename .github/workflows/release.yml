@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Existing release tag. Leave empty to use manifest.json version, for example v0.1.0.'
+        description: 'Existing release tag. Leave empty to use package.json version, for example v0.1.0.'
         required: false
         type: string
 
@@ -43,8 +43,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          manifest_version="$(node -p "JSON.parse(require('fs').readFileSync('manifest.json', 'utf8')).version")"
-          current_tag="v${manifest_version}"
+          package_version="$(node -p "require('./package.json').version")"
+          current_tag="v${package_version}"
 
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             tag="${INPUT_TAG}"
@@ -82,26 +82,23 @@ jobs:
           set -euo pipefail
           git checkout --detach "${{ steps.release_ref.outputs.tag }}"
 
-      - name: Verify version consistency
-        run: npm run version:check
-
       - name: Verify release version
         id: release_version
         shell: bash
         run: |
           set -euo pipefail
 
-          manifest_version="$(node -p "JSON.parse(require('fs').readFileSync('manifest.json', 'utf8')).version")"
-          expected_tag="v${manifest_version}"
+          package_version="$(node -p "require('./package.json').version")"
+          expected_tag="v${package_version}"
           tag="${{ steps.release_ref.outputs.tag }}"
 
           if [[ "${tag}" != "${expected_tag}" ]]; then
-            echo "Release tag ${tag} does not match manifest.json version ${manifest_version}." >&2
-            echo "Update manifest.json or use ${expected_tag}." >&2
+            echo "Release tag ${tag} does not match package.json version ${package_version}." >&2
+            echo "Update package.json or use ${expected_tag}." >&2
             exit 1
           fi
 
-          echo "version=${manifest_version}" >> "${GITHUB_OUTPUT}"
+          echo "version=${package_version}" >> "${GITHUB_OUTPUT}"
 
       - name: Install dependencies
         run: npm ci
@@ -121,14 +118,35 @@ jobs:
       - name: Generate changelog
         run: npm run changelog -- --tag "${{ steps.release_ref.outputs.tag }}" --output release-notes.md
 
-      - name: Package Chromium extension
-        run: npm run package:chromium
+      - name: Package release assets
+        shell: bash
+        run: |
+          set -Eeuo pipefail
 
-      - name: Package Firefox extension and source
-        run: npm run package:firefox
+          version="${{ steps.release_version.outputs.version }}"
+          assets_dir="release-assets"
+          chromium_zip="shortcut-override-for-netflix-chromium-${version}.zip"
+          firefox_zip="shortcut-override-for-netflix-firefox-${version}.zip"
+          source_zip="shortcut-override-for-netflix-source-${version}.zip"
 
-      - name: Generate SHA-256 checksums
-        run: npm run package:checksums
+          mkdir -p "${assets_dir}"
+          find dist/chromium dist/firefox -name .DS_Store -delete
+          jq -e 'has("key") | not' dist/chromium/manifest.json >/dev/null
+
+          (
+            cd dist/chromium
+            zip -X -r "../../${assets_dir}/${chromium_zip}" .
+          )
+          (
+            cd dist/firefox
+            zip -X -r "../../${assets_dir}/${firefox_zip}" .
+          )
+          git archive --format=zip --output="${assets_dir}/${source_zip}" HEAD
+
+          (
+            cd "${assets_dir}"
+            sha256sum "${chromium_zip}" "${firefox_zip}" "${source_zip}" > SHA256SUMS
+          )
 
       - name: Publish GitHub Release
         shell: bash
