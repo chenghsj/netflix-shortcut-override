@@ -20,7 +20,7 @@ describe('shortcut bindings', () => {
     expect(conflict).toBe('seekBackward')
   })
 
-  it('detects conflicts against disabled bindings before they can be re-enabled', () => {
+  it('releases keys belonging to disabled bindings', () => {
     const conflict = findBindingConflict(
       {
         ...DEFAULT_SETTINGS,
@@ -36,7 +36,7 @@ describe('shortcut bindings', () => {
       DEFAULT_SETTINGS.bindings.playPause.key
     )
 
-    expect(conflict).toBe('playPause')
+    expect(conflict).toBeNull()
   })
 
   it('can ignore browser-unsupported actions when checking conflicts', () => {

@@ -1,4 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { requestCaptionMetadata } from './subtitle-practice'
+import { CAPTION_REQUEST_EVENT, CAPTION_RESPONSE_EVENT } from '@/shared/netflix-caption-events'
 
 import {
   NETFLIX_API_BRIDGE_READY_ATTR,
@@ -58,6 +60,46 @@ describe('main-world Netflix API bridge', () => {
 
   it('marks the DOM when the page bridge is ready', () => {
     expect(document.documentElement.getAttribute(NETFLIX_API_BRIDGE_READY_ATTR)).toBe('ready')
+  })
+
+  it('round-trips caption metadata using string details in both worlds', async () => {
+    window.history.replaceState(null, '', '/watch/123')
+    const track = { trackId: 'en', ttDownloadables: { 'webvtt-lssdh': {
+      downloadUrls: { main: 'https://a.nflxvideo.net/sub.vtt' },
+    } } }
+    const player = { getCurrentTime: () => 3500, getTextTrack: () => track, getTextTrackList: () => [track] }
+    Object.assign(window, { netflix: { appContext: { state: { playerApp: { getAPI: () => ({
+      videoPlayer: { getAllPlayerSessionIds: () => ['player'], getVideoPlayerBySessionId: () => player },
+    }) } } } } })
+    const details: unknown[] = []
+    const observe = (event: Event) => details.push((event as CustomEvent).detail)
+    window.addEventListener(CAPTION_REQUEST_EVENT, observe)
+    window.addEventListener(CAPTION_RESPONSE_EVENT, observe)
+    try {
+      await expect(requestCaptionMetadata()).resolves.toMatchObject({
+        key: '123:player:en', watchId: '123', url: 'https://a.nflxvideo.net/sub.vtt', currentMs: 3500,
+      })
+      expect(details).toHaveLength(2)
+      expect(details.every(detail => typeof detail === 'string')).toBe(true)
+    } finally {
+      window.removeEventListener(CAPTION_REQUEST_EVENT, observe)
+      window.removeEventListener(CAPTION_RESPONSE_EVENT, observe)
+    }
+  })
+
+  it('returns caption failure codes through the string protocol', async () => {
+    await expect(requestCaptionMetadata()).rejects.toThrow('watch')
+  })
+
+  it('ignores malformed or untrusted caption requests', () => {
+    const respond = vi.fn()
+    window.addEventListener(CAPTION_RESPONSE_EVENT, respond)
+    try {
+      for (const detail of ['{', 'null', '[]', JSON.stringify({ source: 'other', id: 'test' }), { source: 'shortcut-override', id: 'test' }]) {
+        window.dispatchEvent(new CustomEvent(CAPTION_REQUEST_EVENT, { detail }))
+      }
+      expect(respond).not.toHaveBeenCalled()
+    } finally { window.removeEventListener(CAPTION_RESPONSE_EVENT, respond) }
   })
 
   it('uses the Netflix player seek API without mutating native video time', () => {

@@ -1,3 +1,5 @@
+import { createSubtitlePractice } from './subtitle-practice'
+import { practiceAction } from '@/shared/subtitle-practice'
 import {
   canHandlePlaybackShortcut,
   findVideo,
@@ -28,10 +30,12 @@ let settingsLoaded = false
 let pipManager: PipManager | null = null
 
 const playbackSession = createNetflixPlaybackSession()
+const subtitlePractice = createSubtitlePractice(() => settings, playbackSession, () => pipManager?.recordUserSeek())
 const commandController = createShortcutCommandController(
   () => settings,
   playbackSession,
   {
+    onPlaybackToggleRequested: () => subtitlePractice.cancel(),
     onSeekRequested: () => pipManager?.recordUserSeek(),
     onSubtitlesToggled: (subtitlesEnabled, targetDoc) => {
       if (!isPipDocument(targetDoc)) return
@@ -60,6 +64,7 @@ const stopContentListeners = () => {
   window.removeEventListener('blur', clearHoldSpeedOnWindowBlur)
   document.removeEventListener('visibilitychange', clearHoldSpeedOnVisibilityChange)
   commandController.clearHoldSpeedInteraction()
+  subtitlePractice.cancel()
   pipManager?.destroy()
 }
 
@@ -76,6 +81,21 @@ const handleKeydown = (event: KeyboardEvent, explicitTargetDoc?: Document) => {
 
   if (event.repeat && commandController.shouldInterceptHoldSpeedRepeat(event.code)) {
     interceptShortcutEvent(event)
+    return
+  }
+
+  const practice = settings.subtitlePractice.enabled ? practiceAction(event, settings) : null
+  if (practice) {
+    if (!canHandlePlaybackShortcut(targetDoc) || !findVideo(targetDoc)) return
+    interceptShortcutEvent(event)
+    if (event.repeat) return
+    commandController.clearHoldSpeedInteraction()
+    if (practice === 'playback') {
+      subtitlePractice.cancel()
+      commandController.execute('playPause', targetDoc)
+    } else {
+      void subtitlePractice.execute(practice, targetDoc)
+    }
     return
   }
 
@@ -98,6 +118,7 @@ const handleKeydown = (event: KeyboardEvent, explicitTargetDoc?: Document) => {
 
   if (!canHandlePlaybackShortcut(targetDoc)) return
 
+  if (action) subtitlePractice.cancel()
   if (action === 'playPause') {
     const video = findVideo(targetDoc)
     if (!video) return
@@ -181,6 +202,7 @@ const applySettings = (
   nextSettings: ShortcutSettings,
   subtitleStateConfirmed = false
 ) => {
+  subtitlePractice.updateSettings(nextSettings)
   settings = nextSettings
   settingsLoaded = true
   if (subtitleStateConfirmed) pipManager?.confirmSubtitleState(nextSettings)

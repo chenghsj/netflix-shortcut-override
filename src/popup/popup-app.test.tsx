@@ -2,16 +2,304 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { PopupApp } from '@/popup/popup-app'
+import { registerFeatureAnnouncements } from '@/background/feature-announcements'
 import { EXTERNAL_LINKS } from '@/shared/external-links'
 import { PLAYBACK_FOCUS_RESTORATION_MESSAGE_TYPE } from '@/shared/playback-focus-restoration'
+import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
+import { saveSettings } from '@/shared/storage'
+import { subtitleNavigationAnnouncement } from '@/shared/feature-announcements'
+
+const recordEligibleUpgrade = () => subtitleNavigationAnnouncement.recordInstall(
+  { reason: 'update', previousVersion: '0.6.1' } as chrome.runtime.InstalledDetails, '0.6.2',
+)
 
 const openCompatibilityDiagnostics = async () => {
   fireEvent.click(await screen.findByRole('button', { name: 'Compatibility' }))
 }
 
 describe('PopupApp', () => {
+  const subscriptions: Array<() => void> = []
   afterEach(() => {
+    for (const unsubscribe of subscriptions.splice(0)) unsubscribe()
     vi.restoreAllMocks()
+  })
+
+  it('clears NEW on viewing and does not show the introduction again while the feature remains disabled', async () => {
+    await recordEligibleUpgrade()
+    subscriptions.push(registerFeatureAnnouncements())
+    await vi.waitFor(() => expect(chrome.action.setBadgeText).toHaveBeenLastCalledWith({ text: 'NEW' }))
+    const popup = render(<PopupApp />)
+    const card = await screen.findByRole('region', { name: 'New: Subtitle navigation' })
+    await waitFor(() => expect(chrome.action.setBadgeText).toHaveBeenLastCalledWith({ text: '' }))
+    await waitFor(() => expect(within(card).queryByText('NEW')).not.toBeInTheDocument())
+    expect(within(card).getByRole('button', { name: 'Go to enable' })).toBeInTheDocument()
+    expect((await subtitleNavigationAnnouncement.getState()).pending).toBe(true)
+    expect((await subtitleNavigationAnnouncement.getState()).unread).toBe(false)
+    expect(chrome.storage.sync.set).not.toHaveBeenCalled()
+    expect(chrome.permissions.request).not.toHaveBeenCalled()
+    popup.unmount()
+    render(<PopupApp />)
+    const subtitleSection = await screen.findByRole('region', { name: 'Subtitle navigation' })
+    expect(screen.queryByRole('region', { name: 'New: Subtitle navigation' })).not.toBeInTheDocument()
+    expect(within(subtitleSection).getByRole('button', { name: 'Go to enable' })).toBeInTheDocument()
+    expect(within(subtitleSection).getByText('Not enabled')).toBeInTheDocument()
+  })
+
+  it('does not mark the introduction as seen while settings are still loading', async () => {
+    await recordEligibleUpgrade()
+    const original = vi.mocked(chrome.storage.sync.get).getMockImplementation()!
+    let release!: () => void
+    vi.mocked(chrome.storage.sync.get).mockImplementationOnce((keys, callback) => {
+      release = () => original(keys, callback)
+    })
+    render(<PopupApp />)
+    await waitFor(() => expect(screen.getByRole('main', { name: 'Loading' })).toBeInTheDocument())
+    // Drain the independent announcement read while the settings form is held.
+    await act(async () => { expect((await subtitleNavigationAnnouncement.getState()).pending).toBe(true) })
+    expect(chrome.storage.local.set).not.toHaveBeenCalledWith(
+      { [subtitleNavigationAnnouncement.keys.seen]: true }, expect.any(Function),
+    )
+    expect((await subtitleNavigationAnnouncement.getState()).unread).toBe(true)
+    await act(async () => { release() })
+    await screen.findByRole('region', { name: 'New: Subtitle navigation' })
+    await waitFor(async () => expect((await subtitleNavigationAnnouncement.getState()).unread).toBe(false))
+  })
+
+  it('waits for a hidden popup to become visible before recording a view', async () => {
+    await recordEligibleUpgrade()
+    const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+    render(<PopupApp />)
+    await screen.findByRole('region', { name: 'New: Subtitle navigation' })
+    expect((await subtitleNavigationAnnouncement.getState()).unread).toBe(true)
+    visibility.mockReturnValue('visible')
+    await act(async () => { document.dispatchEvent(new Event('visibilitychange')) })
+    await waitFor(async () => expect((await subtitleNavigationAnnouncement.getState()).unread).toBe(false))
+    expect((await subtitleNavigationAnnouncement.getState()).pending).toBe(true)
+  })
+
+  it('retries recording a view on reopening after a storage failure', async () => {
+    await recordEligibleUpgrade()
+    const original = vi.mocked(chrome.storage.local.set).getMockImplementation()!
+    vi.mocked(chrome.storage.local.set).mockImplementationOnce((_items, callback) => {
+      Object.defineProperty(chrome.runtime, 'lastError', { configurable: true, value: { message: 'Storage unavailable' } })
+      callback?.()
+      Reflect.deleteProperty(chrome.runtime, 'lastError')
+    })
+    const popup = render(<PopupApp />)
+    await screen.findByRole('region', { name: 'New: Subtitle navigation' })
+    await waitFor(() => expect(chrome.storage.local.set).toHaveBeenCalledWith(
+      { [subtitleNavigationAnnouncement.keys.seen]: true }, expect.any(Function),
+    ))
+    expect((await subtitleNavigationAnnouncement.getState()).unread).toBe(true)
+    expect(chrome.storage.sync.set).not.toHaveBeenCalled()
+    popup.unmount()
+    vi.mocked(chrome.storage.local.set).mockImplementation(original)
+    render(<PopupApp />)
+    await screen.findByRole('region', { name: 'New: Subtitle navigation' })
+    await waitFor(async () => expect((await subtitleNavigationAnnouncement.getState()).unread).toBe(false))
+    expect((await subtitleNavigationAnnouncement.getState()).pending).toBe(true)
+  })
+
+  it('retires the introduction when going to settings without requiring activation', async () => {
+    await recordEligibleUpgrade()
+    vi.spyOn(window, 'close').mockImplementation(() => undefined)
+    render(<PopupApp />)
+    const announcement = await screen.findByRole('region', { name: 'New: Subtitle navigation' })
+    expect(announcement).toHaveTextContent('Enable it in settings')
+    fireEvent.click(within(announcement).getByRole('button', { name: 'Go to enable' }))
+    expect(chrome.tabs.create).toHaveBeenCalledWith({
+      url: 'chrome-extension://test-extension-id/options.html#subtitle-navigation',
+    })
+    expect(chrome.permissions.request).not.toHaveBeenCalled()
+    expect(chrome.storage.sync.set).not.toHaveBeenCalled()
+    await waitFor(() => expect(announcement).not.toBeInTheDocument())
+    expect((await subtitleNavigationAnnouncement.getState()).pending).toBe(false)
+    const subtitleSection = screen.getByRole('region', { name: 'Subtitle navigation' })
+    expect(within(subtitleSection).getByText('Not enabled')).toBeInTheDocument()
+  })
+
+  it('opens subtitle settings from the persistent inactive section after the introduction has been read', async () => {
+    await recordEligibleUpgrade()
+    await subtitleNavigationAnnouncement.markSeen()
+    render(<PopupApp />)
+    const subtitleSection = await screen.findByRole('region', { name: 'Subtitle navigation' })
+    expect(screen.queryByRole('region', { name: 'New: Subtitle navigation' })).not.toBeInTheDocument()
+    fireEvent.click(within(subtitleSection).getByRole('button', { name: 'Go to enable' }))
+    expect(chrome.tabs.create).toHaveBeenCalledWith({ url: 'chrome-extension://test-extension-id/options.html#subtitle-navigation' })
+    expect(chrome.permissions.request).not.toHaveBeenCalled()
+    expect(chrome.storage.sync.set).not.toHaveBeenCalled()
+    expect((await subtitleNavigationAnnouncement.getState()).unread).toBe(false)
+  })
+
+  it('persists dismissal across popup sessions while leaving the feature disabled', async () => {
+    await recordEligibleUpgrade()
+    const first = render(<PopupApp />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Dismiss' }))
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'New: Subtitle navigation' })).not.toBeInTheDocument())
+    first.unmount()
+    render(<PopupApp />)
+    await screen.findByRole('region', { name: 'Subtitle navigation' })
+    expect((await subtitleNavigationAnnouncement.getState()).pending).toBe(false)
+    expect(chrome.storage.sync.set).not.toHaveBeenCalled()
+    expect(screen.queryByRole('region', { name: 'New: Subtitle navigation' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the announcement and offers retry when dismissal cannot be saved', async () => {
+    await recordEligibleUpgrade()
+    render(<PopupApp />)
+    await screen.findByRole('button', { name: 'Dismiss' })
+    vi.mocked(chrome.storage.local.set).mockImplementationOnce((_items, callback) => {
+      Object.defineProperty(chrome.runtime, 'lastError', { configurable: true, value: { message: 'Storage unavailable' } })
+      callback?.()
+      Reflect.deleteProperty(chrome.runtime, 'lastError')
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Please try again')
+    expect((await subtitleNavigationAnnouncement.getState()).pending).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'New: Subtitle navigation' })).not.toBeInTheDocument())
+  })
+
+  it('removes the card after activation is persisted in Options', async () => {
+    await recordEligibleUpgrade()
+    render(<PopupApp />)
+    await screen.findByRole('region', { name: 'New: Subtitle navigation' })
+    const settings = structuredClone(DEFAULT_SETTINGS)
+    settings.subtitlePractice.enabled = true
+    await act(async () => { await saveSettings(settings) })
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'New: Subtitle navigation' })).not.toBeInTheDocument())
+    settings.subtitlePractice.enabled = false
+    await act(async () => { await saveSettings(settings) })
+    expect((await subtitleNavigationAnnouncement.getState()).pending).toBe(false)
+  })
+
+  it('keeps the card when activation fails to save', async () => {
+    await recordEligibleUpgrade()
+    render(<PopupApp />)
+    await screen.findByRole('region', { name: 'New: Subtitle navigation' })
+    const settings = structuredClone(DEFAULT_SETTINGS)
+    settings.subtitlePractice.enabled = true
+    vi.mocked(chrome.storage.sync.set).mockImplementationOnce((_items, callback) => {
+      Object.defineProperty(chrome.runtime, 'lastError', { configurable: true, value: { message: 'Save failed' } })
+      callback?.()
+      Reflect.deleteProperty(chrome.runtime, 'lastError')
+    })
+    await expect(saveSettings(settings)).rejects.toThrow('Save failed')
+    expect((await subtitleNavigationAnnouncement.getState()).pending).toBe(true)
+    expect(screen.getByRole('region', { name: 'New: Subtitle navigation' })).toBeInTheDocument()
+  })
+
+  it('honors dismissal changes from another extension page', async () => {
+    await recordEligibleUpgrade()
+    render(<PopupApp />)
+    await screen.findByRole('region', { name: 'New: Subtitle navigation' })
+    await act(async () => { await subtitleNavigationAnnouncement.dismiss() })
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'New: Subtitle navigation' })).not.toBeInTheDocument())
+  })
+
+  it('hides the announcement after a fresh install and reacts to upgrade eligibility from the background', async () => {
+    await subtitleNavigationAnnouncement.recordInstall({ reason: 'install' } as chrome.runtime.InstalledDetails, '0.6.2')
+    render(<PopupApp />)
+    await screen.findByRole('region', { name: 'Subtitle navigation' })
+    expect((await subtitleNavigationAnnouncement.getState()).pending).toBe(false)
+    expect(screen.queryByRole('region', { name: 'New: Subtitle navigation' })).not.toBeInTheDocument()
+    await act(async () => { await recordEligibleUpgrade() })
+    expect(await screen.findByRole('region', { name: 'New: Subtitle navigation' })).toBeInTheDocument()
+  })
+
+  it.each(['subtitle master', 'global override'])('collapses subtitle navigation when the %s is off', async master => {
+    const settings = structuredClone(DEFAULT_SETTINGS)
+    settings.subtitlePractice.enabled = master === 'global override'
+    settings.enabled = master !== 'global override'
+    await saveSettings(settings)
+    render(<PopupApp />)
+
+    const section = await screen.findByRole('region', { name: 'Subtitle navigation' })
+    expect(within(section).getByText('Not enabled')).toBeInTheDocument()
+    expect(within(section).queryByText('Previous subtitle')).not.toBeInTheDocument()
+    const skipIntro = screen.getByText('Skip intro').closest('div') as HTMLElement
+    expect(within(skipIntro).getByText('S')).toBeInTheDocument()
+    expect(screen.queryByText('Subtitle priority')).not.toBeInTheDocument()
+    expect(chrome.permissions.request).not.toHaveBeenCalled()
+  })
+
+  it.each(['Chrome/140.0', 'Firefox/156.0'])('shows configured subtitle keys and precedence in %s', async browser => {
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(`Mozilla/5.0 ${browser}`)
+    const settings = structuredClone(DEFAULT_SETTINGS)
+    settings.subtitlePractice.enabled = true
+    settings.subtitlePractice.bindings.previous.key = {
+      code: 'KeyZ', key: 'z', ctrl: true, alt: false, shift: false, meta: false,
+    }
+    settings.subtitlePractice.bindings.next.enabled = false
+    await saveSettings(settings)
+    render(<PopupApp />)
+
+    const section = await screen.findByRole('region', { name: 'Subtitle navigation' })
+    const previous = within(section).getByText('Previous subtitle').closest('div') as HTMLElement
+    expect(within(previous).getByText('Ctrl')).toBeInTheDocument()
+    expect(within(previous).getByText('Z')).toBeInTheDocument()
+    expect(within(previous).queryByText('A')).not.toBeInTheDocument()
+    const next = within(section).getByText('Next subtitle').closest('div') as HTMLElement
+    expect(within(next).getByText('Disabled')).toBeInTheDocument()
+    const replay = within(section).getByText('Replay current subtitle').closest('div') as HTMLElement
+    expect(within(replay).getByText('S')).toBeInTheDocument()
+    const playback = within(section).getByText('Play / pause').closest('div') as HTMLElement
+    expect(within(playback).getByText('W')).toBeInTheDocument()
+    const skipIntro = screen.getByText('Skip intro').closest('div') as HTMLElement
+    expect(within(skipIntro).getByText('Subtitle priority')).toHaveAttribute(
+      'aria-label', 'This key is used by Replay current subtitle in Subtitle navigation.'
+    )
+    expect(within(skipIntro).queryByText('S')).not.toBeInTheDocument()
+    expect(within(section).queryByRole('button')).not.toBeInTheDocument()
+    expect(within(section).queryByRole('switch')).not.toBeInTheDocument()
+    expect(chrome.permissions.request).not.toHaveBeenCalled()
+  })
+
+  it('updates subtitle precedence when a row or the master is disabled in Options', async () => {
+    const settings = structuredClone(DEFAULT_SETTINGS)
+    settings.subtitlePractice.enabled = true
+    await saveSettings(settings)
+    render(<PopupApp />)
+    await screen.findByText('Subtitle priority')
+
+    settings.subtitlePractice.bindings.replay.enabled = false
+    await act(async () => { await saveSettings(settings) })
+    const skipIntro = screen.getByText('Skip intro').closest('div') as HTMLElement
+    expect(within(skipIntro).getByText('S')).toBeInTheDocument()
+    expect(screen.queryByText('Subtitle priority')).not.toBeInTheDocument()
+    const section = screen.getByRole('region', { name: 'Subtitle navigation' })
+    const replay = within(section).getByText('Replay current subtitle').closest('div') as HTMLElement
+    expect(within(replay).getByText('Disabled')).toBeInTheDocument()
+
+    settings.subtitlePractice.enabled = false
+    await act(async () => { await saveSettings(settings) })
+    expect(within(section).getByText('Not enabled')).toBeInTheDocument()
+    expect(within(section).queryByText('Replay current subtitle')).not.toBeInTheDocument()
+  })
+
+  it('uses physical keys and modifiers for localized custom subtitle precedence', async () => {
+    const settings = structuredClone(DEFAULT_SETTINGS)
+    settings.locale = 'zh-TW'
+    settings.subtitlePractice.enabled = true
+    settings.subtitlePractice.bindings.replay.key.shift = true
+    await saveSettings(settings)
+    render(<PopupApp />)
+    const section = await screen.findByRole('region', { name: '字幕導航' })
+    const skipIntro = screen.getByText('略過片頭').closest('div') as HTMLElement
+    expect(within(skipIntro).getByText('S')).toBeInTheDocument()
+    expect(screen.queryByText('字幕導航優先')).not.toBeInTheDocument()
+
+    // Match the actual shortcut router: physical code and modifiers, not key text.
+    settings.subtitlePractice.bindings.previous.key = {
+      ...settings.bindings.seekForward.key, key: 'custom label',
+    }
+    await act(async () => { await saveSettings(settings) })
+    const seekForward = screen.getByText('快轉').closest('div') as HTMLElement
+    expect(within(seekForward).getByText('字幕導航優先')).toHaveAttribute(
+      'aria-label', '這個按鍵由字幕導航的「上一句」使用。'
+    )
+    expect(within(skipIntro).getByText('S')).toBeInTheDocument()
+    expect(within(section).getByText('→')).toBeInTheDocument()
   })
 
   it('explains prolonged Netflix loading without reporting compatibility ready', async () => {

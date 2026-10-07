@@ -1,3 +1,6 @@
+export const TEXT_HINT_ID = 'shortcut-override-text-hint'
+export const TEXT_HINT_LABEL_ID = 'shortcut-override-text-hint-label'
+export const TEXT_HINT_VISIBLE_DURATION_MS = 5000
 export const MEDIA_HINT_ID = 'shortcut-override-media-hint'
 export const PLAYBACK_HINT_ID = 'shortcut-override-playback-hint'
 export const VOLUME_HINT_ID = 'shortcut-override-volume-hint'
@@ -8,6 +11,8 @@ export const SEEK_HINT_ID = 'shortcut-override-seek-hint'
 export const HOLD_SPEED_HINT_ID = 'shortcut-override-hold-speed-hint'
 
 export const HINT_IDS = [
+  TEXT_HINT_ID,
+  TEXT_HINT_LABEL_ID,
   MEDIA_HINT_ID,
   PLAYBACK_HINT_ID,
   VOLUME_HINT_ID,

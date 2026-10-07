@@ -5,9 +5,24 @@ import { SettingsTransferCard } from '@/options/settings-transfer-card'
 import { getCopy } from '@/shared/i18n'
 import {
   createSettingsBackup,
+  parseSettingsBackup,
   serializeSettingsBackup,
 } from '@/shared/settings-backup'
 import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
+import { LOCALES } from '@/shared/shortcut-types'
+import { SUBTITLE_PRACTICE_COPY } from '@/shared/subtitle-practice'
+
+const customSubtitleSettings = () => {
+  const settings = structuredClone(DEFAULT_SETTINGS)
+  settings.enabled = false
+  settings.subtitlePractice.enabled = true
+  settings.subtitlePractice.bindings.next.key = {
+    code: 'KeyN', key: 'n', ctrl: true, alt: false, shift: true, meta: false,
+  }
+  settings.subtitlePractice.bindings.playback.enabled = false
+  settings.bindings.mute.enabled = false
+  return settings
+}
 
 const copy = getCopy('en')
 const backup = createSettingsBackup(
@@ -61,12 +76,13 @@ describe('SettingsTransferCard', () => {
     const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:settings')
     const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
+    const settings = customSubtitleSettings()
 
     render(
       <SettingsTransferCard
         copy={copy}
         locale="en"
-        settings={{ ...DEFAULT_SETTINGS, enabled: false }}
+        settings={settings}
         onImport={vi.fn()}
       />
     )
@@ -74,15 +90,58 @@ describe('SettingsTransferCard', () => {
 
     expect(createObjectURL).toHaveBeenCalledOnce()
     const blob = createObjectURL.mock.calls[0][0] as Blob
-    expect(JSON.parse(await blob.text())).toMatchObject({
+    const source = await blob.text()
+    expect(JSON.parse(source)).toMatchObject({
       format: 'netflix-shortcut-override-settings',
       formatVersion: 1,
       exportedAt: '2026-08-12T03:04:05.000Z',
       extensionVersion: '0.4.1',
-      settings: { enabled: false },
+      settings: { enabled: false, subtitlePractice: settings.subtitlePractice },
     })
+    expect(parseSettingsBackup(source)).toMatchObject({ ok: true, value: { settings } })
     expect(click).toHaveBeenCalledOnce()
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:settings')
+  })
+
+  it.each(LOCALES)('previews configured subtitle keys and separate counts in %s', async locale => {
+    const localizedCopy = getCopy(locale)
+    const subtitleCopy = SUBTITLE_PRACTICE_COPY[locale]
+    const settings = customSubtitleSettings()
+    const onImport = vi.fn().mockResolvedValue(settings)
+    render(<SettingsTransferCard copy={localizedCopy} locale={locale} settings={DEFAULT_SETTINGS} onImport={onImport} />)
+    fireEvent.change(screen.getByLabelText(localizedCopy.importSettings), {
+      target: { files: [new File([serializeSettingsBackup(createSettingsBackup(settings, { extensionVersion: 'test' }))], 'settings.json')] },
+    })
+    const dialog = await screen.findByRole('dialog')
+    const generalSummary = within(dialog).getByText(localizedCopy.backupEnabledShortcuts).nextElementSibling
+    const subtitleSummary = within(dialog).getByText(subtitleCopy.title).nextElementSibling as HTMLElement
+    expect(generalSummary).toHaveTextContent('13 / 14')
+    expect(subtitleSummary).toHaveTextContent(localizedCopy.backupEnabled)
+    expect(subtitleSummary).toHaveTextContent('3 / 4')
+    expect(within(subtitleSummary).getAllByRole('listitem')).toHaveLength(4)
+    const nextRow = within(subtitleSummary).getByText(subtitleCopy.next).closest('li') as HTMLElement
+    expect(nextRow).toHaveTextContent(/Ctrl.*Shift.*N/)
+    expect(nextRow).toHaveTextContent(localizedCopy.backupEnabled)
+    const playbackRow = within(subtitleSummary).getByText(subtitleCopy.playback).closest('li')
+    expect(playbackRow).toHaveTextContent(localizedCopy.backupDisabled)
+    expect(onImport).not.toHaveBeenCalled()
+    fireEvent.click(within(dialog).getByRole('button', { name: localizedCopy.confirmImport }))
+    await waitFor(() => expect(onImport).toHaveBeenCalledWith(settings))
+  })
+
+  it('shows a disabled subtitle master without hiding retained keys or row counts', async () => {
+    const settings = customSubtitleSettings()
+    settings.subtitlePractice.enabled = false
+    const onImport = vi.fn()
+    render(<SettingsTransferCard copy={copy} locale="en" settings={DEFAULT_SETTINGS} onImport={onImport} />)
+    selectFile(serializeSettingsBackup(createSettingsBackup(settings, { extensionVersion: 'test' })))
+    const dialog = await screen.findByRole('dialog')
+    const summary = within(dialog).getByText('Subtitle navigation').nextElementSibling as HTMLElement
+    expect(summary).toHaveTextContent('Disabled · enabled keys: 3 / 4')
+    expect(within(summary).getAllByRole('listitem')).toHaveLength(4)
+    expect(summary).toHaveTextContent(/Ctrl.*Shift.*N/)
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+    expect(onImport).not.toHaveBeenCalled()
   })
 
   it('previews a backup and cancels without importing', async () => {

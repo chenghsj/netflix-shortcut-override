@@ -1,7 +1,7 @@
 {
   "name": "netflix-shortcut-override",
   "private": true,
-  "version": "0.6.1",
+  "version": "0.6.2",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "rm -rf dist && npm run typecheck && npm run build:chromium && npm run build:firefox",
+    "build": "rm -rf dist && npm run typecheck && npm run build:chromium && npm run build:firefox && npm run verify:build",
     "build:chromium": "vite build --mode chromium --outDir dist/chromium",
     "build:firefox": "vite build --mode firefox --outDir dist/firefox",
     "test": "vitest run",
@@ -18,7 +18,8 @@
     "lint": "eslint .",
     "lint:firefox": "web-ext lint --source-dir dist/firefox",
     "icons": "node scripts/generate-icons.mjs",
-    "changelog": "node scripts/generate-release-notes.mjs"
+    "changelog": "node scripts/generate-release-notes.mjs",
+    "verify:build": "node scripts/verify-build.mjs"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.2.8",

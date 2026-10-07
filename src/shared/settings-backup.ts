@@ -4,7 +4,8 @@ import {
   isCompleteSettingsForBackup,
   normalizeSettings,
 } from '@/shared/shortcut-settings'
-import { SHORTCUT_ACTIONS, type ShortcutSettings } from '@/shared/shortcut-types'
+import { keyBindingsEqual } from './shortcut-bindings'
+import { SUBTITLE_PRACTICE_ACTIONS, SHORTCUT_ACTIONS, type ShortcutSettings } from '@/shared/shortcut-types'
 
 export const SETTINGS_BACKUP_FORMAT = 'netflix-shortcut-override-settings'
 export const SETTINGS_BACKUP_FORMAT_VERSION = 1
@@ -69,6 +70,11 @@ const isCurrentSettingsNormalized = (
   return (
     settings.version === normalized.version &&
     settings.enabled === normalized.enabled &&
+    settings.subtitlePractice.enabled === normalized.subtitlePractice.enabled &&
+    SUBTITLE_PRACTICE_ACTIONS.every(action => {
+      const left = settings.subtitlePractice.bindings[action], right = normalized.subtitlePractice.bindings[action]
+      return left.enabled === right.enabled && keyBindingsEqual(left.key, right.key) && left.key.key === right.key.key
+    }) &&
     settings.locale === normalized.locale &&
     settings.theme === normalized.theme &&
     settings.speed.min === normalized.speed.min &&

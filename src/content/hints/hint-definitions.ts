@@ -304,6 +304,7 @@ export const mediaHintIcons = {
 }
 
 export type HintRequest =
+  | { type: 'text'; label: string; durationMs?: number | null; loading?: boolean }
   | { type: 'media'; icon: HintIcon; label: string }
   | { type: 'playback'; icon: HintIcon; color?: string }
   | { type: 'volume'; icon: HintIcon; label: string }
@@ -313,6 +314,7 @@ export type HintRequest =
 
 export interface HintManager {
   show(request: HintRequest): void
+  dismiss(request: HintRequest): void
   hideHoldSpeed(): void
   hide(): void
   destroy(): void

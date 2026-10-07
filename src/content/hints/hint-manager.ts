@@ -1,5 +1,6 @@
 import {
   HINT_IDS,
+  TEXT_HINT_LABEL_ID,
   HOLD_SPEED_HINT_ID,
   SPEED_HINT_LABEL_ID,
   VOLUME_HINT_LABEL_ID,
@@ -24,6 +25,7 @@ import {
 import { isPipDocument } from '@/content/pip/pip-document'
 import {
   renderMediaHint,
+  renderTextHint,
   renderPlaybackHint,
   renderSeekHint,
   renderHoldSpeedHint,
@@ -70,6 +72,9 @@ class DocumentHintManager implements HintManager {
     this.activeRequest = request
 
     switch (request.type) {
+      case 'text':
+        renderTextHint(this.rendererContext, request)
+        return
       case 'media':
         renderMediaHint(this.rendererContext, request)
         return
@@ -86,6 +91,16 @@ class DocumentHintManager implements HintManager {
         this.seekSeries = renderSeekHint(this.rendererContext, request, this.seekSeries)
         return
     }
+  }
+
+  dismiss(request: HintRequest): void {
+    // A completed operation must not dismiss feedback from a newer action.
+    if (this.activeRequest !== request) return
+    this.clearTimer()
+    this.root?.remove()
+    this.root = null
+    this.activeRequest = null
+    this.seekSeries = null
   }
 
   hideHoldSpeed(): void {
@@ -166,6 +181,11 @@ class DocumentHintManager implements HintManager {
     if (!root || !request) return
 
     switch (request.type) {
+      case 'text': {
+        const label = root.querySelector<HTMLElement>(`#${TEXT_HINT_LABEL_ID}`)
+        if (label) positionLabeledHintLabel(label)
+        return
+      }
       case 'media':
       case 'playback':
         positionCenteredHint(root, this.renderDoc)

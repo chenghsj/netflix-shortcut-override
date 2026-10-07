@@ -151,14 +151,19 @@ export const findBindingConflict = (
   key: KeyBinding,
   options: { ignoredActions?: readonly ShortcutAction[] } = {}
 ): ShortcutAction | null => {
-  const conflict = SHORTCUT_ACTIONS.find(candidate => {
-    if (candidate === action || options.ignoredActions?.includes(candidate)) return false
-    const binding = settings.bindings[candidate]
-    return keyBindingsEqual(binding.key, key)
-  })
-
-  return conflict ?? null
+  return findEnabledBindingConflicts(settings.bindings, SHORTCUT_ACTIONS, action, key, options.ignoredActions)[0] ?? null
 }
+
+export const findEnabledBindingConflicts = <Action extends string>(
+  bindings: Record<Action, ShortcutBinding>,
+  actions: readonly Action[],
+  action: Action,
+  key: KeyBinding,
+  ignoredActions: readonly Action[] = [],
+): Action[] => actions.filter(candidate =>
+  candidate !== action && !ignoredActions.includes(candidate) &&
+  bindings[candidate].enabled && keyBindingsEqual(bindings[candidate].key, key)
+)
 
 const CODE_LABELS: Record<string, string> = {
   Space: 'Space',

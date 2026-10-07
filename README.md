@@ -31,12 +31,14 @@ This project is not affiliated with, endorsed by, or sponsored by Netflix.
 - Copy a privacy-safe compatibility report that excludes the active Netflix URL.
 - Edit every shortcut from the options page.
 - Enable or disable each shortcut independently.
+- Reuse disabled keys and resolve conflicts in a popover before enabling or resetting a shortcut.
 - Reset shortcut bindings without resetting global or speed settings.
 - Show compact media hints for shortcut actions.
 - Follow the browser UI language automatically when supported, or choose the options UI language manually.
 - Rewind and fast-forward by a configurable interval.
 - Configure the rewind and fast-forward interval.
 - Control play/pause, volume, mute, Netflix subtitles, fullscreen, skip intro, and playback speed.
+- Enable optional subtitle navigation with configurable previous, next, replay, and play/pause keys.
 - Toggle a Document Picture-in-Picture player with Netflix subtitle mirroring on Chrome and Edge Chromium.
 - Use the same configurable shortcut to enter or exit Picture-in-Picture on supported Chromium browsers.
 - When Netflix automatically advances to the next episode, close Picture-in-Picture and leave the next episode's playback state to Netflix and the profile's autoplay setting.
@@ -74,6 +76,33 @@ The configured Play / Pause shortcut has two behaviors when hold speed is enable
 
 - Tap the key to play or pause.
 - Hold it for roughly 250 ms to temporarily switch to the configured hold speed. The default hold speed is `2x`.
+
+## Subtitle Navigation
+
+Subtitle navigation is **off by default**. In Options, turn on **Enable shortcut override** and the **Subtitle navigation** master switch, allow Netflix subtitle website access if the browser asks, then select a Netflix subtitle track. If access is already granted, the switch enables without another permission prompt. Denying access leaves it off; turn the switch on again to retry.
+
+| Action | Default key | Behavior |
+| --- | --- | --- |
+| Previous subtitle | `A` | Jump to the preceding subtitle start. |
+| Next subtitle | `D` | Jump to the next subtitle start. |
+| Replay current subtitle | `S` | Seek to the most recently started subtitle and begin playback once; it does not loop or stop automatically at the subtitle end. Before the first subtitle, replay starts at the first subtitle. |
+| Play / Pause | `W` | Toggle playback immediately, without hold-speed behavior. |
+
+A/D preserve the current playing or paused state. These keys can also be used in the extension-managed PiP window on Chrome and Edge. Enabled subtitle navigation keys take priority over ordinary shortcuts: by default, `S` replays a subtitle instead of skipping the intro while subtitle navigation is enabled. Disabling its row or master switch releases that key to the ordinary shortcuts. Typing fields are excluded. The ordinary Play / Pause shortcut keeps its existing tap/hold behavior.
+
+The section has the same Function / Key / Enabled / Actions columns as the ordinary shortcut table. Each row supports enabling, key editing, and reset. The section **Reset** restores all four default bindings and row enabled states, preserving its master switch and other settings; the ordinary shortcut section's Reset does not reset subtitle navigation. The title's help tooltip explains the feature and its dependency on the global switch.
+
+Turning off the global shortcut override disables the subtitle navigation controls without clearing their values. Turning it back on restores access to those saved values. When only the subtitle navigation master is off, key editing and reset remain available, while the row switches are disabled.
+
+Within either shortcut table, individually disabled rows keep their saved keys but allow other rows to reuse them. Enabled rows reserve their keys within that table even while a master switch is off. Enabling or resetting a row whose key is already reserved opens a popover without changing settings: choose **Change key** to record a different key and enable the row, or **Use for [action]** to disable the current owner and transfer the key. Clicking outside or pressing Escape cancels; cancelling the key editor also leaves settings unchanged. Ordinary and subtitle shortcuts remain separate groups, with subtitle navigation taking priority during playback.
+
+The popup has a separate, read-only Subtitle navigation summary. It shows the four configured keys and individual disabled states while both master switches are on; otherwise it shows only the title and **Not enabled**. Ordinary shortcuts whose configured keys are claimed by enabled subtitle navigation rows display **Subtitle priority**, with the overriding action in their tooltip. Key editing, resets, and website authorization remain in Options.
+
+Subtitle timings are loaded on demand and cached in memory for the selected video/player session/track. During a download, a compact text hint and spinner remain visible until loading completes, fails, or the operation is cancelled. The spinner takes 1.6 seconds per revolution and respects reduced-motion preferences. Cache hits, successful jumps, and subtitle boundaries show no navigation hint. Failures use the volume-value text hint style for five seconds; `W` keeps the play/pause icon hint.
+
+Playback toggles, disabling the pending action, and closing its PiP window cancel pending navigation. Re-enabling a disabled action does not revive the cancelled request. A late response cannot seek or start playback after cancellation.
+
+This feature uses undocumented Netflix subtitle metadata and HTTPS subtitle delivery documents, so availability can vary by Netflix player build or selected track. It uses the currently selected track without changing its language. See [Permissions](#permissions) and [Privacy](#privacy) for subtitle CDN access.
 
 ## Speed Settings
 
@@ -209,9 +238,10 @@ The default `npm run build` command creates both browser-specific outputs under 
 | Command | Description |
 | --- | --- |
 | `npm run dev` | Start the CRXJS/Vite dev server with HMR. |
-| `npm run build` | Clear `dist`, type-check, and build Chromium `dist/chromium` and Firefox `dist/firefox`. |
+| `npm run build` | Clear `dist`, type-check, build both browser outputs, and verify background entry points. |
 | `npm run build:chromium` | Build the Chromium extension in `dist/chromium`. |
 | `npm run build:firefox` | Build the Firefox extension in `dist/firefox`. |
+| `npm run verify:build` | Verify both generated background loaders point to the background bundle and contain its message handlers. |
 | `npm run lint:firefox` | Run `web-ext lint` against `dist/firefox`. |
 | `npm run lint` | Run ESLint. |
 | `npm test` | Run Vitest tests. |
@@ -231,10 +261,12 @@ The default `npm run build` command creates both browser-specific outputs under 
 |-- manifest.config.ts
 |-- scripts
 |   |-- generate-icons.mjs
-|   `-- generate-release-notes.mjs
+|   |-- generate-release-notes.mjs
+|   `-- verify-build.mjs
 |-- src
-|   |-- background.ts
 |   |-- background
+|   |   |-- index.ts
+|   |   `-- service-worker.ts
 |   |-- components
 |   |-- content
 |   |-- lib
@@ -254,8 +286,13 @@ Key areas:
 - `src/content/shortcuts/`: media command handling and Play / Pause hold interaction state.
 - `src/content/hints/`: hint overlay rendering, layout, icons, and timing.
 - `src/content/pip/`: Document Picture-in-Picture lifecycle, subtitle mirroring, and PiP keyboard routing.
-- `src/content/netflix-api-bridge.ts`: page-world bridge for Netflix player API access.
-- `src/background/index.ts`: background-side Netflix API execution fallback and popup focus handoff coordination.
+- `src/content/netflix-api-bridge.ts`: page-world bridge for Netflix player API access and selected subtitle metadata.
+- `src/content/subtitle-practice.ts`: subtitle navigation, timing cache, loading feedback, and pending-action cancellation.
+- `src/shared/netflix-caption-events.ts`: JSON string message protocol for caption metadata across browser worlds.
+- `src/shared/netflix-subtitles.ts`: bounded Netflix timed-text normalization.
+- `src/background/service-worker.ts`: distinct manifest entry point for the background bundle.
+- `src/background/index.ts`: background-side Netflix API execution fallback, caption-fetch routing, and popup focus handoff coordination.
+- `src/background/netflix-caption-fetch.ts`: allowlisted HTTPS caption downloads with size and timeout limits.
 - `src/popup/popup-app.tsx`: toolbar popup for quick status, toggles, shortcut summary, and options entry.
 - `src/options/options-app.tsx`: extension options UI.
 - `src/shared/shortcut-bindings.ts`: shortcut actions, default key bindings, normalization, and conflict checks.
@@ -270,7 +307,7 @@ Chrome content scripts normally run in an isolated world, while Netflix player i
 - a `MAIN` world bridge, loaded at `document_start`
 - the main isolated content script, also loaded at `document_start`
 
-The isolated content script handles keyboard events and sends bridge requests for Netflix-specific actions such as seeking. This keeps shortcut logic in the extension while still using Netflix's player API for behavior that native video APIs may not handle correctly on Netflix.
+The isolated content script handles keyboard events and sends bridge requests for Netflix-specific actions such as seeking. This keeps shortcut logic in the extension while still using Netflix's player API for behavior that native video APIs may not handle correctly on Netflix. Chromium caption metadata requests and responses use JSON string event details with message identity and payload validation. Firefox routes playback commands and caption metadata through the background's MAIN-world execution path instead of depending on the page bridge. The injected function contains its runtime dependencies so serialization does not lose imported helpers. Caption documents are then downloaded through the background worker.
 
 ## Permissions
 
@@ -278,17 +315,23 @@ The extension requests:
 
 | Permission | Why it is needed |
 | --- | --- |
-| `storage` | Save shortcut, language, playback speed, seek, and hold-speed settings. |
+| `storage` | Save ordinary and subtitle navigation shortcuts, language, playback speed, seek, and hold-speed settings. |
 | `scripting` | Execute Netflix player API operations and restore focus to the visible playback context after the popup closes. |
 | `activeTab` | Check the active Netflix tab, request local compatibility status, restore playback focus, and reload that tab when the user selects the recovery action. |
-| `*://*.netflix.com/*` | Run the extension only on Netflix pages. |
+| `*://*.netflix.com/*` | Run content scripts on Netflix pages and retrieve selected subtitles delivered from Netflix hosts. |
+| `https://*.nflxvideo.net/*`, `https://*.nflximg.net/*`, `https://*.nflxext.com/*` | Retrieve Netflix subtitle documents when subtitle navigation is requested. No content scripts run on these CDN hosts. |
+
+Both builds request the existing Netflix and subtitle CDN host access when you turn on the Subtitle navigation master. The request runs directly from that click; the browser only prompts when approval is needed. The feature remains off while awaiting approval and after a denial or request failure. Turning it off does not revoke website access used by the extension.
+
+Firefox may leave declared website access disabled, including on temporary add-ons. If permissions are later revoked, uncached subtitle downloads return `CAPTION_PERMISSION_REQUIRED` before sending a CDN request. Turn the subtitle master off and on to request access again. Manual recovery is also available in the browser's extension permissions; in Firefox, open `about:addons` → this extension → **Permissions and Data**. Approve access and retry the shortcut.
 
 ## Privacy
 
 - No remote analytics or tracking code is included.
-- No external API calls are made by the extension.
-- Shortcut, enabled state, language, theme, playback speed, seek, hold-speed, and PiP subtitle settings are stored with `chrome.storage.sync`.
+- Subtitle navigation retrieves the selected subtitle document from Netflix delivery hosts. No analytics or third-party processing service receives subtitle data.
+- Shortcut, enabled state, language, theme, playback speed, seek, hold-speed, subtitle navigation, and PiP subtitle settings are stored with `chrome.storage.sync`.
 - A pending popup focus handoff is stored temporarily in `chrome.storage.session` for at most 30 seconds. It contains only tab/window identifiers, an opaque request identifier, and a deadline.
+- Subtitle documents are parsed locally; the navigation timing cache remains in content-script memory and is not saved to sync storage. Requests may include browser-managed cookies for the Netflix delivery host.
 - Content scripts only run on pages matching `*://*.netflix.com/*`.
 - The toolbar popup checks the active tab only after it is opened. It uses that tab to show page status, request locally generated compatibility diagnostics, restore keyboard focus to a still-visible playback context after dismissal, and reload the Netflix page only when the user selects the recovery action.
 - Compatibility diagnostics stay on the device. A report is written to the clipboard only when the user selects Copy diagnostics.
@@ -307,7 +350,7 @@ npm run build
 The coverage check enforces minimum global thresholds of 80% statements, 65% branches,
 80% functions, and 85% lines. The test suite covers shortcut normalization, options behavior,
 content shortcut handling, Netflix API bridge and background execution behavior, compatibility
-readiness, PiP controls and subtitle mirroring, video handoff, and episode-transition recovery.
+readiness, subtitle navigation and its JSON bridge, pending-action cancellation, PiP controls and subtitle mirroring, video handoff, and episode-transition recovery.
 
 The real-Chrome regression flow, including the reload-in-progress popup case, is documented in [docs/chrome-real-browser-test.md](docs/chrome-real-browser-test.md). The Firefox smoke-test flow is documented in [docs/firefox-real-browser-test.md](docs/firefox-real-browser-test.md).
 

@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import { useRef, useState } from 'react'
 
+import { KeyBindingKbd } from '@/components/key-binding-kbd'
 import { Alert, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -25,7 +26,8 @@ import {
   type ParsedSettingsBackup,
   type SettingsBackupParseErrorCode,
 } from '@/shared/settings-backup'
-import { SHORTCUT_ACTIONS, type Locale, type ShortcutSettings } from '@/shared/shortcut-types'
+import { SHORTCUT_ACTIONS, SUBTITLE_PRACTICE_ACTIONS, type Locale, type ShortcutSettings } from '@/shared/shortcut-types'
+import { SUBTITLE_PRACTICE_COPY } from '@/shared/subtitle-practice'
 
 type SettingsTransferCardProps = {
   copy: ReturnType<typeof getCopy>
@@ -133,6 +135,10 @@ export function SettingsTransferCard({
   }
 
   const importedSettings = pendingBackup?.settings
+  const subtitleCopy = SUBTITLE_PRACTICE_COPY[locale]
+  const enabledSubtitleShortcutCount = importedSettings
+    ? SUBTITLE_PRACTICE_ACTIONS.filter(action => importedSettings.subtitlePractice.bindings[action].enabled).length
+    : 0
   const enabledShortcutCount = importedSettings
     ? Object.values(importedSettings.bindings).filter(binding => binding.enabled).length
     : 0
@@ -237,6 +243,26 @@ export function SettingsTransferCard({
               <dd>{enabledLabel(importedSettings.enabled)}</dd>
               <dt className="text-muted-foreground">{copy.backupEnabledShortcuts}</dt>
               <dd>{enabledShortcutCount} / {SHORTCUT_ACTIONS.length}</dd>
+              <dt className="text-muted-foreground">{subtitleCopy.title}</dt>
+              <dd className="min-w-0">
+                <p>{formatTemplate(copy.backupSubtitleNavigationSummary, {
+                  status: enabledLabel(importedSettings.subtitlePractice.enabled),
+                  count: enabledSubtitleShortcutCount,
+                  total: SUBTITLE_PRACTICE_ACTIONS.length,
+                })}</p>
+                <ul className="mt-2 flex flex-col gap-2">
+                  {SUBTITLE_PRACTICE_ACTIONS.map(action => {
+                    const binding = importedSettings.subtitlePractice.bindings[action]
+                    return (
+                      <li key={action} className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span>{subtitleCopy[action]}</span>
+                        <KeyBindingKbd binding={binding.key} className="flex-wrap" />
+                        <span className="text-muted-foreground">{enabledLabel(binding.enabled)}</span>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </dd>
               <dt className="text-muted-foreground">{copy.speed}</dt>
               <dd>
                 {formatTemplate(copy.backupSpeedSummary, {

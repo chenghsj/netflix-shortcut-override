@@ -138,6 +138,100 @@ describe('HintManager', () => {
     expect(document.getElementById('shortcut-override-volume-hint')).toBeNull()
   })
 
+  it('shows text feedback in the volume label style without an icon for five seconds', () => {
+    vi.useFakeTimers()
+    const manager = getHintManager(document)
+    manager.show({ type: 'text', label: '<b>Subtitle download failed</b>' })
+    const root = document.getElementById('shortcut-override-text-hint')
+    const label = document.getElementById('shortcut-override-text-hint-label')
+    expect(label).toHaveTextContent('<b>Subtitle download failed</b>')
+    expect(label?.querySelector('b')).toBeNull()
+    expect(root?.querySelector('svg')).toBeNull()
+    expect(label?.style.fontSize).toBe('16px')
+    expect(label?.style.background).toBe('rgba(0, 0, 0, 0.68)')
+    expect(label?.style.top).toBe('10%')
+    expect(label).toHaveAttribute('role', 'status')
+    vi.advanceTimersByTime(4999)
+    expect(label?.style.opacity).toBe('1')
+    vi.advanceTimersByTime(1)
+    expect(label?.style.opacity).toBe('0')
+  })
+
+  it('keeps persistent text feedback visible until dismissed', () => {
+    vi.useFakeTimers()
+    const manager = getHintManager(document)
+    const loading = { type: 'text', label: 'Loading subtitles…', durationMs: null } as const
+    manager.show(loading)
+    const label = document.getElementById('shortcut-override-text-hint-label')
+    vi.advanceTimersByTime(12000)
+    expect(label?.style.opacity).toBe('1')
+    manager.dismiss(loading)
+    expect(document.getElementById('shortcut-override-text-hint')).toBeNull()
+  })
+
+  it('dismisses only the requested hint while preserving newer playback feedback', () => {
+    const manager = getHintManager(document)
+    const loading = { type: 'text', label: 'Loading subtitles…', durationMs: null } as const
+    manager.show(loading)
+    manager.dismiss(loading)
+    expect(document.getElementById('shortcut-override-text-hint')).toBeNull()
+    manager.show(loading)
+    manager.show({ type: 'playback', icon: testIcon() })
+    manager.dismiss(loading)
+    expect(document.getElementById('shortcut-override-playback-hint')?.style.opacity).toBe('1')
+  })
+
+  it('replaces the loading spinner with plain error text when loading fails', () => {
+    const manager = getHintManager(document)
+    manager.show({ type: 'text', label: 'Loading subtitles…', durationMs: null, loading: true })
+    const label = document.getElementById('shortcut-override-text-hint-label')
+    const spinner = label?.querySelector('[data-hint-loading]')
+    expect(spinner).toBeInTheDocument()
+    expect(spinner).toHaveAttribute('aria-hidden', 'true')
+    expect(label).toHaveTextContent('Loading subtitles…')
+    manager.show({ type: 'text', label: 'Subtitle download failed' })
+    expect(document.getElementById('shortcut-override-text-hint-label')).toBe(label)
+    expect(label).toHaveTextContent('Subtitle download failed')
+    expect(label?.querySelector('[data-hint-loading]')).toBeNull()
+  })
+
+  it('refreshes the text duration on update and clears it when another hint replaces it', () => {
+    vi.useFakeTimers()
+    const manager = getHintManager(document)
+    manager.show({ type: 'text', label: 'First failure' })
+    const label = document.getElementById('shortcut-override-text-hint-label')
+    vi.advanceTimersByTime(4000)
+    manager.show({ type: 'text', label: 'Second failure' })
+    expect(document.getElementById('shortcut-override-text-hint-label')).toBe(label)
+    vi.advanceTimersByTime(1000)
+    expect(label?.style.opacity).toBe('1')
+    expect(label).toHaveTextContent('Second failure')
+    manager.show({ type: 'volume', icon: testIcon(), label: '50%' })
+    expect(document.getElementById('shortcut-override-text-hint')).toBeNull()
+    const volume = document.getElementById('shortcut-override-volume-hint')
+    vi.advanceTimersByTime(359)
+    expect(volume?.style.opacity).toBe('1')
+    vi.advanceTimersByTime(1)
+    expect(volume?.style.opacity).toBe('0')
+  })
+
+  it('wraps long text feedback and uses the shared label scale in PiP', () => {
+    const iframe = document.createElement('iframe')
+    document.body.append(iframe)
+    const pipDoc = iframe.contentDocument!
+    markPipDocument(pipDoc)
+    const manager = getHintManager(pipDoc)
+    try {
+      manager.show({ type: 'text', label: 'Subtitle download failed. Reload the extension and Netflix tab; check subtitle website access.' })
+      const label = pipDoc.getElementById('shortcut-override-text-hint-label')
+      expect(label?.style.maxWidth).toBe('calc(100% - 32px)')
+      expect(label?.style.whiteSpace).toBe('normal')
+      expect(label?.style.overflowWrap).toBe('anywhere')
+      expect(label?.style.transform).toContain('scale(0.86)')
+      expect(pipDoc.getElementById('shortcut-override-text-hint')?.querySelector('svg')).toBeNull()
+    } finally { manager.destroy(); iframe.remove() }
+  })
+
   it('starts fading a volume hint 360ms after the last update', () => {
     vi.useFakeTimers()
     const manager = getHintManager(document)

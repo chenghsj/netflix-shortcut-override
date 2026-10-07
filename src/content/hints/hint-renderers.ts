@@ -7,6 +7,9 @@ import {
   HINT_VISIBLE_OPACITY,
   HINT_VISIBLE_TRANSFORM,
   MEDIA_HINT_ID,
+  TEXT_HINT_ID,
+  TEXT_HINT_LABEL_ID,
+  TEXT_HINT_VISIBLE_DURATION_MS,
   PLAYBACK_HINT_ENTER_TRANSITION,
   PLAYBACK_HINT_EXIT_MS,
   PLAYBACK_HINT_EXIT_TRANSFORM,
@@ -208,6 +211,40 @@ const scheduleLabeledHintExit = (
   })
 }
 
+const createLabeledHintLabel = (context: HintRendererContext, labelId: string, text: string): HTMLElement => {
+  const label = context.renderDoc.createElement('div')
+  label.id = labelId
+  label.textContent = text
+  setStyles(label, {
+    position: 'absolute',
+    left: '50%',
+    top: '10%',
+    transform: getTransform(context, VOLUME_HINT_LABEL_HIDDEN_TRANSFORM),
+    transformOrigin: 'top center',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxSizing: 'border-box',
+    minWidth: '68px',
+    minHeight: '38px',
+    padding: '6px 10px',
+    borderRadius: '4px',
+    background: HINT_SURFACE_BACKGROUND,
+    color: 'white',
+    fontFamily: 'Arial,sans-serif',
+    fontSize: '16px',
+    fontWeight: '400',
+    lineHeight: '22px',
+    whiteSpace: 'nowrap',
+    pointerEvents: 'none',
+    zIndex: '2147483647',
+    opacity: '0',
+    transition: VOLUME_HINT_LABEL_ENTER_TRANSITION,
+    willChange: 'opacity,transform',
+  })
+  return label
+}
+
 const renderLabeledHint = (
   context: HintRendererContext,
   request: { icon: HintIcon; label: string },
@@ -286,36 +323,7 @@ const renderLabeledHint = (
   })
   circle.append(icon)
 
-  const label = context.renderDoc.createElement('div')
-  label.id = labelId
-  label.textContent = request.label
-  setStyles(label, {
-    position: 'absolute',
-    left: '50%',
-    top: '10%',
-    transform: getTransform(context, VOLUME_HINT_LABEL_HIDDEN_TRANSFORM),
-    transformOrigin: 'top center',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    boxSizing: 'border-box',
-    minWidth: '68px',
-    minHeight: '38px',
-    padding: '6px 10px',
-    borderRadius: '4px',
-    background: HINT_SURFACE_BACKGROUND,
-    color: 'white',
-    fontFamily: 'Arial,sans-serif',
-    fontSize: '16px',
-    fontWeight: '400',
-    lineHeight: '22px',
-    whiteSpace: 'nowrap',
-    pointerEvents: 'none',
-    zIndex: '2147483647',
-    opacity: '0',
-    transition: VOLUME_HINT_LABEL_ENTER_TRANSITION,
-    willChange: 'opacity,transform',
-  })
+  const label = createLabeledHintLabel(context, labelId, request.label)
   nextRoot.replaceChildren(circle, label)
 
   positionCenteredHint(circle, context.renderDoc)
@@ -331,6 +339,72 @@ const renderLabeledHint = (
   label.style.opacity = '1'
   label.style.transform = getTransform(context, VOLUME_HINT_LABEL_VISIBLE_TRANSFORM)
   scheduleLabeledHintExit(context, nextRoot, circle, label)
+}
+
+export const renderTextHint = (
+  context: HintRendererContext,
+  request: Extract<HintRequest, { type: 'text' }>
+): void => {
+  const current = context.getRoot()
+  const visible = current?.isConnected && current.id === TEXT_HINT_ID && current.style.opacity === HINT_VISIBLE_OPACITY
+  const root = visible ? current : context.createRoot(TEXT_HINT_ID, {
+    position: 'fixed', top: '0', left: '0', width: '100%', height: '100%',
+    background: 'transparent', pointerEvents: 'none', zIndex: '2147483647',
+    transition: PLAYBACK_HINT_ENTER_TRANSITION,
+  })
+  let label = root.querySelector<HTMLElement>(`#${TEXT_HINT_LABEL_ID}`)
+  if (!label) {
+    label = createLabeledHintLabel(context, TEXT_HINT_LABEL_ID, request.label)
+    setStyles(label, { maxWidth: 'calc(100% - 32px)', width: 'max-content', whiteSpace: 'normal', overflowWrap: 'anywhere', textAlign: 'center' })
+    label.setAttribute('role', 'status')
+    root.replaceChildren(label)
+  }
+  if (request.loading) {
+    const styleId = 'shortcut-override-hint-loading-style'
+    if (!context.renderDoc.getElementById(styleId)) {
+      const style = context.renderDoc.createElement('style')
+      style.id = styleId
+      style.textContent = `
+        @keyframes shortcut-override-hint-spin { to { transform: rotate(360deg); } }
+        #${TEXT_HINT_LABEL_ID} [data-hint-loading] { animation: shortcut-override-hint-spin 1600ms linear infinite; }
+        @media (prefers-reduced-motion: reduce) {
+          #${TEXT_HINT_LABEL_ID} [data-hint-loading] { animation: none; }
+        }
+      `
+      context.renderDoc.head.append(style)
+    }
+    const spinner = context.renderDoc.createElement('span')
+    spinner.dataset.hintLoading = 'true'
+    spinner.setAttribute('aria-hidden', 'true')
+    setStyles(spinner, { width: '14px', height: '14px', boxSizing: 'border-box', flexShrink: '0', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%' })
+    const text = context.renderDoc.createElement('span')
+    text.textContent = request.label
+    text.style.minWidth = '0'
+    label.style.gap = '8px'
+    label.replaceChildren(spinner, text)
+  } else {
+    label.style.gap = ''
+    label.textContent = request.label
+  }
+  positionLabeledHintLabel(label)
+  root.style.visibility = 'visible'
+  root.style.opacity = HINT_VISIBLE_OPACITY
+  if (!visible) {
+    label.style.transition = VOLUME_HINT_LABEL_ENTER_TRANSITION
+    label.style.opacity = '0'
+    label.style.transform = getTransform(context, VOLUME_HINT_LABEL_HIDDEN_TRANSFORM)
+    void label.offsetWidth
+    label.style.opacity = HINT_VISIBLE_OPACITY
+    label.style.transform = getTransform(context, VOLUME_HINT_LABEL_VISIBLE_TRANSFORM)
+  }
+  if (request.durationMs === null) return
+  context.scheduleExit(request.durationMs ?? TEXT_HINT_VISIBLE_DURATION_MS, () => {
+    label.style.transition = VOLUME_HINT_LABEL_EXIT_TRANSITION
+    label.style.opacity = '0'
+    label.style.transform = getTransform(context, VOLUME_HINT_LABEL_EXIT_TRANSFORM)
+    root.style.transition = PLAYBACK_HINT_EXIT_TRANSITION
+    root.style.opacity = '0'
+  })
 }
 
 export const renderVolumeHint = (

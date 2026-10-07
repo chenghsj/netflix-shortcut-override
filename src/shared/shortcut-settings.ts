@@ -1,5 +1,7 @@
+import { DEFAULT_PRACTICE_BINDINGS } from './subtitle-practice'
 import { DEFAULT_KEY_BINDINGS, isKeyBinding, keyBindingsEqual } from './shortcut-bindings'
 import {
+  SUBTITLE_PRACTICE_ACTIONS,
   LOCALES,
   LOCALE_PREFERENCES,
   SHORTCUT_ACTIONS,
@@ -56,7 +58,7 @@ export const DEFAULT_PIP_SETTINGS: PipSettings = {
   subtitleBackground: 'translucent',
 }
 
-export const SHORTCUT_SETTINGS_VERSION = 10
+export const SHORTCUT_SETTINGS_VERSION = 12
 export const MIN_SETTINGS_BACKUP_VERSION = 8
 
 const SETTINGS_ACTIONS_BY_VERSION: Record<number, readonly ShortcutAction[]> = {
@@ -65,6 +67,8 @@ const SETTINGS_ACTIONS_BY_VERSION: Record<number, readonly ShortcutAction[]> = {
   ),
   9: SHORTCUT_ACTIONS.filter(action => action !== 'setPreferredSpeed'),
   10: SHORTCUT_ACTIONS,
+  11: SHORTCUT_ACTIONS,
+  12: SHORTCUT_ACTIONS,
 }
 
 const LEGACY_PICTURE_IN_PICTURE_BINDING = {
@@ -82,6 +86,7 @@ export const DEFAULT_SETTINGS: ShortcutSettings = {
   locale: 'auto',
   theme: 'auto',
   speed: DEFAULT_SPEED_SETTINGS,
+  subtitlePractice: { enabled: false, bindings: DEFAULT_PRACTICE_BINDINGS },
   holdSpeed: DEFAULT_HOLD_SPEED_SETTINGS,
   seek: DEFAULT_SEEK_SETTINGS,
   pip: DEFAULT_PIP_SETTINGS,
@@ -117,6 +122,12 @@ export const isCompleteSettingsForBackup = (
   const requiredActions = SETTINGS_ACTIONS_BY_VERSION[version]
   const holdSpeedKey = version >= 10 ? 'holdSpeed' : 'spaceHold'
   if (
+    (version >= 11 && (!isRecord(settings.subtitlePractice) || typeof settings.subtitlePractice.enabled !== 'boolean')) ||
+    (version >= 12 && (!isRecord(settings.subtitlePractice) || !isRecord(settings.subtitlePractice.bindings) || !SUBTITLE_PRACTICE_ACTIONS.every(action => {
+      const binding = (settings.subtitlePractice as Record<string, unknown>).bindings as Record<string, unknown>
+      const item = binding[action]
+      return isRecord(item) && typeof item.enabled === 'boolean' && isKeyBinding(item.key)
+    }))) ||
     !requiredActions ||
     settings.version !== version ||
     typeof settings.enabled !== 'boolean' ||
@@ -289,6 +300,13 @@ export const normalizeSettings = (raw: unknown): ShortcutSettings => {
       typeof source.theme === 'string' && isThemeMode(source.theme)
         ? source.theme
         : DEFAULT_SETTINGS.theme,
+    subtitlePractice: {
+      enabled: source.subtitlePractice?.enabled === true,
+      bindings: Object.fromEntries(SUBTITLE_PRACTICE_ACTIONS.map(action => {
+        const raw = source.subtitlePractice?.bindings?.[action]
+        return [action, { enabled: typeof raw?.enabled === 'boolean' ? raw.enabled : true, key: isKeyBinding(raw?.key) ? raw.key : DEFAULT_PRACTICE_BINDINGS[action].key }]
+      })) as ShortcutSettings['subtitlePractice']['bindings'],
+    },
     speed: normalizeSpeedSettings(source.speed),
     holdSpeed: normalizeHoldSpeedSettings(
       source.holdSpeed ?? legacySource.spaceHold,

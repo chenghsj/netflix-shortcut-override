@@ -25,12 +25,18 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { useCompatibilitySession } from '@/popup/use-compatibility-session'
 import { usePopupFocusRestoration } from '@/popup/use-popup-focus-restoration'
+import { SUBTITLE_NAVIGATION_POPUP_COPY } from '@/popup/subtitle-navigation-copy'
+import { FEATURE_ANNOUNCEMENT_COPY } from '@/popup/feature-announcement-copy'
+import { FeatureAnnouncementCard } from '@/popup/feature-announcement-card'
+import { SUBTITLE_OPTIONS_HASH, subtitleNavigationAnnouncement } from '@/shared/feature-announcements'
 import { EXTERNAL_LINKS, getShortcutOverrideRatingUrl } from '@/shared/external-links'
 import { resolveLocalePreference } from '@/shared/browser-locale'
 import { getBrowserCapabilities } from '@/shared/browser-capabilities'
 import { getCopy } from '@/shared/i18n'
 import { HOLD_SPEED_LIMITS, SEEK_LIMITS, SPEED_LIMITS } from '@/shared/shortcut-settings'
-import type { ShortcutAction } from '@/shared/shortcut-types'
+import { keyBindingsEqual } from '@/shared/shortcut-bindings'
+import { SUBTITLE_PRACTICE_ACTIONS, type ShortcutAction } from '@/shared/shortcut-types'
+import { SUBTITLE_PRACTICE_COPY } from '@/shared/subtitle-practice'
 import { useShortcutSettingsForm } from '@/shared/use-shortcut-settings-form'
 import { useTheme } from '@/shared/use-theme'
 
@@ -86,7 +92,21 @@ export function PopupApp() {
   } = useCompatibilitySession()
   const { suppressFocusRestoration } =
     usePopupFocusRestoration(resolvePlaybackFocusTarget)
-  const copy = getCopy(resolveLocalePreference(settings.locale))
+  const locale = resolveLocalePreference(settings.locale)
+  const copy = getCopy(locale)
+  const subtitleCopy = SUBTITLE_PRACTICE_COPY[locale]
+  const subtitlePopupCopy = SUBTITLE_NAVIGATION_POPUP_COPY[locale]
+  const announcementCopy = FEATURE_ANNOUNCEMENT_COPY[locale]
+  const openSubtitleOptions = () => {
+    suppressFocusRestoration()
+    if (typeof chrome !== 'undefined' && chrome.runtime?.getURL) {
+      void chrome.tabs.create({ url: chrome.runtime.getURL(`options.html${SUBTITLE_OPTIONS_HASH}`) })
+      if (getBrowserCapabilities().closesPopupAfterOpeningOptions) window.close()
+      return
+    }
+    window.location.href = `/options.html${SUBTITLE_OPTIONS_HASH}`
+  }
+  const subtitleNavigationEnabled = settings.enabled && settings.subtitlePractice.enabled
   const browserCapabilities = getBrowserCapabilities()
   useTheme(settings.theme)
 
@@ -134,6 +154,8 @@ export function PopupApp() {
               <Settings2Icon aria-hidden="true" />
             </Button>
           </header>
+
+          <FeatureAnnouncementCard announcement={subtitleNavigationAnnouncement} copy={announcementCopy} onEnable={openSubtitleOptions} />
 
           {diagnosticsTriggerState === 'reload-required' && (
             <CompatibilityConnectionAlert copy={copy} onReloadPage={reloadNetflixPage} />
@@ -227,6 +249,15 @@ export function PopupApp() {
               const actionSupported =
                 action !== 'pictureInPicture' ||
                 browserCapabilities.supportsSubtitlePreservingPip
+              const overridingSubtitleAction = subtitleNavigationEnabled && binding.enabled && actionSupported
+                ? SUBTITLE_PRACTICE_ACTIONS.find(subtitleAction => {
+                    const subtitleBinding = settings.subtitlePractice.bindings[subtitleAction]
+                    return subtitleBinding.enabled && keyBindingsEqual(subtitleBinding.key, binding.key)
+                  })
+                : undefined
+              const overrideDescription = overridingSubtitleAction
+                ? subtitlePopupCopy.overriddenBy.replace('{action}', subtitleCopy[overridingSubtitleAction])
+                : undefined
               return (
                 <div
                   key={action}
@@ -235,7 +266,7 @@ export function PopupApp() {
                   <span
                     className={cn(
                       'min-w-0 truncate text-xs leading-tight',
-                      (!binding.enabled || !actionSupported) && 'text-muted-foreground'
+                      (!binding.enabled || !actionSupported || overridingSubtitleAction) && 'text-muted-foreground'
                     )}
                     title={actionSupported ? copy.actions[action] : copy.pictureInPictureUnsupported}
                   >
@@ -248,6 +279,15 @@ export function PopupApp() {
                       title={copy.pictureInPictureUnsupported}
                     >
                       {copy.diagnosticsUnsupportedValue}
+                    </Badge>
+                  ) : overridingSubtitleAction ? (
+                    <Badge
+                      variant="secondary"
+                      className="max-w-32 justify-start truncate px-1.5 text-xs"
+                      title={overrideDescription}
+                      aria-label={overrideDescription}
+                    >
+                      {subtitlePopupCopy.overridden}
                     </Badge>
                   ) : binding.enabled ? (
                     <KeyBindingKbd
@@ -267,6 +307,49 @@ export function PopupApp() {
               )
             })}
           </div>
+          </section>
+
+          <section
+            className="rounded-lg border bg-card p-2.5 shadow-xs"
+            aria-labelledby="popup-subtitle-navigation-title"
+          >
+            <div className={cn('flex items-center justify-between gap-3', subtitleNavigationEnabled && 'mb-2.5')}>
+              <h2 id="popup-subtitle-navigation-title" className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+                <KeyboardIcon className="size-3.5" />
+                {subtitleCopy.title}
+              </h2>
+              {!subtitleNavigationEnabled && (
+                <div className="flex shrink-0 items-center gap-2">
+                  <Badge variant="secondary" className="px-1.5 text-xs" title={!settings.enabled ? subtitleCopy.requiresEnabled : undefined}>
+                    {subtitlePopupCopy.inactive}
+                  </Badge>
+                  <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={openSubtitleOptions}>
+                    {announcementCopy.enable}
+                  </Button>
+                </div>
+              )}
+            </div>
+            {subtitleNavigationEnabled && (
+              <div className="flex flex-col gap-1">
+                {SUBTITLE_PRACTICE_ACTIONS.map(action => {
+                  const binding = settings.subtitlePractice.bindings[action]
+                  return (
+                    <div key={action} className="flex min-h-7 items-center justify-between gap-3 rounded-md px-1.5">
+                      <span className={cn('min-w-0 truncate text-xs leading-tight', !binding.enabled && 'text-muted-foreground')} title={subtitleCopy[action]}>
+                        {subtitleCopy[action]}
+                      </span>
+                      {binding.enabled ? (
+                        <KeyBindingKbd binding={binding.key} className="max-w-32 shrink-0 justify-end overflow-hidden" />
+                      ) : (
+                        <Badge variant="secondary" className="max-w-24 justify-start truncate px-1.5 text-xs" title={copy.disabledStatus}>
+                          {copy.disabledStatus}
+                        </Badge>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </section>
 
           <section className="rounded-lg border bg-card p-3 shadow-xs">

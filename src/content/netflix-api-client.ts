@@ -8,6 +8,7 @@ import {
   type NetflixApiAction,
   type NetflixApiResponse,
 } from '@/shared/netflix-api'
+import { getBrowserCapabilities } from '@/shared/browser-capabilities'
 
 let netflixApiRequestId = 0
 
@@ -65,7 +66,9 @@ export const sendNetflixApi = async (
   action: NetflixApiAction,
   value?: number
 ): Promise<NetflixApiResponse> => {
-  if (!hasNetflixPageBridge()) return sendNetflixBackgroundApi(action, value)
+  if (!getBrowserCapabilities().requiresNetflixPageBridge || !hasNetflixPageBridge()) {
+    return sendNetflixBackgroundApi(action, value)
+  }
 
   const pageResponse = await sendNetflixPageApi(action, value)
   if (pageResponse.success) return pageResponse

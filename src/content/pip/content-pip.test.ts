@@ -363,6 +363,55 @@ describe('content PiP shortcuts', () => {
     }
   })
 
+  it.each(['video', 'control', 'close'])('cancels pending subtitle replay on PiP %s', async target => {
+    const { pipWindow, cleanup } = createDocumentPipFixture()
+    let finish!: (reply: { text: string }) => void
+    vi.mocked(chrome.runtime.sendMessage).mockImplementation((message, callback) => {
+      const request = message as unknown as { type?: string }
+      if (request.type === 'FETCH_NETFLIX_CAPTION') return new Promise(resolve => { finish = resolve }) as never
+      const reply = { success: true, result: { seekCalled: true, subtitlesEnabled: true } }
+      if (typeof callback === 'function') callback(reply)
+      return Promise.resolve(reply) as never
+    })
+    const respond = (event: Event) => window.dispatchEvent(new CustomEvent('shortcut-override:caption-response', { detail: JSON.stringify({
+      source: 'shortcut-override',
+      id: JSON.parse((event as CustomEvent<string>).detail).id,
+      metadata: { key: `123:player:${target}`, watchId: '123', url: 'https://a.nflxvideo.net/sub.vtt', currentMs: 3500 },
+    }) }))
+    window.addEventListener('shortcut-override:caption-request', respond)
+    try {
+      await saveSettings({ ...DEFAULT_SETTINGS, subtitlePractice: { ...DEFAULT_SETTINGS.subtitlePractice, enabled: true } })
+      const video = document.createElement('video')
+      let paused = false
+      const play = vi.fn(() => { paused = false; return Promise.resolve() })
+      const pause = vi.fn(() => { paused = true })
+      Object.defineProperties(video, {
+        paused: { configurable: true, get: () => paused },
+        play: { configurable: true, value: play },
+        pause: { configurable: true, value: pause },
+      })
+      document.body.append(video)
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyP', key: 'P', shiftKey: true, bubbles: true, cancelable: true }))
+      await vi.waitFor(() => expect(pipWindow.document.querySelector('video')).toBe(video))
+      pipWindow.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyS', key: 's', bubbles: true, cancelable: true }))
+      await vi.waitFor(() => expect(finish).toBeTypeOf('function'))
+      if (target === 'close') pipWindow.dispatchEvent(new Event('pagehide'))
+      else if (target === 'video') pipWindow.dispatchEvent(new MouseEvent('click', { button: 0, bubbles: true, cancelable: true }))
+      else pipWindow.document.querySelector<HTMLButtonElement>('[data-pip-control="playback"]')?.click()
+      if (target === 'close') {
+        expect(document.querySelector('video')).toBe(video)
+        expect(pause).not.toHaveBeenCalled()
+      } else expect(pause).toHaveBeenCalledOnce()
+      finish({ text: 'WEBVTT\n\n00:00:03.000 --> 00:00:04.000\nTwo' })
+      // Flush the bounded metadata/seek/play promise chain after the late delivery.
+      for (let index = 0; index < 12; index++) await Promise.resolve()
+      expect(play).not.toHaveBeenCalled()
+      expect(paused).toBe(target !== 'close')
+      expect(pipWindow.document.querySelector('[data-hint-loading]')).toBeNull()
+      expect(vi.mocked(chrome.runtime.sendMessage).mock.calls.some(([message]) => (message as { action?: string }).action === 'seekTo')).toBe(false)
+    } finally { window.removeEventListener('shortcut-override:caption-request', respond); cleanup() }
+  })
+
   it('toggles playback on the first PiP click, including after refocus', async () => {
     const { pipWindow, cleanup } = createDocumentPipFixture()
 

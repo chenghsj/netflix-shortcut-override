@@ -78,12 +78,17 @@ export type PipSettings = {
   subtitleBackground: PipSubtitleBackground
 }
 
+export const SUBTITLE_PRACTICE_ACTIONS = ['previous', 'next', 'replay', 'playback'] as const
+export type SubtitlePracticeAction = (typeof SUBTITLE_PRACTICE_ACTIONS)[number]
+export type SubtitlePracticeSettings = { enabled: boolean; bindings: Record<SubtitlePracticeAction, ShortcutBinding> }
+
 export type ShortcutSettings = {
   version: number
   enabled: boolean
   locale: LocalePreference
   theme: ThemeMode
   speed: SpeedSettings
+  subtitlePractice: SubtitlePracticeSettings
   holdSpeed: HoldSpeedSettings
   seek: SeekSettings
   pip: PipSettings

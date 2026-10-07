@@ -1,12 +1,18 @@
 # Privacy Policy
 
-Shortcut Override for Netflix does not collect, sell, share, or transfer user data.
+Shortcut Override for Netflix does not collect user data for the developer, sell user data, or send it to analytics, advertising, or third-party processing services.
 
-The extension only stores user preferences needed for its single purpose: customizing playback keyboard shortcuts in Netflix playback contexts. These preferences may include shortcut settings, enabled or disabled state, language and theme preferences, seek interval, hold-speed settings, playback speed settings, and Picture-in-Picture subtitle appearance settings.
+The extension only stores user preferences needed for its single purpose: customizing playback keyboard shortcuts in Netflix playback contexts. These preferences may include ordinary and subtitle navigation shortcut settings, enabled or disabled state, language and theme preferences, seek interval, hold-speed settings, playback speed settings, and Picture-in-Picture subtitle appearance settings.
 
 These settings are stored using browser sync storage (`chrome.storage.sync`) and are used only by the extension to provide its shortcut customization features.
 
-Shortcut Override for Netflix does not use analytics, tracking, advertising, or external API calls. The extension does not send user data to any external server.
+The extension also stores a local acknowledgement (`chrome.storage.local`) when a new-feature announcement is dismissed or its feature is enabled, so the same announcement is not repeated. This record contains only a feature identifier and acknowledgement flag; it is not synced or sent to an external service.
+
+Shortcut Override for Netflix does not use analytics, tracking, advertising, or third-party processing APIs.
+
+When subtitle navigation is enabled and the user requests a previous, next, or replay action, the extension reads the selected Netflix subtitle track and retrieves its timed-text document from an HTTPS Netflix delivery host (`netflix.com`, `nflxvideo.net`, `nflximg.net`, or `nflxext.com`, including subdomains). The request uses the subtitle URL supplied by the active Netflix player and may include browser-managed cookies for the delivery host. The extension does not send those URLs, cookies, or subtitle documents to the developer or another processing service.
+
+Subtitle documents are parsed locally. The navigation timing cache is held in content-script memory and is not written to browser sync storage. User-facing subtitle failure diagnostics use error codes rather than signed delivery URLs, cookies, or subtitle content. The CDN host permissions are used for document retrieval; content scripts still run only on Netflix pages.
 
 The extension only runs on Netflix pages to listen for user-configured keyboard shortcuts and perform playback actions requested by the user.
 

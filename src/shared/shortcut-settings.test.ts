@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   DEFAULT_SETTINGS,
+  SHORTCUT_SETTINGS_VERSION,
   HOLD_SPEED_LIMITS,
   SEEK_LIMITS,
   SPEED_LIMITS,
@@ -69,7 +70,7 @@ describe('shortcut settings', () => {
     expect(normalized.bindings.pictureInPicture.key).toEqual(
       DEFAULT_SETTINGS.bindings.pictureInPicture.key
     )
-    expect(normalized.version).toBe(10)
+    expect(normalized.version).toBe(SHORTCUT_SETTINGS_VERSION)
   })
 
   it('adds the subtitle toggle binding when normalizing older settings', () => {

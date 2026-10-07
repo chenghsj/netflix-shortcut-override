@@ -86,7 +86,7 @@ Do not use Chrome DevTools as the verification path for this real-browser check.
 
 ## 5. Verify Keyboard Shortcuts
 
-Before testing shortcuts, open the extension toolbar popup on the watch page.
+For the ordinary shortcut checks below, leave the Subtitle navigation master off so its default `S` binding does not replace Skip Intro. Before testing shortcuts, open the extension toolbar popup on the watch page.
 
 Verify playback focus restoration:
 
@@ -175,56 +175,33 @@ Any extension-triggered playback-state change, blank title, black or stale video
 
 ## 6. Agent-Assisted Chrome Workflow
 
-When using `@Chrome`, use the existing real Netflix tab:
+Use the Computer Use plugin to inspect the available browsers and select the existing Netflix tab in the user's real Chrome profile:
 
-1. Confirm Chrome is running.
-2. Confirm the Codex Chrome Extension is installed and enabled.
-3. Run `browser.user.openTabs()` and find the existing `netflix.com/watch/...` tab.
-4. Pass that exact returned tab object to `browser.user.claimTab(tab)`.
-5. Use the returned controllable tab for keyboard input and screenshots of the real Chrome tab.
-6. Finalize Chrome tabs after the run.
+```js
+await cua.getState();
+// Use the exact tab ID and browser ID returned by the inventory.
+let netflixTab = await cua.getTab(tabId, { browser: browserId });
+```
 
-Do not use a separate automation-only Chrome window for this real Netflix validation.
+Read the returned documentation before operating the tab. Verify its URL and visible Netflix player, then use the documented keyboard/UI APIs. After each shortcut, inspect the current state for the expected playback behavior. Keep existing user tabs open and close only temporary tabs created for this check.
 
-If `browser.user.claimTab(tab)` repeatedly times out but the user explicitly wants real Chrome behavior, use Computer Use against `/Applications/Google Chrome.app` as the fallback. This still operates the user's visible Chrome window and real Netflix page. Keep the fallback limited to keyboard/UI actions that the user requested.
+A local preview or fake player can help diagnose a failure, but is not real Netflix acceptance evidence.
 
 ## 7. Computer Use Fallback Workflow
 
-Use this only after `@Chrome` can list tabs but cannot control the selected real Chrome tab.
+If the browser tab API cannot operate the real Chrome tab or an internal extension page, use the native Chrome interface:
 
-1. Read the real Chrome state:
-
-```text
-Computer Use -> get_app_state({ app: "Google Chrome" })
+```js
+let chrome = await cua.getApp('com.google.Chrome');
 ```
 
-2. If the target Netflix URL is not selected, set the address bar value to the target URL and press `Return`.
-3. Verify the state output shows:
-   - Window title `Netflix`.
-   - URL starts with `netflix.com/watch/...`.
-   - Toolbar item `Shortcut Override` has site access.
-   - Netflix `video` UI is visible.
-4. Press each shortcut using real keyboard input:
+1. Confirm the selected window belongs to the Netflix Chrome profile. Use the visible tab controls to reach the existing Netflix watch page or its extension manager.
+2. Inspect the current accessibility state or screenshot before each action. Confirm the toolbar reports that Shortcut Override has site access.
+3. Use the documented native keyboard/UI methods to exercise the shortcuts from section 5, reading the resulting state after each action.
+4. Reload the existing unpacked extension and Netflix tab after a build; do not replace another installed extension to make the test pass.
+5. Restore temporary test settings and pause playback at the end unless the user requested another final state. Save a screenshot of the observed result.
 
-```text
-space
-m
-c
-Right
-Left
-Up
-Down
-s
-shift+period
-shift+comma
-shift+slash
-f
-f
-space
-```
-
-5. After each key, inspect the returned screen/accessibility tree for the expected Netflix state or media hint.
-6. Pause playback at the end unless the user wants it left playing.
+If the extension manager is blank or the loaded directory cannot be verified, record that blocker and leave the new-build acceptance check unverified.
 
 ## 8. Observed Run, 2026-05-18
 
@@ -302,3 +279,38 @@ npm run lint
 npm run test:coverage
 npm run build
 ```
+
+## 11. Subtitle Navigation Regression Checks
+
+Open the popup with subtitle navigation off: its separate summary shows only its title and Not enabled. Enable both masters in Options and reopen the popup: all four configured subtitle keys appear, disabled rows show Disabled, and ordinary shortcuts claimed by enabled subtitle rows show Subtitle priority with the overriding action in their tooltip. Verify the default S/Skip Intro overlap, a custom key with modifiers, and release after disabling the overlapping row. Turning off the global override collapses the subtitle summary without clearing its saved values. Editing, resets, and authorization stay in Options.
+
+This is an acceptance checklist, not a record of a completed run. Record the browser and extension version, loaded directory, selected subtitle language, and each result. Reload the unpacked `dist/chromium` extension and Netflix tab before testing source changes.
+
+### Settings and key priority
+
+1. For fresh settings, confirm Subtitle navigation is off by default. Both shortcut tables use the same Function / Key / Enabled / Actions columns. The title's help tooltip explains the feature and the global switch dependency; the subtitle master appears before its Reset button.
+2. Enable the global shortcut override and Subtitle navigation, and select a Netflix subtitle track. Already-granted host access must enable without another prompt. If access is withheld, the subtitle master click must display Chrome's permission request; denial keeps it off with localized retry guidance, and a subsequent accepted request enables it. Do not revoke existing permissions solely for a test without arranging restoration with the user.
+3. Verify A/D jump to the previous/next subtitle start while preserving both playing and paused states. Verify S seeks to the current or most recently started subtitle and plays once without an automatic loop or stop. Verify W toggles immediately and does not apply hold speed.
+4. Verify ordinary shortcuts still work. With subtitle navigation enabled, S replays instead of skipping the intro. Disable the replay row and confirm S is released to the ordinary Skip Intro binding when its button is available.
+5. Edit a subtitle key and disable a row. Turn the global override off: subtitle controls become disabled, the title tooltip remains available, and the saved values are retained. Turn it back on and confirm those same values return.
+6. With only the subtitle master off, confirm keys remain editable/resettable and row switches are disabled. The subtitle section Reset restores its four keys and row enabled states while preserving its master and other settings; the ordinary section Reset preserves subtitle settings. Restore test changes afterward.
+
+### Disabled-key reuse and conflict popover
+
+1. Record the original settings. Disable subtitle Play / pause (W), then edit Next subtitle to W. Saving must succeed and leave Play / pause disabled. Attempt to enable Play / pause: the popover identifies W and Next subtitle; neither row changes yet.
+2. Dismiss with Escape and by clicking outside. Settings remain unchanged and keyboard focus returns to the available row switch. Choose Change key, then cancel the recorder: settings still remain unchanged and focus returns. Repeat, record Q, and save: Play / pause becomes enabled on Q while Next subtitle stays enabled on W.
+3. Restore the overlap and choose Use for Play / pause. Play / pause becomes enabled on W and Next subtitle becomes disabled while retaining W. Ordinary shortcut settings remain unchanged. Repeat the reuse, cancellation, and transfer flow in the ordinary table, for example with disabled Mute and enabled Skip intro on S.
+4. Reset a row whose default key was reused by another enabled row. The same popover must appear before its key or enabled state changes. Confirm transfer, then verify only the affected rows changed. Enabled rows continue reserving keys for editing even with their table master off; disabled rows release them. Existing cross-table subtitle priority remains unchanged.
+5. Open a conflict popover and change settings from another view. It must close and stay closed when those settings are restored. Restore all original keys and enabled states after testing.
+
+### Loading, errors, and cancellation
+
+1. Use a newly selected track with uncached timings. While caption delivery is pending, verify the top text hint and spinner remain visible until completion, failure, or cancellation. The rotation takes about 1.6 seconds per revolution. If delivery is too fast to observe, record this item as unverified rather than claiming a long loading state was tested.
+2. Repeat navigation on the same track. Cache hits and successful/boundary jumps show no subtitle navigation hint; W shows its playback icon. Verify reduced-motion preferences suppress spinner motion.
+3. Trigger an observable unavailable-track or delivery failure. Confirm a localized text hint stays visible for about five seconds, clears the busy state, and allows retry. Diagnostics must not expose signed delivery URLs, cookies, or subtitle text.
+4. During a pending replay, toggle playback using the keyboard, Netflix native controls, and PiP mouse controls. Late delivery must not undo the requested playback state.
+5. During a pending action, disable its row and re-enable it before delivery finishes. Late delivery must not seek or play. Disabling a different row must preserve the pending action.
+6. In PiP, request S with uncached timings and close the window while loading is visible. Confirm the source video is restored, loading feedback is cleared, and late delivery neither seeks nor starts it. Repeat using the PiP shortcut to exit. If no pending delivery can be observed, mark the cancellation scenario unverified.
+7. Change subtitle language or watch ID and confirm timings from the old track/session are not used for the new one.
+
+Automated tests cover string bridge messages and cancellation during both caption delivery and a pending seek. They do not establish actual Netflix/Chrome event timing; record those results separately.

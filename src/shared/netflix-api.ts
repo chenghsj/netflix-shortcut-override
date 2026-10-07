@@ -11,6 +11,7 @@ export const NETFLIX_API_ACTIONS = [
   'unmuteWithVolume',
   'setPlaybackRate',
   'getSubtitleState',
+  'getCaptionMetadata',
   'toggleSubtitles',
 ] as const
 
@@ -40,6 +41,7 @@ export type NetflixPageResult = {
   subtitleToggleCalled?: boolean
   subtitlesEnabled?: boolean
   subtitleTrack?: string
+  captionMetadata?: { key: string; watchId: string; url: string; currentMs: number }
   currentTime?: number
   targetTime?: number
   error?: string

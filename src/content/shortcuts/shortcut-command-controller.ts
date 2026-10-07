@@ -32,6 +32,7 @@ export type ShortcutCommandController = HoldSpeedInteractionController & {
 }
 
 type ShortcutCommandControllerOptions = {
+  onPlaybackToggleRequested?: () => void
   onSeekRequested?: () => void
   onSubtitlesToggled?: (enabled: boolean, targetDoc: Document) => void
 }
@@ -163,6 +164,7 @@ const createCommandMap = (
     const video = findVideo(context.targetDoc)
     if (!video) return false
 
+    options.onPlaybackToggleRequested?.()
     togglePlayback(playbackSession, video, context)
     return true
   },

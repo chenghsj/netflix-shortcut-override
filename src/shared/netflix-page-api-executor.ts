@@ -61,6 +61,157 @@ export const executeNetflixPageApi = (
 ): NetflixPageResult => {
   // chrome.scripting.executeScript serializes this function without its module
   // scope, so every runtime dependency must remain inside this function body.
+  function allowedNetflixSubtitleUrl(input: string): boolean {
+    try {
+      const url = new URL(input);
+      const host = url.hostname.toLowerCase();
+      return (
+        url.protocol === "https:" &&
+        !url.username &&
+        !url.password &&
+        (!url.port || url.port === "443") &&
+        ["netflix.com", "nflxvideo.net", "nflximg.net", "nflxext.com"].some(
+          domain => host === domain || host.endsWith("." + domain),
+        )
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  function subtitleUrlFromTrack(track: unknown): string | null {
+    if (!track || typeof track !== "object") return null;
+    const source = track as Record<string, unknown>;
+    // Traverse only known subtitle delivery fields, not arbitrary player internals.
+    function readableUrl(value: unknown, depth = 0): string | null {
+      if (typeof value === "string") return allowedNetflixSubtitleUrl(value) ? value : null;
+      if (!value || typeof value !== "object" || depth > 5) return null;
+      const entries = Array.isArray(value) ? value.slice(0, 100) : Object.values(value).slice(0, 100);
+      for (const entry of entries) {
+        const url = readableUrl(entry, depth + 1);
+        if (url) return url;
+      }
+      return null;
+    }
+    const entries: unknown[] = [];
+    if (source.ttDownloadables && typeof source.ttDownloadables === "object") {
+      const downloadables = source.ttDownloadables as Record<string, unknown>;
+      for (const name of [
+        "webvtt-lssdh-ios8",
+        "webvtt-lssdh",
+        "dfxp-ls-sdh",
+        "imsc1.1",
+        "simplesdh",
+      ]) {
+        if (name in downloadables) entries.push(downloadables[name]);
+      }
+    }
+    entries.push(source.urls, source.downloadUrls, source.url);
+    for (const entry of entries) {
+      const url = readableUrl(entry);
+      if (url) return url;
+    }
+    return null;
+  }
+
+  type NetflixCaptionTrack = { id?: string; trackId?: string; new_track_id?: string; bcp47?: string; language?: string; isNoneTrack?: boolean }
+  function trackId(track: NetflixCaptionTrack | null): string | null {
+    return track?.trackId ?? track?.new_track_id ?? track?.id ?? null;
+  }
+
+  function findInternalTrackUrl(root: unknown, wantedId: string): string | null {
+    const visited = new WeakSet<object>();
+    let checked = 0;
+    function walk(value: unknown, depth: number): string | null {
+      if (
+        !value ||
+        typeof value !== "object" ||
+        visited.has(value) ||
+        depth > 14 ||
+        ++checked > 30_000
+      )
+        return null;
+      visited.add(value);
+      if (Array.isArray(value)) {
+        for (const entry of value) {
+          if (
+            entry &&
+            typeof entry === "object" &&
+            trackId(entry as NetflixCaptionTrack) === wantedId
+          ) {
+            const url = subtitleUrlFromTrack(entry);
+            if (url) return url;
+          }
+        }
+        for (const entry of value) {
+          const result = walk(entry, depth + 1);
+          if (result) return result;
+        }
+        return null;
+      }
+      // Inspect only own data properties: do not invoke arbitrary Netflix getters.
+      let descriptors: PropertyDescriptorMap;
+      try {
+        descriptors = Object.getOwnPropertyDescriptors(value);
+      } catch {
+        return null;
+      }
+      for (const [name, descriptor] of Object.entries(descriptors)) {
+        if (
+          ["parentNode", "ownerDocument", "window", "document"].includes(name) ||
+          !("value" in descriptor)
+        )
+          continue;
+        const result = walk(descriptor.value, depth + 1);
+        if (result) return result;
+      }
+      return null;
+    }
+    return walk(root, 0);
+  }
+
+
+  type CaptionPlayer = {
+    getCurrentTime(): number
+    getTextTrack?(): NetflixCaptionTrack | string | null | undefined
+    getTimedTextTrack?(): NetflixCaptionTrack | string | null | undefined
+    getTextTrackList?(): NetflixCaptionTrack[]
+    getTimedTextTrackList?(): NetflixCaptionTrack[]
+  }
+  type CaptionPage = typeof window & {
+    netflix?: {
+      player?: { MediaSession?: unknown }
+    }
+  }
+
+  function readCaptionMetadata(page: CaptionPage, player: CaptionPlayer, sessionId: string, watchId: string) {
+    const tracks: NetflixCaptionTrack[] = []
+    for (const read of [player.getTextTrackList, player.getTimedTextTrackList]) {
+      try {
+        const list = read?.call(player)
+        if (Array.isArray(list)) tracks.push(...list)
+      } catch { /* Read the other supported API generation. */ }
+    }
+    let selected: NetflixCaptionTrack | string | null = null
+    for (const read of [player.getTextTrack, player.getTimedTextTrack]) {
+      try { selected = read?.call(player) ?? null } catch { /* Try the other API. */ }
+      if (selected) break
+    }
+    if (!selected) selected = tracks.find(track => (track as NetflixCaptionTrack & { isSelected?: boolean; selected?: boolean }).isSelected || (track as NetflixCaptionTrack & { selected?: boolean }).selected) ?? null
+    if (!selected || (typeof selected !== 'string' && selected.isNoneTrack)) throw new Error('track')
+    const id = typeof selected === 'string' ? selected : trackId(selected)
+    if (!id) throw new Error('track')
+    // The selected-track API can return only a reference; delivery URLs live in
+    // the complete catalog. Match by identity, never silently pick a language.
+    const candidates = tracks.filter(track => trackId(track) === id && !track.isNoneTrack)
+    const url = (typeof selected === 'object' ? subtitleUrlFromTrack(selected) : null)
+      ?? candidates.map(subtitleUrlFromTrack).find(Boolean)
+      ?? findInternalTrackUrl(page.netflix?.player?.MediaSession, id)
+    if (!url) throw new Error('document')
+    const currentMs = player.getCurrentTime()
+    if (!Number.isFinite(currentMs)) throw new Error('player')
+    return { key: `${watchId}:${sessionId}:${id}`, watchId, url, currentMs }
+  }
   const defaultVolume = 0.1
   const clampVolume = (volume: number, fallback = defaultVolume): number => {
     const clamped = Math.min(1, Math.max(0, Number.isFinite(volume) ? volume : fallback))
@@ -268,7 +419,12 @@ export const executeNetflixPageApi = (
     const player = selected?.player
     result.playerFound = Boolean(player)
 
-    if (player) {
+    if (action === 'getCaptionMetadata') {
+      const watchId = location.pathname.match(/^\/watch\/(\d+)/)?.[1]
+      if (!watchId) throw new Error('watch')
+      if (!selected) throw new Error('player')
+      result.captionMetadata = readCaptionMetadata(window as CaptionPage, selected.player, selected.sessionId, watchId)
+    } else if (player) {
       if (action === 'diagnose') {
         // Diagnostics only inspect API availability and must not alter playback.
       } else if (action === 'play') {

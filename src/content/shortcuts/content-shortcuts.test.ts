@@ -8,6 +8,59 @@ import { setupContentIndexTests } from './content-script.test-support'
 describe('content media shortcuts', () => {
   setupContentIndexTests()
 
+  it('enables WASD as a group while preserving typing and modified keys', async () => {
+    document.body.append(document.createElement('video'))
+    const press = (extra: KeyboardEventInit = {}) => {
+      const event = new KeyboardEvent('keydown', { code: 'KeyW', key: 'w', bubbles: true, cancelable: true, ...extra })
+      window.dispatchEvent(event)
+      return event
+    }
+    expect(press().defaultPrevented).toBe(false)
+    await saveSettings({ ...DEFAULT_SETTINGS, subtitlePractice: { ...DEFAULT_SETTINGS.subtitlePractice, enabled: true } })
+    expect(press({ shiftKey: true }).defaultPrevented).toBe(false)
+    expect(press({ repeat: true }).defaultPrevented).toBe(true)
+    const input = document.createElement('input')
+    document.body.append(input)
+    input.focus()
+    expect(press().defaultPrevented).toBe(false)
+    input.blur()
+    await saveSettings(DEFAULT_SETTINGS)
+    expect(press().defaultPrevented).toBe(false)
+  })
+
+  it.each([false, true])('cancels a pending subtitle row when disabled, even if re-enabled before delivery (%s)', async reenable => {
+    const settings = structuredClone(DEFAULT_SETTINGS)
+    settings.subtitlePractice.enabled = true
+    await saveSettings(settings)
+    document.body.append(document.createElement('video'))
+    let finish!: (reply: { text: string }) => void
+    vi.mocked(chrome.runtime.sendMessage).mockImplementation((message, callback) => {
+      if ((message as { type?: string }).type === 'FETCH_NETFLIX_CAPTION') return new Promise(resolve => { finish = resolve }) as never
+      const reply = { success: true, result: { seekCalled: true } }
+      if (typeof callback === 'function') callback(reply)
+      return Promise.resolve(reply) as never
+    })
+    const respond = (event: Event) => window.dispatchEvent(new CustomEvent('shortcut-override:caption-response', { detail: JSON.stringify({
+      source: 'shortcut-override',
+      id: JSON.parse((event as CustomEvent<string>).detail).id,
+      metadata: { key: `123:disabled:${reenable}`, watchId: '123', url: 'https://a.nflxvideo.net/sub.vtt', currentMs: 3500 },
+    }) }))
+    window.addEventListener('shortcut-override:caption-request', respond)
+    try {
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyD', key: 'd', bubbles: true, cancelable: true }))
+      await vi.waitFor(() => expect(finish).toBeTypeOf('function'))
+      settings.subtitlePractice.bindings.next.enabled = false
+      await saveSettings(settings)
+      if (reenable) {
+        settings.subtitlePractice.bindings.next.enabled = true
+        await saveSettings(settings)
+      }
+      finish({ text: 'WEBVTT\n\n00:00:06.000 --> 00:00:07.000\nThree' })
+      for (let index = 0; index < 12; index++) await Promise.resolve()
+      expect(vi.mocked(chrome.runtime.sendMessage).mock.calls.some(([message]) => (message as { action?: string }).action === 'seekTo')).toBe(false)
+    } finally { window.removeEventListener('shortcut-override:caption-request', respond) }
+  })
+
   it('does not enqueue audio commands when volume down repeats at zero volume', async () => {
     const video = document.createElement('video')
     video.volume = 0

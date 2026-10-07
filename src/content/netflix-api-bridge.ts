@@ -1,3 +1,5 @@
+import { getCaptionMetadata } from '@/shared/netflix-caption-metadata'
+import { CAPTION_REQUEST_EVENT, CAPTION_RESPONSE_EVENT, readCaptionEvent } from '@/shared/netflix-caption-events'
 import {
   NETFLIX_API_BRIDGE_READY_ATTR,
   NETFLIX_API_REQUEST_EVENT,
@@ -64,3 +66,19 @@ document.documentElement?.setAttribute(NETFLIX_API_BRIDGE_READY_ATTR, 'ready')
 window.addEventListener(NETFLIX_API_REQUEST_EVENT, handleRequest, {
   signal: abortController.signal,
 })
+
+window.addEventListener(CAPTION_REQUEST_EVENT, (event: Event) => {
+  const detail = readCaptionEvent(event)
+  if (!detail) return
+  const respond = (result: Record<string, unknown>) => {
+    window.dispatchEvent(new CustomEvent(CAPTION_RESPONSE_EVENT, {
+      detail: JSON.stringify({ source: 'shortcut-override', id: detail.id, ...result }),
+    }))
+  }
+  try {
+    respond({ metadata: getCaptionMetadata() })
+  } catch (error) {
+    const code = error instanceof Error && ['watch', 'player', 'track', 'document'].includes(error.message) ? error.message : 'player'
+    respond({ error: code })
+  }
+}, { signal: abortController.signal })

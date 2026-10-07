@@ -28,4 +28,18 @@ describe('Netflix API client', () => {
     })
     expect(chrome.runtime.sendMessage).not.toHaveBeenCalled()
   })
+
+  it('uses the background in Firefox even when the DOM bridge marker exists', async () => {
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 Firefox/143.0')
+    const reply = { success: true, result: { seekCalled: true } }
+    vi.mocked(chrome.runtime.sendMessage).mockImplementation((_message, callback) => {
+      if (typeof callback === 'function') callback(reply)
+      return Promise.resolve(reply) as never
+    })
+    await expect(sendNetflixApi('seek', 10_000)).resolves.toEqual(reply)
+    expect(window.dispatchEvent).not.toHaveBeenCalled()
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+      type: 'EXECUTE_NETFLIX_API', action: 'seek', value: 10_000,
+    }, expect.any(Function))
+  })
 })

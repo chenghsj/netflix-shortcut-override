@@ -8,6 +8,7 @@ type ChromeStorageArea = {
 
 const storageState: Record<string, unknown> = {}
 const sessionStorageState: Record<string, unknown> = {}
+const localStorageState: Record<string, unknown> = {}
 const storageListeners = new Set<(changes: Record<string, chrome.storage.StorageChange>, area: string) => void>()
 
 const syncArea: ChromeStorageArea = {
@@ -69,6 +70,26 @@ const sessionArea = {
   }),
 }
 
+const localArea: ChromeStorageArea & { clear: ReturnType<typeof vi.fn> } = {
+  get: vi.fn((key: string, callback: (items: Record<string, unknown>) => void) => {
+    callback({ [key]: localStorageState[key] })
+  }),
+  set: vi.fn((items: Record<string, unknown>, callback?: () => void) => {
+    const changes = Object.fromEntries(Object.entries(items).map(([key, value]) => [
+      key, { oldValue: localStorageState[key], newValue: value },
+    ]))
+    Object.assign(localStorageState, items)
+    for (const listener of storageListeners) listener(changes, 'local')
+    callback?.()
+  }),
+  clear: vi.fn((callback?: () => void) => {
+    const changes = Object.fromEntries(Object.entries(localStorageState).map(([key, oldValue]) => [key, { oldValue }]))
+    for (const key of Object.keys(localStorageState)) delete localStorageState[key]
+    for (const listener of storageListeners) listener(changes, 'local')
+    callback?.()
+  }),
+}
+
 const defaultTabsQuery = (
   _query: chrome.tabs.QueryInfo,
   callback: (tabs: chrome.tabs.Tab[]) => void
@@ -122,10 +143,17 @@ const defaultWindowsGet = (
 }
 
 const chromeMock = {
+  permissions: {
+    contains: vi.fn().mockResolvedValue(true),
+    request: vi.fn().mockResolvedValue(true),
+  },
   i18n: {
     getUILanguage: vi.fn(() => 'en-US'),
   },
   action: {
+    setBadgeText: vi.fn().mockResolvedValue(undefined),
+    setBadgeBackgroundColor: vi.fn().mockResolvedValue(undefined),
+    setBadgeTextColor: vi.fn().mockResolvedValue(undefined),
     onClicked: {
       addListener: vi.fn(),
     },
@@ -134,6 +162,9 @@ const chromeMock = {
     id: 'test-extension-id',
     getManifest: vi.fn(() => ({ version: '0.4.1' })),
     openOptionsPage: vi.fn(),
+    getURL: vi.fn((path: string) => `chrome-extension://test-extension-id/${path}`),
+    onInstalled: { addListener: vi.fn(), removeListener: vi.fn() },
+    onStartup: { addListener: vi.fn(), removeListener: vi.fn() },
     sendMessage: vi.fn().mockResolvedValue(undefined),
     onMessage: {
       addListener: vi.fn(),
@@ -176,6 +207,7 @@ const chromeMock = {
     executeScript: vi.fn().mockResolvedValue([{ frameId: 0, result: true }]),
   },
   storage: {
+    local: localArea,
     sync: syncArea,
     session: sessionArea,
     onChanged: {
@@ -212,7 +244,10 @@ Element.prototype.scrollIntoView = vi.fn()
 beforeEach(() => {
   for (const key of Object.keys(storageState)) delete storageState[key]
   for (const key of Object.keys(sessionStorageState)) delete sessionStorageState[key]
+  for (const key of Object.keys(localStorageState)) delete localStorageState[key]
   vi.clearAllMocks()
+  chromeMock.permissions.contains.mockReset().mockResolvedValue(true)
+  chromeMock.permissions.request.mockReset().mockResolvedValue(true)
   chromeMock.i18n.getUILanguage.mockReturnValue('en-US')
   chromeMock.runtime.sendMessage.mockReset().mockResolvedValue(undefined)
   chromeMock.tabs.get.mockReset().mockImplementation(defaultTabsGet)
