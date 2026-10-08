@@ -11,7 +11,7 @@ import { getSettings, saveSettings } from '@/shared/storage'
 import { subtitleNavigationAnnouncement } from '@/shared/feature-announcements'
 
 const recordEligibleUpgrade = () => subtitleNavigationAnnouncement.recordInstall(
-  { reason: 'update', previousVersion: '0.6.1' } as chrome.runtime.InstalledDetails, '0.6.2',
+  { reason: 'update', previousVersion: '0.6.2' } as chrome.runtime.InstalledDetails, '0.6.3',
 )
 
 describe('OptionsApp', () => {
@@ -259,14 +259,14 @@ describe('OptionsApp', () => {
     expect((await getSettings()).subtitlePractice.bindings.next.enabled).toBe(false)
   })
 
-  it.each(['Chrome/140.0', 'Firefox/156.0'])('requests subtitle access directly from the switch click in %s', async browser => {
+  it.each(['Chrome/140.0', 'Chrome/140.0 Edg/140.0', 'Firefox/156.0'])('requests subtitle access directly from the switch click in %s', async browser => {
     vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(`Mozilla/5.0 ${browser}`)
     render(<OptionsApp />)
     const toggle = await screen.findByRole('switch', { name: 'Enable subtitle navigation shortcuts' })
     fireEvent.click(toggle)
     // Assert before yielding: Firefox requires the request in this user gesture.
     expect(chrome.permissions.request).toHaveBeenCalledExactlyOnceWith({ origins: [
-      '*://*.netflix.com/*', 'https://*.nflxvideo.net/*', 'https://*.nflximg.net/*', 'https://*.nflxext.com/*',
+      '*://*.netflix.com/*', 'https://*.nflxvideo.net/*',
     ] })
     await waitFor(async () => expect((await getSettings()).subtitlePractice.enabled).toBe(true))
     fireEvent.click(toggle)

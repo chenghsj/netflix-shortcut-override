@@ -70,7 +70,7 @@ export const executeNetflixPageApi = (
         !url.username &&
         !url.password &&
         (!url.port || url.port === "443") &&
-        ["netflix.com", "nflxvideo.net", "nflximg.net", "nflxext.com"].some(
+        ["netflix.com", "nflxvideo.net"].some(
           domain => host === domain || host.endsWith("." + domain),
         )
       );

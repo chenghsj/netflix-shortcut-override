@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
 import extensionManifest from './manifest.config'
-import { NETFLIX_CAPTION_HOST_PERMISSIONS } from './src/shared/netflix-caption-permissions'
 
 const resolveManifest = async (mode: 'chromium' | 'firefox') => {
   if (typeof extensionManifest !== 'function') {
@@ -17,10 +16,10 @@ const resolveManifest = async (mode: 'chromium' | 'firefox') => {
 }
 
 describe('extension manifest', () => {
-  it.each(['chromium', 'firefox'] as const)('declares only the existing subtitle request hosts in %s', async mode => {
+  it.each(['chromium', 'firefox'] as const)('requires Netflix access and makes only subtitle CDN access optional in %s', async mode => {
     const manifest = await resolveManifest(mode)
-    expect(manifest.host_permissions).toEqual([...NETFLIX_CAPTION_HOST_PERMISSIONS])
-    expect(manifest.host_permissions).not.toContain('<all_urls>')
+    expect(manifest.host_permissions).toEqual(['*://*.netflix.com/*'])
+    expect(manifest.optional_host_permissions).toEqual(['https://*.nflxvideo.net/*'])
   })
   it('uses a service worker for Chromium', async () => {
     const manifest = await resolveManifest('chromium')

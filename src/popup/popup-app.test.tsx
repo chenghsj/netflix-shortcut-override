@@ -10,7 +10,7 @@ import { saveSettings } from '@/shared/storage'
 import { subtitleNavigationAnnouncement } from '@/shared/feature-announcements'
 
 const recordEligibleUpgrade = () => subtitleNavigationAnnouncement.recordInstall(
-  { reason: 'update', previousVersion: '0.6.1' } as chrome.runtime.InstalledDetails, '0.6.2',
+  { reason: 'update', previousVersion: '0.6.2' } as chrome.runtime.InstalledDetails, '0.6.3',
 )
 
 const openCompatibilityDiagnostics = async () => {
@@ -198,7 +198,7 @@ describe('PopupApp', () => {
   })
 
   it('hides the announcement after a fresh install and reacts to upgrade eligibility from the background', async () => {
-    await subtitleNavigationAnnouncement.recordInstall({ reason: 'install' } as chrome.runtime.InstalledDetails, '0.6.2')
+    await subtitleNavigationAnnouncement.recordInstall({ reason: 'install' } as chrome.runtime.InstalledDetails, '0.6.3')
     render(<PopupApp />)
     await screen.findByRole('region', { name: 'Subtitle navigation' })
     expect((await subtitleNavigationAnnouncement.getState()).pending).toBe(false)

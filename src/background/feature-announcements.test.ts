@@ -15,14 +15,20 @@ describe('feature announcement lifecycle', () => {
   }
   const registerEligibleUpdate = () => {
     registerFeatureAnnouncements()
-    installed('update', '0.6.1')
+    installed('update', '0.6.2')
   }
   beforeEach(() => {
-    vi.spyOn(chrome.runtime, 'getManifest').mockReturnValue({ version: '0.6.2' } as chrome.runtime.Manifest)
+    vi.spyOn(chrome.runtime, 'getManifest').mockReturnValue({ version: '0.6.3' } as chrome.runtime.Manifest)
   })
   afterEach(() => {
     for (const unsubscribe of subscriptions.splice(0)) unsubscribe()
     vi.restoreAllMocks()
+  })
+  it.each(['0.6.1', '0.6.2', '0.6.2.0'])('shows subtitle NEW when upgrading from %s to 0.6.3', async previousVersion => {
+    registerFeatureAnnouncements()
+    installed('update', previousVersion)
+    await vi.waitFor(() => expect(chrome.action.setBadgeText).toHaveBeenLastCalledWith({ text: 'NEW' }))
+    expect(await subtitleNavigationAnnouncement.getState()).toEqual({ pending: true, unread: true })
   })
   it('shows NEW on upgrade and worker restart without enabling or opening anything', async () => {
     registerEligibleUpdate()
@@ -45,7 +51,7 @@ describe('feature announcement lifecycle', () => {
     await subtitleNavigationAnnouncement.dismiss()
     await vi.waitFor(() => expect(chrome.action.setBadgeText).toHaveBeenLastCalledWith({ text: '' }))
     const installed = vi.mocked(chrome.runtime.onInstalled.addListener).mock.calls.at(-1)?.[0]
-    installed?.({ reason: chrome.runtime.OnInstalledReason?.UPDATE ?? 'update', previousVersion: '0.6.2' } as chrome.runtime.InstalledDetails)
+    installed?.({ reason: chrome.runtime.OnInstalledReason?.UPDATE ?? 'update', previousVersion: '0.6.3' } as chrome.runtime.InstalledDetails)
     expect((await subtitleNavigationAnnouncement.getState()).pending).toBe(false)
     await vi.waitFor(() => expect(chrome.action.setBadgeText).toHaveBeenLastCalledWith({ text: '' }))
   })
@@ -62,8 +68,8 @@ describe('feature announcement lifecycle', () => {
     subscriptions.pop()?.()
     vi.mocked(chrome.action.setBadgeText).mockClear()
     registerFeatureAnnouncements()
-    vi.mocked(chrome.runtime.getManifest).mockReturnValue({ version: '0.6.3' } as chrome.runtime.Manifest)
-    installed('update', '0.6.2')
+    vi.mocked(chrome.runtime.getManifest).mockReturnValue({ version: '0.6.4' } as chrome.runtime.Manifest)
+    installed('update', '0.6.3')
     await vi.waitFor(() => expect(chrome.action.setBadgeText).toHaveBeenLastCalledWith({ text: '' }))
     expect(chrome.action.setBadgeText).not.toHaveBeenCalledWith({ text: 'NEW' })
     expect((await subtitleNavigationAnnouncement.getState()).pending).toBe(true)
@@ -123,8 +129,8 @@ describe('feature announcement lifecycle', () => {
     await vi.waitFor(() => expect(chrome.action.setBadgeText).toHaveBeenLastCalledWith({ text: '' }))
     expect((await subtitleNavigationAnnouncement.getState()).pending).toBe(false)
     const refreshes = vi.mocked(chrome.action.setBadgeText).mock.calls.length
-    vi.mocked(chrome.runtime.getManifest).mockReturnValue({ version: '0.6.3' } as chrome.runtime.Manifest)
-    installed('update', '0.6.2')
+    vi.mocked(chrome.runtime.getManifest).mockReturnValue({ version: '0.6.4' } as chrome.runtime.Manifest)
+    installed('update', '0.6.3')
     vi.mocked(chrome.runtime.onStartup.addListener).mock.calls.at(-1)?.[0]()
     await vi.waitFor(() => expect(vi.mocked(chrome.action.setBadgeText).mock.calls.length).toBeGreaterThan(refreshes))
     expect((await subtitleNavigationAnnouncement.getState()).pending).toBe(false)
@@ -133,7 +139,7 @@ describe('feature announcement lifecycle', () => {
 
   it.each([
     ['0.5.0', '0.6.10'],
-    ['0.6.1', '0.6.2.0'],
+    ['0.6.1', '0.6.3.0'],
   ])('announces a skipped upgrade from %s to %s', async (previousVersion, currentVersion) => {
     vi.mocked(chrome.runtime.getManifest).mockReturnValue({ version: currentVersion } as chrome.runtime.Manifest)
     registerFeatureAnnouncements()
@@ -155,22 +161,24 @@ describe('feature announcement lifecycle', () => {
     installed('install')
     await vi.waitFor(() => expect(chrome.action.setBadgeText).toHaveBeenLastCalledWith({ text: '' }))
     const refreshes = vi.mocked(chrome.action.setBadgeText).mock.calls.length
-    vi.mocked(chrome.runtime.getManifest).mockReturnValue({ version: '0.6.3' } as chrome.runtime.Manifest)
-    installed('update', '0.6.2')
+    vi.mocked(chrome.runtime.getManifest).mockReturnValue({ version: '0.6.4' } as chrome.runtime.Manifest)
+    installed('update', '0.6.3')
     await vi.waitFor(() => expect(vi.mocked(chrome.action.setBadgeText).mock.calls.length).toBeGreaterThan(refreshes))
     expect((await subtitleNavigationAnnouncement.getState()).pending).toBe(false)
     expect(chrome.action.setBadgeText).not.toHaveBeenCalledWith({ text: 'NEW' })
   })
 
   it.each([
+    ['update', '0.6.3', '0.6.3'],
     ['update', '0.6.2', '0.6.2'],
-    ['update', '0.6.2.0', '0.6.3'],
-    ['update', '0.6.2', '0.6.10'],
+    ['update', '0.6.1', '0.6.2'],
+    ['update', '0.6.3.0', '0.6.4'],
+    ['update', '0.6.3', '0.6.10'],
     ['update', '0.5.0', '0.6.1'],
-    ['update', '0.6.3', '0.6.2'],
-    ['update', undefined, '0.6.2'],
-    ['update', 'invalid', '0.6.2'],
-    ['chrome_update', '0.6.1', '0.6.2'],
+    ['update', '0.6.4', '0.6.3'],
+    ['update', undefined, '0.6.3'],
+    ['update', 'invalid', '0.6.3'],
+    ['chrome_update', '0.6.1', '0.6.3'],
   ])('keeps %s from %s to %s quiet without existing eligibility', async (reason, previousVersion, currentVersion) => {
     vi.mocked(chrome.runtime.getManifest).mockReturnValue({ version: currentVersion } as chrome.runtime.Manifest)
     registerFeatureAnnouncements()
@@ -192,8 +200,8 @@ describe('feature announcement lifecycle', () => {
     registerEligibleUpdate()
     await vi.waitFor(() => expect(chrome.action.setBadgeText).toHaveBeenLastCalledWith({ text: 'NEW' }))
     vi.mocked(chrome.action.setBadgeText).mockClear()
-    vi.mocked(chrome.runtime.getManifest).mockReturnValue({ version: '0.6.3' } as chrome.runtime.Manifest)
-    installed('update', '0.6.2')
+    vi.mocked(chrome.runtime.getManifest).mockReturnValue({ version: '0.6.4' } as chrome.runtime.Manifest)
+    installed('update', '0.6.3')
     await vi.waitFor(() => expect(chrome.action.setBadgeText).toHaveBeenLastCalledWith({ text: 'NEW' }))
     expect((await subtitleNavigationAnnouncement.getState()).pending).toBe(true)
   })
@@ -212,7 +220,7 @@ describe('feature announcement lifecycle', () => {
   })
 
   it('keeps NEW while any registered feature is unread and restores the aggregate after restart', async () => {
-    const second = createFeatureAnnouncement({ id: 'another-feature', introducedIn: '0.6.2' })
+    const second = createFeatureAnnouncement({ id: 'another-feature', introducedIn: '0.6.3' })
     const features = [subtitleNavigationAnnouncement, second]
     registerFeatureAnnouncements(features)
     installed('update', '0.6.1')

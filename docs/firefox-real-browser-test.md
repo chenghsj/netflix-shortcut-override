@@ -9,7 +9,7 @@ Use this checklist to verify the Firefox-specific build locally. It covers Firef
 3. In Firefox, open `about:debugging#/runtime/this-firefox`.
 4. Choose "Load Temporary Add-on…".
 5. Select `dist/firefox/manifest.json`. After rebuilding, reload the temporary add-on and the Netflix tab before testing again.
-6. Verify Netflix website access is granted so the ordinary shortcuts can run. For subtitle access, use the Subtitle navigation master in Options; it requests the declared Netflix and subtitle CDN hosts from that click. Manual recovery remains available in `about:addons` → Shortcut Override for Netflix → Permissions and Data for Netflix, `nflxvideo.net`, `nflximg.net`, and `nflxext.com`.
+6. Verify Netflix website access is granted so the ordinary shortcuts can run. For subtitle access, use the Subtitle navigation master in Options; it requests Netflix and optional `nflxvideo.net` access from that click. Manual recovery remains available in `about:addons` → Shortcut Override for Netflix → Permissions and Data for Netflix and `nflxvideo.net`.
 
 The generated `dist/firefox` directory is disposable. The Chromium build remains in `dist/chromium`.
 
@@ -33,7 +33,7 @@ Check the popup's separate read-only subtitle summary: it is collapsed with Not 
 
 This checklist does not establish a completed Firefox run. Record the Firefox version, extension version, loaded `dist/firefox` build, selected subtitle language, and pass/fail/unverified status.
 
-1. With fresh settings, confirm Subtitle navigation is off by default. Enable the global shortcut override and its separate subtitle master, then select a Netflix subtitle language. Missing host access must display Firefox's permission prompt from that click. Deny it once: the master stays off, its settings remain unchanged, and localized retry guidance appears. Retry and allow access: the master turns on and the guidance clears. With access already granted, toggling off and on must need no additional approval. Do not revoke existing permissions solely for a test without arranging restoration with the user.
+1. With a fresh installation, confirm Netflix is the only required host and `nflxvideo.net` is optional. With fresh settings, confirm Subtitle navigation is off by default and ordinary shortcuts work without CDN access. Enable the global shortcut override and its separate subtitle master, then select a Netflix subtitle language. Missing host access must display Firefox's permission prompt from that click for Netflix and `nflxvideo.net`, without `nflximg.net` or `nflxext.com`. Deny it once: the master stays off, its settings remain unchanged, and localized retry guidance appears. Retry and allow access: the master turns on and the guidance clears. With access already granted, toggling off and on must need no additional approval. Do not revoke existing permissions solely for a test without arranging restoration with the user.
 2. Press A/D and confirm movement to the previous/next subtitle start, preserving playing and paused states. Press S and confirm a single replay that starts playback; W must toggle immediately without hold speed.
 3. Confirm A/D/S complete instead of reporting that the subtitle connection is unavailable. Firefox must retrieve metadata through the background's MAIN-world execution path even when its page bridge is absent. Same-world DOM tests are not sufficient evidence of this item; reload both the add-on and Netflix tab after updating the build.
 4. For uncached timings, verify the loading text and spinner are shown only while delivery is pending. A rotation takes about 1.6 seconds, and reduced-motion preferences suppress it. Cached navigation, success, and boundaries have no subtitle navigation hint. If delivery completes too quickly to observe, record the loading-duration check as unverified.
@@ -46,6 +46,8 @@ This checklist does not establish a completed Firefox run. Record the Firefox ve
 Document Picture-in-Picture remains unsupported in Firefox; the PiP-close cancellation scenario belongs to the [Chrome regression checklist](chrome-real-browser-test.md#11-subtitle-navigation-regression-checks).
 
 ### Local permission-flow check, 2026-10-04
+
+This historical check predates the reduction to required Netflix access and optional `nflxvideo.net` access; it does not verify the current permission declaration.
 
 Firefox Desktop 156.0.1, extension 0.6.2, temporarily loaded from this checkout's `dist/firefox`. Reloaded the add-on after building the options bundle `options-C3PcCKoi.js`. The Permissions and Data page showed all four declared host permissions already enabled. In the newly opened Options page, turning the subtitle master off disabled its row switches; turning it back on succeeded without a permission prompt or error. The original enabled state and row settings were restored. The denied/missing-access prompt was not tested live because existing permissions were retained; denial, retry, request failure, pending approval, and stale-response behavior have automated regression coverage. This check does not constitute a complete Netflix navigation smoke test.
 

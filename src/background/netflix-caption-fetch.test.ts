@@ -10,9 +10,9 @@ it('does not request a subtitle CDN without granted host access', async () => {
   expect(request).not.toHaveBeenCalled()
 })
 
-it('rejects non-Netflix endpoints without sending a request', async () => {
+it('rejects unsupported endpoints without checking permissions or sending a request', async () => {
   const request = vi.fn<typeof fetch>()
-  for (const url of ['https://nflxvideo.net.attacker.example/sub', 'http://a.nflxvideo.net/sub', 'https://user:pass@a.nflxvideo.net/sub']) {
+  for (const url of ['https://nflxvideo.net.attacker.example/sub', 'http://a.nflxvideo.net/sub', 'https://user:pass@a.nflxvideo.net/sub', 'https://a.nflximg.net/sub', 'https://a.nflxext.com/sub']) {
     await expect(fetchNetflixCaptionText(url, request)).rejects.toThrow('rejected')
   }
   expect(request).not.toHaveBeenCalled()

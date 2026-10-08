@@ -10,7 +10,7 @@ The extension also stores a local acknowledgement (`chrome.storage.local`) when 
 
 Shortcut Override for Netflix does not use analytics, tracking, advertising, or third-party processing APIs.
 
-When subtitle navigation is enabled and the user requests a previous, next, or replay action, the extension reads the selected Netflix subtitle track and retrieves its timed-text document from an HTTPS Netflix delivery host (`netflix.com`, `nflxvideo.net`, `nflximg.net`, or `nflxext.com`, including subdomains). The request uses the subtitle URL supplied by the active Netflix player and may include browser-managed cookies for the delivery host. The extension does not send those URLs, cookies, or subtitle documents to the developer or another processing service.
+When subtitle navigation is enabled and the user requests a previous, next, or replay action, the extension reads the selected Netflix subtitle track and retrieves its timed-text document from an HTTPS Netflix delivery host (`netflix.com` or `nflxvideo.net`, including subdomains). Access to `nflxvideo.net` is optional and requested when the user enables subtitle navigation. The request uses the subtitle URL supplied by the active Netflix player and may include browser-managed cookies for the delivery host. The extension does not send those URLs, cookies, or subtitle documents to the developer or another processing service.
 
 Subtitle documents are parsed locally. The navigation timing cache is held in content-script memory and is not written to browser sync storage. User-facing subtitle failure diagnostics use error codes rather than signed delivery URLs, cookies, or subtitle content. The CDN host permissions are used for document retrieval; content scripts still run only on Netflix pages.
 

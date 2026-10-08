@@ -9,7 +9,7 @@ The announcement flow lives in `src/shared/feature-announcement.ts`. Each defini
    ```ts
    export const subtitleNavigationAnnouncement = createFeatureAnnouncement({
      id: 'subtitle-navigation',
-     introducedIn: '0.6.2',
+     introducedIn: '0.6.3',
      isEnabled: settings => settings.subtitlePractice.enabled,
    })
    ```

@@ -3,7 +3,7 @@
  * It does not discover tracks, bypass DRM, or follow redirects to new origins.
  */
 export const CAPTION_BYTE_LIMIT = 2_000_000;
-const NETFLIX_HOSTS = ["netflix.com", "nflxvideo.net", "nflximg.net", "nflxext.com"] as const;
+const NETFLIX_HOSTS = ["netflix.com", "nflxvideo.net"] as const;
 
 export class CaptionPermissionError extends Error {
   readonly code = 'CAPTION_PERMISSION_REQUIRED';

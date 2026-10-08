@@ -1,5 +1,5 @@
 import { DEFAULT_PRACTICE_BINDINGS, practiceConflict, SUBTITLE_PERMISSION_COPY, SUBTITLE_PRACTICE_COPY } from '@/shared/subtitle-practice'
-import { NETFLIX_CAPTION_HOST_PERMISSIONS } from '@/shared/netflix-caption-permissions'
+import { NETFLIX_CAPTION_HOST_PERMISSIONS, NETFLIX_PAGE_HOST_PERMISSIONS } from '@/shared/netflix-caption-permissions'
 import {
   ChevronsLeftRightIcon,
   CircleHelpIcon,
@@ -263,7 +263,7 @@ export function OptionsApp() {
     try {
       // Invoke synchronously in the switch's user gesture, without awaiting
       // contains(). Both browsers grant silently when access is already held.
-      void chrome.permissions.request({ origins: [...NETFLIX_CAPTION_HOST_PERMISSIONS] })
+      void chrome.permissions.request({ origins: [...NETFLIX_PAGE_HOST_PERMISSIONS, ...NETFLIX_CAPTION_HOST_PERMISSIONS] })
         .then(granted => {
           if (attempt !== permissionAttempt.current) return
           if (!granted) { fail('denied'); return }

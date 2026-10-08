@@ -1,6 +1,6 @@
 import { defineManifest } from '@crxjs/vite-plugin'
 import packageJson from './package.json' with { type: 'json' }
-import { NETFLIX_CAPTION_HOST_PERMISSIONS } from './src/shared/netflix-caption-permissions'
+import { NETFLIX_CAPTION_HOST_PERMISSIONS, NETFLIX_PAGE_HOST_PERMISSIONS } from './src/shared/netflix-caption-permissions'
 
 const devSuffix = '-dev'
 
@@ -56,7 +56,8 @@ export default defineManifest(({ command, mode }) => {
       },
     ],
     permissions: ['storage', 'scripting', 'activeTab'],
-    host_permissions: [...NETFLIX_CAPTION_HOST_PERMISSIONS],
+    host_permissions: [...NETFLIX_PAGE_HOST_PERMISSIONS],
+    optional_host_permissions: [...NETFLIX_CAPTION_HOST_PERMISSIONS],
     ...(isFirefox
       ? {
           browser_specific_settings: {
