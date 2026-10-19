@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Announcement lifecycle is covered separately; isolate bridge registration.
 vi.mock('@/background/feature-announcements', () => ({ registerFeatureAnnouncements: vi.fn() }))
+vi.mock('@/background/action-icon', () => ({ registerActionIcon: vi.fn() }))
 
 describe('background Netflix API bridge', () => {
   beforeEach(() => {

@@ -10,13 +10,14 @@ export default defineManifest(({ command, mode }) => {
 
   return {
     manifest_version: 3,
-    name: `Shortcut Override for Netflix${isDev ? devSuffix : ''}`,
+    name: `__MSG_extensionName__${isDev ? devSuffix : ''}`,
     short_name: `Shortcut NF${isDev ? devSuffix : ''}`,
     version: packageJson.version,
-    description:
-      'Customize playback shortcuts on Netflix. Unofficial extension, not affiliated with Netflix.',
+    default_locale: 'en',
+    description: '__MSG_extensionDescription__',
     icons: {
       16: 'icons/icon16.png',
+      32: 'icons/icon32.png',
       48: 'icons/icon48.png',
       128: 'icons/icon128.png',
     },
@@ -25,6 +26,7 @@ export default defineManifest(({ command, mode }) => {
       default_popup: 'popup.html',
       default_icon: {
         16: 'icons/icon16.png',
+        32: 'icons/icon32.png',
         48: 'icons/icon48.png',
         128: 'icons/icon128.png',
       },

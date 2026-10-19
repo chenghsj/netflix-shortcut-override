@@ -8,8 +8,10 @@ import { executeNetflixPageApi } from '@/shared/netflix-page-api-executor'
 import { requestPlaybackFocusRestoration } from '@/background/playback-focus-restoration'
 import { isPlaybackFocusRestorationRequest } from '@/shared/playback-focus-restoration'
 import { registerFeatureAnnouncements } from '@/background/feature-announcements'
+import { registerActionIcon } from '@/background/action-icon'
 
 registerFeatureAnnouncements()
+registerActionIcon()
 
 chrome.action?.onClicked.addListener(() => {
   chrome.runtime.openOptionsPage()

@@ -151,6 +151,7 @@ const chromeMock = {
     getUILanguage: vi.fn(() => 'en-US'),
   },
   action: {
+    setIcon: vi.fn().mockResolvedValue(undefined),
     setBadgeText: vi.fn().mockResolvedValue(undefined),
     setBadgeBackgroundColor: vi.fn().mockResolvedValue(undefined),
     setBadgeTextColor: vi.fn().mockResolvedValue(undefined),

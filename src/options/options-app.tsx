@@ -192,6 +192,7 @@ export function OptionsApp() {
     holdSpeed: holdSpeedForm,
   } = useShortcutSettingsForm()
   const subtitleSection = useRef<HTMLDivElement>(null)
+  const globalEnableSwitch = useRef<HTMLButtonElement>(null)
   const subtitleActivationAnchor = useRef<HTMLDivElement>(null)
   const [subtitleGuideRequested, setSubtitleGuideRequested] = useState(() => window.location.hash === SUBTITLE_OPTIONS_HASH)
   useEffect(() => {
@@ -356,6 +357,20 @@ export function OptionsApp() {
 
   if (!loaded) return null
 
+  const subtitleEnableGuidance = <>
+    {practiceCopy.requiresEnabled}{' '}
+    <a href="#enable-shortcut-override"
+      className="inline-block rounded-sm text-foreground underline underline-offset-4 hover:text-primary focus-visible:outline-2 focus-visible:outline-ring"
+      onClick={event => {
+        event.preventDefault()
+        setSubtitleGuideRequested(false)
+        globalEnableSwitch.current?.scrollIntoView({ block: 'center' })
+        globalEnableSwitch.current?.focus({ preventScroll: true })
+      }}>
+      {practiceCopy.goToGeneralSettings}
+    </a>
+  </>
+
   return (
     <TooltipProvider>
       <main className="min-h-svh bg-background text-foreground">
@@ -459,6 +474,7 @@ export function OptionsApp() {
                         tooltip={copy.enabledDesc}
                       />
                       <Switch
+                        ref={globalEnableSwitch}
                         id="enable-shortcut-override"
                         checked={settings.enabled}
                         onCheckedChange={enabled => {
@@ -592,8 +608,10 @@ export function OptionsApp() {
                           <CircleHelpIcon className="size-3.5" />
                         </button>
                       </TooltipTrigger>
-                      <TooltipContent side="top" sideOffset={6} className="max-w-80 whitespace-pre-line">
-                        {`${practiceCopy.requiresEnabled}\n\n${practiceCopy.description}`}
+                      <TooltipContent side="top" sideOffset={6} className="max-w-80">
+                        <div className="space-y-2 whitespace-normal">
+                          {practiceCopy.description.split('\n\n').map(paragraph => <p key={paragraph}>{paragraph}</p>)}
+                        </div>
                       </TooltipContent>
                     </Tooltip>
                   </CardTitle>
@@ -618,7 +636,7 @@ export function OptionsApp() {
                         onFocusOutside={event => {
                           if (event.target === subtitleSection.current) event.preventDefault()
                         }}>
-                        <p id="subtitle-activation-guide" className="leading-relaxed">{settings.enabled ? activationCopy.guide : practiceCopy.requiresEnabled}</p>
+                        <p id="subtitle-activation-guide" className="leading-relaxed">{settings.enabled ? activationCopy.guide : subtitleEnableGuidance}</p>
                         <p id="subtitle-activation-permission" className="text-xs leading-relaxed text-muted-foreground">{activationCopy.permission}</p>
                         <PopoverArrow />
                       </PopoverContent>
@@ -630,14 +648,14 @@ export function OptionsApp() {
                     </Button>
                   </CardAction>
                 </CardHeader>
-                <CardContent className={cn("overflow-x-auto", !settings.enabled && "opacity-60")}>
-                  {!settings.enabled && !showSubtitleGuide && <p className="mb-3 text-xs text-muted-foreground">{practiceCopy.requiresEnabled}</p>}
+                <CardContent className="overflow-x-auto">
+                  {!settings.enabled && !showSubtitleGuide && <p className="mb-3 text-xs text-muted-foreground">{subtitleEnableGuidance}</p>}
                   {subtitlePermissionError && settings.enabled && (
                     <Alert id="subtitle-permission-error" variant="destructive" className="mb-3">
                       <AlertTitle>{SUBTITLE_PERMISSION_COPY[resolvedLocale][subtitlePermissionError]}</AlertTitle>
                     </Alert>
                   )}
-                  <Table className="min-w-[36rem] table-fixed">
+                  <Table className={cn("min-w-[36rem] table-fixed", !settings.enabled && "opacity-60")}>
                     <ShortcutTableHeader labels={copy} />
                     <TableBody>{SUBTITLE_PRACTICE_ACTIONS.map(action => {
                       const binding = settings.subtitlePractice.bindings[action]

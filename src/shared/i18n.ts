@@ -53,7 +53,7 @@ export const LOCALE_LABELS: Record<Locale, string> = {
 }
 
 export const LOCALE_SHORT_LABELS: Record<Locale, string> = {
-  en: 'EN',
+  en: 'English',
   'zh-TW': '繁中',
   'zh-CN': '简中',
   ja: '日本語',
@@ -191,7 +191,7 @@ type Copy = {
 export const COPY: Record<Locale, Copy> = {
   en: {
     appTitle: 'Shortcut Override for Netflix',
-    enabled: 'Enable shortcut override',
+    enabled: 'Enable extension',
     enabledDesc: 'When off, all extension shortcuts are disabled.',
     quickSettings: 'General settings',
     settingsSaveError: 'Settings were not saved',
@@ -295,7 +295,7 @@ export const COPY: Record<Locale, Copy> = {
     shortcuts: 'Shortcuts',
     shortcutsDesc: 'Record keys, disable individual actions, or reset defaults.',
     pictureInPictureTooltip:
-      'Picture-in-Picture is a separate window, so Netflix native shortcuts cannot run there. Only extension shortcuts enabled on this page can be used in Picture-in-Picture.',
+      'Netflix built-in shortcuts do not work in Picture-in-Picture. Use the shortcuts enabled on this page.',
     pictureInPictureUnsupported:
       'Firefox does not support the subtitle-preserving Picture-in-Picture window used by this extension.',
     pipControls: EN_PIP_CONTROLS_COPY,
@@ -338,7 +338,7 @@ export const COPY: Record<Locale, Copy> = {
   },
   'zh-TW': {
     appTitle: 'Shortcut Override for Netflix',
-    enabled: '啟用快捷鍵覆寫',
+    enabled: '啟用擴充功能',
     enabledDesc: '關閉後，所有擴充功能快捷鍵都會停用。',
     quickSettings: '一般設定',
     settingsSaveError: '設定未儲存',
@@ -441,7 +441,7 @@ export const COPY: Record<Locale, Copy> = {
     shortcuts: '快捷鍵',
     shortcutsDesc: '錄製按鍵、停用單項功能，或還原預設值。',
     pictureInPictureTooltip:
-      '子母畫面是獨立視窗，無法使用 Netflix 原生快捷鍵。只有在此頁面啟用的擴充功能快捷鍵，才能在子母畫面中使用。',
+      'Netflix 內建快捷鍵在子母畫面中不會生效。請使用此頁已啟用的快捷鍵。',
     pictureInPictureUnsupported: 'Firefox 不支援本擴充功能使用的字幕保留子母畫面視窗。',
     pipControls: {
       timeline: '播放時間軸',
@@ -503,7 +503,7 @@ export const COPY: Record<Locale, Copy> = {
   },
   'zh-CN': {
     appTitle: 'Shortcut Override for Netflix',
-    enabled: '启用快捷键覆盖',
+    enabled: '启用扩展程序',
     enabledDesc: '关闭后，所有扩展程序快捷键都会停用。',
     quickSettings: '常规设置',
     settingsSaveError: '设置未保存',
@@ -606,7 +606,7 @@ export const COPY: Record<Locale, Copy> = {
     shortcuts: '快捷键',
     shortcutsDesc: '录制按键、停用单项功能，或还原默认值。',
     pictureInPictureTooltip:
-      '画中画是独立窗口，无法使用 Netflix 原生快捷键。只有在此页面启用的扩展程序快捷键，才能在画中画中使用。',
+      'Netflix 内置快捷键在画中画中不会生效。请使用此页已启用的快捷键。',
     pictureInPictureUnsupported: 'Firefox 不支持本扩展程序使用的保留字幕画中画窗口。',
     pipControls: {
       timeline: '播放时间轴',
@@ -668,7 +668,7 @@ export const COPY: Record<Locale, Copy> = {
   },
   ja: {
     appTitle: 'Shortcut Override for Netflix',
-    enabled: 'ショートカットの上書きを有効化',
+    enabled: '拡張機能を有効にする',
     enabledDesc: '無効にすると、拡張機能のすべてのショートカットが無効になります。',
     quickSettings: '一般設定',
     settingsSaveError: '設定は保存されませんでした',
@@ -773,7 +773,7 @@ export const COPY: Record<Locale, Copy> = {
     shortcuts: 'ショートカット',
     shortcutsDesc: 'キーの記録、個別無効化、既定値へのリセットができます。',
     pictureInPictureTooltip:
-      'ピクチャー イン ピクチャーは独立したウィンドウのため、Netflix 本来のショートカットは使えません。このページで有効にした拡張機能のショートカットのみ、ピクチャー イン ピクチャーで使用できます。',
+      'Netflix 標準のショートカットはピクチャー イン ピクチャーでは使えません。このページで有効にしたショートカットを使用してください。',
     pictureInPictureUnsupported:
       'Firefox はこの拡張機能が使用する字幕を保持したピクチャー イン ピクチャー ウィンドウに対応していません。',
     pipControls: {
@@ -836,7 +836,7 @@ export const COPY: Record<Locale, Copy> = {
   },
   ko: {
     appTitle: 'Shortcut Override for Netflix',
-    enabled: '단축키 재정의 사용',
+    enabled: '확장 프로그램 사용',
     enabledDesc: '끄면 확장 프로그램의 모든 단축키가 비활성화됩니다.',
     quickSettings: '일반 설정',
     settingsSaveError: '설정이 저장되지 않았습니다',
@@ -940,7 +940,7 @@ export const COPY: Record<Locale, Copy> = {
     shortcuts: '단축키',
     shortcutsDesc: '키 기록, 개별 비활성화, 기본값 복원이 가능합니다.',
     pictureInPictureTooltip:
-      '화면 속 화면은 별도 창이므로 Netflix 기본 단축키를 사용할 수 없습니다. 이 페이지에서 활성화한 확장 프로그램 단축키만 화면 속 화면에서 사용할 수 있습니다.',
+      'Netflix 기본 단축키는 화면 속 화면에서 작동하지 않습니다. 이 페이지에서 켠 단축키를 사용하세요.',
     pictureInPictureUnsupported:
       'Firefox는 이 확장 프로그램이 사용하는 자막 보존 화면 속 화면 창을 지원하지 않습니다.',
     pipControls: {

@@ -374,7 +374,7 @@ describe('PopupApp', () => {
     expect(within(subtitleShortcut as HTMLElement).getByText('C')).toBeInTheDocument()
     const localeCombobox = screen.getByRole('combobox', { name: 'Language' })
     const themeCombobox = screen.getByRole('combobox', { name: 'Theme' })
-    const enabledSwitch = screen.getByRole('switch', { name: 'Enable shortcut override' })
+    const enabledSwitch = screen.getByRole('switch', { name: 'Enable extension' })
     expect(localeCombobox.compareDocumentPosition(enabledSwitch)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
     )
@@ -405,7 +405,7 @@ describe('PopupApp', () => {
     expect(within(seekSection as HTMLElement).getByLabelText('Seconds per seek')).toBe(
       seekInput
     )
-    expect(screen.getByRole('button', { name: 'Enable shortcut override info' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Enable extension info' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Lowest speed info' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Highest speed info' })).toBeInTheDocument()
     expect(
@@ -429,7 +429,7 @@ describe('PopupApp', () => {
     render(<PopupApp />)
 
     const enabledSwitch = await screen.findByRole('switch', {
-      name: 'Enable shortcut override',
+      name: 'Enable extension',
     })
     fireEvent.click(enabledSwitch)
 

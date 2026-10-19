@@ -121,7 +121,7 @@ describe('OptionsApp', () => {
       expect(screen.queryByText(SUBTITLE_ACTIVATION_COPY.en.guide)).not.toBeInTheDocument()
       if (!subtitleEnabled) expect(screen.getByText(SUBTITLE_ACTIVATION_COPY.en.permission)).toBeInTheDocument()
       else expect(screen.queryByText(SUBTITLE_ACTIVATION_COPY.en.permission)).not.toBeInTheDocument()
-      fireEvent.click(screen.getByRole('switch', { name: 'Enable shortcut override' }))
+      fireEvent.click(screen.getByRole('switch', { name: 'Enable extension' }))
       await waitFor(() => expect(toggle).not.toBeDisabled())
       if (!subtitleEnabled) expect(screen.getByText(SUBTITLE_ACTIVATION_COPY.en.guide)).toBeInTheDocument()
       else expect(screen.queryByText(SUBTITLE_ACTIVATION_COPY.en.guide)).not.toBeInTheDocument()
@@ -308,7 +308,7 @@ describe('OptionsApp', () => {
     vi.mocked(chrome.permissions.request).mockImplementationOnce(() => new Promise<boolean>(resolve => { approve = resolve }) as never)
     render(<OptionsApp />)
     const toggle = await screen.findByRole('switch', { name: 'Enable subtitle navigation shortcuts' })
-    const global = screen.getByRole('switch', { name: 'Enable shortcut override' })
+    const global = screen.getByRole('switch', { name: 'Enable extension' })
     fireEvent.click(toggle)
     expect(toggle).toBeDisabled()
     fireEvent.click(toggle)
@@ -426,7 +426,32 @@ describe('OptionsApp', () => {
     const info = await screen.findByRole('button', { name: 'Subtitle navigation info' })
     expect(screen.queryByText(SUBTITLE_PRACTICE_COPY.en.description)).not.toBeInTheDocument()
     fireEvent.focus(info)
-    expect(await screen.findByRole('tooltip')).toHaveTextContent(SUBTITLE_PRACTICE_COPY.en.description)
+    const tooltip = await screen.findByRole('tooltip')
+    for (const paragraph of SUBTITLE_PRACTICE_COPY.en.description.split('\n\n')) {
+      expect(within(tooltip).getByText(paragraph)).toBeInTheDocument()
+    }
+  })
+
+  it.each(['inline', 'activation guide'] as const)('links the disabled %s to the global switch without enabling it', async surface => {
+    const saved = await saveSettings({ ...structuredClone(DEFAULT_SETTINGS), enabled: false })
+    window.history.replaceState(null, '', surface === 'inline' ? '/options.html' : '/options.html#subtitle-navigation')
+    try {
+      render(<OptionsApp />)
+      const link = await screen.findByRole('link', { name: SUBTITLE_PRACTICE_COPY.en.goToGeneralSettings })
+      const globalSwitch = screen.getByRole('switch', { name: 'Enable extension' })
+      expect(link).toHaveAttribute('href', '#enable-shortcut-override')
+      fireEvent.click(link)
+      await waitFor(() => expect(globalSwitch).toHaveFocus())
+      expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({ block: 'center' })
+      expect(screen.queryByRole('dialog', { name: 'Subtitle navigation' })).not.toBeInTheDocument()
+      expect(await getSettings()).toEqual(saved)
+      expect(chrome.permissions.request).not.toHaveBeenCalled()
+      fireEvent.click(globalSwitch)
+      await waitFor(() => expect(screen.queryByRole('link', { name: SUBTITLE_PRACTICE_COPY.en.goToGeneralSettings })).not.toBeInTheDocument())
+      expect((await getSettings()).enabled).toBe(true)
+    } finally {
+      window.history.replaceState(null, '', '/options.html')
+    }
   })
 
   it.each([false, true])('disables subtitle controls under the global switch and preserves their settings (%s)', async enabled => {
@@ -436,7 +461,7 @@ describe('OptionsApp', () => {
     custom.subtitlePractice.bindings.next.key = { code: 'KeyN', key: 'n', ctrl: false, alt: false, shift: false, meta: false }
     const saved = await saveSettings(custom)
     render(<OptionsApp />)
-    const globalSwitch = await screen.findByRole('switch', { name: 'Enable shortcut override' })
+    const globalSwitch = await screen.findByRole('switch', { name: 'Enable extension' })
     await waitFor(() => expect(globalSwitch).not.toBeDisabled())
     const card = screen.getByText('Subtitle navigation').closest('[data-slot="card"]') as HTMLElement
     const master = within(card).getByRole('switch', { name: 'Enable subtitle navigation shortcuts' })
@@ -447,8 +472,13 @@ describe('OptionsApp', () => {
     for (const button of within(card).getAllByRole('button').filter(button => button.getAttribute('aria-label') !== 'Subtitle navigation info')) expect(button).toBeDisabled()
     const info = within(card).getByRole('button', { name: 'Subtitle navigation info' })
     expect(info).not.toBeDisabled()
+    expect(within(card).getByText(SUBTITLE_PRACTICE_COPY.en.requiresEnabled)).toBeVisible()
     fireEvent.focus(info)
-    expect(await screen.findByRole('tooltip')).toHaveTextContent(SUBTITLE_PRACTICE_COPY.en.requiresEnabled)
+    const tooltip = await screen.findByRole('tooltip')
+    for (const paragraph of SUBTITLE_PRACTICE_COPY.en.description.split('\n\n')) {
+      expect(within(tooltip).getByText(paragraph)).toBeInTheDocument()
+    }
+    expect(tooltip).not.toHaveTextContent(SUBTITLE_PRACTICE_COPY.en.requiresEnabled)
     expect((await getSettings()).subtitlePractice).toEqual(saved.subtitlePractice)
     fireEvent.click(globalSwitch)
     await waitFor(() => expect(master).not.toBeDisabled())
@@ -476,7 +506,7 @@ describe('OptionsApp', () => {
     expect(screen.getByText('General settings')).toBeInTheDocument()
     const localeCombobox = screen.getByRole('combobox', { name: 'Language' })
     const themeCombobox = screen.getByRole('combobox', { name: 'Theme' })
-    const enabledSwitch = screen.getByRole('switch', { name: 'Enable shortcut override' })
+    const enabledSwitch = screen.getByRole('switch', { name: 'Enable extension' })
     expect(localeCombobox.compareDocumentPosition(enabledSwitch)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
     )
@@ -484,7 +514,7 @@ describe('OptionsApp', () => {
       Node.DOCUMENT_POSITION_FOLLOWING
     )
     expect(themeCombobox).toHaveTextContent('Auto')
-    const enabledInfo = screen.getByRole('button', { name: 'Enable shortcut override info' })
+    const enabledInfo = screen.getByRole('button', { name: 'Enable extension info' })
     expect(enabledInfo).toBeInTheDocument()
     fireEvent.focus(enabledInfo)
     expect(await screen.findByRole('tooltip')).toHaveTextContent(
@@ -494,7 +524,7 @@ describe('OptionsApp', () => {
     expect(pictureInPictureInfo).toBeInTheDocument()
     fireEvent.focus(pictureInPictureInfo)
     expect(await screen.findByRole('tooltip')).toHaveTextContent(
-      'Picture-in-Picture is a separate window, so Netflix native shortcuts cannot run there. Only extension shortcuts enabled on this page can be used in Picture-in-Picture.'
+      'Netflix built-in shortcuts do not work in Picture-in-Picture. Use the shortcuts enabled on this page.'
     )
     expect(
       screen.queryByText('When disabled, every key is handled by Netflix, including Space-hold speed.')
@@ -763,7 +793,7 @@ describe('OptionsApp', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('combobox', { name: '語言' })).toHaveTextContent('繁中')
-      expect(screen.getByRole('switch', { name: '啟用快捷鍵覆寫' })).toHaveAttribute(
+      expect(screen.getByRole('switch', { name: '啟用擴充功能' })).toHaveAttribute(
         'aria-checked',
         'false'
       )
@@ -809,7 +839,7 @@ describe('OptionsApp', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('設定已成功匯入。')
     expect(screen.getByRole('combobox', { name: '語言' })).toHaveTextContent('繁中')
     expect(screen.getByRole('combobox', { name: '主題' })).toHaveTextContent('深色')
-    expect(screen.getByRole('switch', { name: '啟用快捷鍵覆寫' })).toHaveAttribute(
+    expect(screen.getByRole('switch', { name: '啟用擴充功能' })).toHaveAttribute(
       'aria-checked',
       'false'
     )
@@ -856,7 +886,7 @@ describe('OptionsApp', () => {
     render(<OptionsApp />)
 
     const globalSwitch = await screen.findByRole('switch', {
-      name: 'Enable shortcut override',
+      name: 'Enable extension',
     })
     const playPauseSwitch = screen.getByRole('switch', {
       name: 'Play / Pause (hold for speed) Enabled',
