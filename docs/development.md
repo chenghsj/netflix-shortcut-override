@@ -77,7 +77,7 @@ The default `npm run build` command creates both browser-specific outputs under 
 | `npm run lint` | Run ESLint. |
 | `npm test` | Run Vitest tests. |
 | `npm run test:coverage` | Run the complete test suite with enforced coverage thresholds. |
-| `npm run icons` | Regenerate enabled icons from `public/icons/icon.svg` and disabled icons from `assets/icons/disabled.png` at 16, 32, 48, and 128 px. |
+| `npm run icons` | Regenerate icons from `assets/icons/enabled.png` and `assets/icons/disabled.png` at 16, 32, 48, and 128 px, preserving aspect ratio and transparency. |
 | `npm run changelog` | Generate release notes from git commits. |
 
 ## Project Structure

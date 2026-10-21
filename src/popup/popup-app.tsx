@@ -126,10 +126,10 @@ export function PopupApp() {
     <TooltipProvider>
       <main className="w-[22rem] bg-background text-foreground">
         <div className="flex flex-col gap-3 p-3">
-          <header className="flex items-center gap-2 px-0.5 py-0.5">
+          <header className="flex items-center gap-2 border-b-2 border-border pb-3">
             <img src="/icons/icon48.png" alt="" className="size-6 shrink-0" />
             <div className="min-w-0 flex-1">
-              <h1 className="truncate text-sm font-semibold leading-tight">Shortcut Override</h1>
+              <h1 className="truncate font-heading text-sm font-black leading-tight">Shortcut Override</h1>
             </div>
             {pageStatus === 'watch' &&
               diagnosticsTriggerState !== 'reload-required' && (
@@ -163,7 +163,7 @@ export function PopupApp() {
 
           {isPageLoadingLong && (
             <section
-              className="rounded-lg border bg-card p-3 shadow-xs"
+              className="rounded-lg border-2 border-border bg-card p-3 shadow-sm"
               role="status"
             >
               <div className="flex items-start gap-2.5">
@@ -176,7 +176,7 @@ export function PopupApp() {
           )}
 
           {shouldShowPageStatus && (
-            <section className="rounded-lg border bg-card p-3 shadow-xs">
+            <section className="rounded-lg border-2 border-border bg-card p-3 shadow-sm">
               <div className="flex items-start gap-2.5">
                 <AlertCircleIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                 <p className="text-xs leading-relaxed text-muted-foreground">{statusText}</p>
@@ -184,8 +184,8 @@ export function PopupApp() {
             </section>
           )}
 
-          <section className="rounded-lg border bg-card p-3 shadow-xs">
-            <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+          <section className="rounded-lg border-2 border-border bg-card p-3 shadow-sm">
+            <h2 className="mb-3 flex items-center gap-2 text-xs font-extrabold text-foreground">
               <SettingsIcon className="size-3.5" />
               {copy.quickSettings}
             </h2>
@@ -238,8 +238,8 @@ export function PopupApp() {
             </div>
           </section>
 
-          <section className="rounded-lg border bg-card p-2.5 shadow-xs">
-          <h2 className="mb-2.5 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+          <section className="rounded-lg border-2 border-border bg-card p-2.5 shadow-sm">
+          <h2 className="mb-2.5 flex items-center gap-2 text-xs font-extrabold text-foreground">
             <KeyboardIcon className="size-3.5" />
             {copy.shortcuts}
           </h2>
@@ -310,11 +310,11 @@ export function PopupApp() {
           </section>
 
           <section
-            className="rounded-lg border bg-card p-2.5 shadow-xs"
+            className="rounded-lg border-2 border-border bg-card p-2.5 shadow-sm"
             aria-labelledby="popup-subtitle-navigation-title"
           >
             <div className={cn('flex items-center justify-between gap-3', subtitleNavigationEnabled && 'mb-2.5')}>
-              <h2 id="popup-subtitle-navigation-title" className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+              <h2 id="popup-subtitle-navigation-title" className="flex items-center gap-2 text-xs font-extrabold text-foreground">
                 <KeyboardIcon className="size-3.5" />
                 {subtitleCopy.title}
               </h2>
@@ -352,8 +352,8 @@ export function PopupApp() {
             )}
           </section>
 
-          <section className="rounded-lg border bg-card p-3 shadow-xs">
-            <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+          <section className="rounded-lg border-2 border-border bg-card p-3 shadow-sm">
+            <h2 className="mb-3 flex items-center gap-2 text-xs font-extrabold text-foreground">
               <GaugeIcon className="size-3.5" />
               {copy.speed}
             </h2>
@@ -433,8 +433,8 @@ export function PopupApp() {
             </div>
           </section>
 
-          <section className="rounded-lg border bg-card p-3 shadow-xs">
-            <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+          <section className="rounded-lg border-2 border-border bg-card p-3 shadow-sm">
+            <h2 className="mb-3 flex items-center gap-2 text-xs font-extrabold text-foreground">
               <ChevronsLeftRightIcon className="size-3.5" />
               {copy.seek}
             </h2>
@@ -459,8 +459,8 @@ export function PopupApp() {
             </div>
           </section>
 
-          <section className="rounded-lg border bg-card p-3 shadow-xs">
-            <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+          <section className="rounded-lg border-2 border-border bg-card p-3 shadow-sm">
+            <h2 className="mb-3 flex items-center gap-2 text-xs font-extrabold text-foreground">
               <HoldSpeedIcon className="size-3.5" />
               {copy.holdSpeed}
             </h2>
@@ -518,7 +518,7 @@ export function PopupApp() {
             </div>
           </section>
 
-          <footer className="grid grid-cols-2 gap-2 border-t pt-3">
+          <footer className="grid grid-cols-2 gap-2 border-t-2 border-border pt-3">
             <Button variant="outline" size="xs" asChild className="min-w-0">
               <a
                 href={EXTERNAL_LINKS.githubRepository}

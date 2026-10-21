@@ -56,7 +56,7 @@ export function OtherProjectsSelect({
           aria-label={ariaLabel}
           aria-expanded={open}
           className={cn(
-            'min-w-28 justify-between rounded-lg has-data-[icon=inline-start]:pl-3',
+            'min-w-28 justify-between rounded-md has-data-[icon=inline-start]:pl-3',
             className,
           )}
         >

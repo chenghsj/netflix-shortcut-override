@@ -14,7 +14,7 @@ export function CompatibilityConnectionAlert({
 }: CompatibilityConnectionAlertProps) {
   return (
     <section
-      className="rounded-lg border bg-card p-3 shadow-xs"
+      className="rounded-lg border-2 border-border bg-card p-3 shadow-sm"
       role="alert"
       aria-labelledby="compatibility-connection-alert-title"
     >

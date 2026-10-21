@@ -47,7 +47,7 @@ export function ChoiceCombobox<Value extends string>({
           role="combobox"
           aria-label={label}
           aria-expanded={open}
-          className={cn('min-w-28 justify-between rounded-lg pl-3', className)}
+          className={cn('min-w-28 justify-between rounded-md pl-3', className)}
         >
           <span className="min-w-0 flex-1 truncate text-left" title={selected?.title ?? selected?.label}>
             {selected?.label}

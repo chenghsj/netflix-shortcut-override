@@ -360,7 +360,7 @@ export function OptionsApp() {
   const subtitleEnableGuidance = <>
     {practiceCopy.requiresEnabled}{' '}
     <a href="#enable-shortcut-override"
-      className="inline-block rounded-sm text-foreground underline underline-offset-4 hover:text-primary focus-visible:outline-2 focus-visible:outline-ring"
+      className="inline-block rounded-sm text-foreground underline underline-offset-4 hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
       onClick={event => {
         event.preventDefault()
         setSubtitleGuideRequested(false)
@@ -375,53 +375,50 @@ export function OptionsApp() {
     <TooltipProvider>
       <main className="min-h-svh bg-background text-foreground">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
-          <header>
-            <Card>
-              <CardHeader>
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <CardTitle className="flex min-w-0 items-center gap-4">
-                    <img src="/icons/icon48.png" alt="" className="size-12 shrink-0" />
-                    <h1 className="truncate text-2xl font-semibold leading-tight">
-                      {copy.appTitle}
-                    </h1>
-                  </CardTitle>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button variant="outline" size="sm" asChild>
-                      <a
-                        href={EXTERNAL_LINKS.githubRepository}
-                        target="_blank"
-                        rel="noreferrer"
-                        aria-label={copy.githubRepositoryAriaLabel}
-                      >
-                        <GitHubIcon data-icon="inline-start" />
-                        {copy.githubRepository}
-                      </a>
-                    </Button>
-                    <Button variant="outline" size="sm" asChild>
-                      <a
-                        href={getShortcutOverrideRatingUrl()}
-                        target="_blank"
-                        rel="noreferrer"
-                        aria-label={copy.rateExtensionAriaLabel}
-                      >
-                        <StarIcon data-icon="inline-start" aria-hidden="true" />
-                        {copy.rateExtension}
-                      </a>
-                    </Button>
-                    <OtherProjectsSelect
-                      label={copy.otherProjects}
-                      ariaLabel={copy.otherProjectsAriaLabel}
-                      streamDanmakuLabel={copy.streamDanmakuStore}
-                      streamDanmakuTitle={copy.streamDanmakuStoreAriaLabel}
-                    />
-                  </div>
-                </div>
-                <SettingsSaveStatus
-                  error={saveError}
-                  errorLabel={copy.settingsSaveError}
+          <header className="flex flex-col gap-2 py-2">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 items-center gap-4">
+                <img src="/icons/icon48.png" alt="" className="size-12 shrink-0" />
+                <h1 className="font-heading text-2xl font-black leading-tight tracking-tight">
+                  {copy.appTitle}
+                </h1>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button variant="outline" asChild>
+                  <a
+                    href={EXTERNAL_LINKS.githubRepository}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={copy.githubRepositoryAriaLabel}
+                  >
+                    <GitHubIcon data-icon="inline-start" />
+                    {copy.githubRepository}
+                  </a>
+                </Button>
+                <Button variant="outline" asChild>
+                  <a
+                    href={getShortcutOverrideRatingUrl()}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={copy.rateExtensionAriaLabel}
+                  >
+                    <StarIcon data-icon="inline-start" aria-hidden="true" />
+                    {copy.rateExtension}
+                  </a>
+                </Button>
+                <OtherProjectsSelect
+                  size="default"
+                  label={copy.otherProjects}
+                  ariaLabel={copy.otherProjectsAriaLabel}
+                  streamDanmakuLabel={copy.streamDanmakuStore}
+                  streamDanmakuTitle={copy.streamDanmakuStoreAriaLabel}
                 />
-              </CardHeader>
-            </Card>
+              </div>
+            </div>
+            <SettingsSaveStatus
+              error={saveError}
+              errorLabel={copy.settingsSaveError}
+            />
           </header>
 
           <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
@@ -561,7 +558,7 @@ export function OptionsApp() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="text-muted-foreground hover:text-foreground focus-visible:text-foreground"
+                                  className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground focus-visible:bg-foreground/10 focus-visible:text-foreground"
                                   disabled={!actionSupported}
                                   onClick={() =>
                                     setRecorder({
@@ -578,7 +575,7 @@ export function OptionsApp() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="text-muted-foreground hover:text-foreground focus-visible:text-foreground"
+                                  className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground focus-visible:bg-foreground/10 focus-visible:text-foreground"
                                   disabled={!actionSupported}
                                   onClick={() => requestEnabled({ group: 'general', action }, true, DEFAULT_KEY_BINDINGS[action], 'reset')}
                                   aria-label={`${copy.reset} ${copy.actions[action]}`}
@@ -664,10 +661,10 @@ export function OptionsApp() {
                         <TableCell><KeyBindingKbd binding={binding.key} className="flex-wrap" /></TableCell>
                         <TableCell>{conflictSwitch({ group: 'practice', action }, !settings.enabled || !settings.subtitlePractice.enabled)}</TableCell>
                         <TableCell><div className="flex items-center justify-end gap-2">
-                          <Button disabled={!settings.enabled} variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground focus-visible:text-foreground"
+                          <Button disabled={!settings.enabled} variant="ghost" size="icon" className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground focus-visible:bg-foreground/10 focus-visible:text-foreground"
                             aria-label={`${copy.edit} ${practiceCopy[action]}`}
                             onClick={() => setRecorder({ group: 'practice', action, draft: binding.key, savedKey: binding.key })}><PencilIcon /></Button>
-                          <Button disabled={!settings.enabled} variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground focus-visible:text-foreground"
+                          <Button disabled={!settings.enabled} variant="ghost" size="icon" className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground focus-visible:bg-foreground/10 focus-visible:text-foreground"
                             aria-label={`${copy.reset} ${practiceCopy[action]}`}
                             onClick={() => requestEnabled({ group: 'practice', action }, true, DEFAULT_PRACTICE_BINDINGS[action].key, 'reset')}><RotateCcwIcon /></Button>
                         </div></TableCell>
@@ -897,7 +894,7 @@ export function OptionsApp() {
           </DialogHeader>
 
           <div className="flex flex-col gap-4">
-            <div className="flex min-h-20 items-center justify-center rounded-lg border border-dashed bg-muted/35 px-4 text-center">
+            <div className="flex min-h-20 items-center justify-center rounded-lg border-2 border-dashed bg-muted px-4 text-center">
               {recorder?.draft ? (
                 <KeyBindingKbd binding={recorder.draft} className="justify-center" />
               ) : (

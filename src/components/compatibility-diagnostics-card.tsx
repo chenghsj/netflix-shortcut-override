@@ -91,7 +91,7 @@ export function CompatibilityDiagnosticsCard({
 
   return (
     <section
-      className={cn('rounded-lg border bg-card p-3 shadow-xs', className)}
+      className={cn('rounded-lg border-2 border-border bg-card p-3 shadow-sm', className)}
       aria-labelledby="diagnostics-title"
     >
       <div className="mb-2.5 flex items-center gap-2">

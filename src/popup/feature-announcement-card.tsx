@@ -15,10 +15,10 @@ export function FeatureAnnouncementCard({ announcement, copy, onEnable }: {
   if (!state.pending) return null
 
   return (
-    <section className="rounded-lg border bg-card p-3 shadow-xs" aria-labelledby={titleId}>
+    <section className="rounded-lg border-2 border-border bg-accent p-3 shadow-sm" aria-labelledby={titleId}>
       <div className="flex items-center gap-2">
-        {state.unread && <Badge className="shrink-0 px-1.5 text-[10px]">NEW</Badge>}
-        <h2 id={titleId} className="text-xs font-semibold">{copy.title}</h2>
+        {state.unread && <Badge className="shrink-0 bg-brand-accent px-1.5 text-[10px] text-brand-accent-foreground">NEW</Badge>}
+        <h2 id={titleId} className="text-xs font-extrabold">{copy.title}</h2>
       </div>
       <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{copy.description}</p>
       <div className="mt-2.5 flex flex-wrap items-center gap-2">
