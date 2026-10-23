@@ -1,5 +1,4 @@
-import { DEFAULT_PRACTICE_BINDINGS, practiceConflict, SUBTITLE_PERMISSION_COPY, SUBTITLE_PRACTICE_COPY } from '@/shared/subtitle-practice'
-import { NETFLIX_CAPTION_HOST_PERMISSIONS, NETFLIX_PAGE_HOST_PERMISSIONS } from '@/shared/netflix-caption-permissions'
+import { DEFAULT_PRACTICE_BINDINGS, SUBTITLE_PERMISSION_COPY, SUBTITLE_PRACTICE_COPY } from '@/shared/subtitle-practice'
 import {
   ChevronsLeftRightIcon,
   CircleHelpIcon,
@@ -11,7 +10,7 @@ import {
   SettingsIcon,
   StarIcon,
 } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState, type ComponentProps } from 'react'
+import { useEffect, useRef, useState, type ComponentProps } from 'react'
 
 import { GitHubIcon } from '@/components/github-icon'
 import { HoldSpeedIcon } from '@/components/hold-speed-icon'
@@ -23,6 +22,8 @@ import { SettingsTransferCard } from '@/options/settings-transfer-card'
 import { SHORTCUT_CONFLICT_COPY } from '@/options/shortcut-conflict-copy'
 import { ShortcutConflictSwitch } from '@/options/shortcut-conflict-switch'
 import { SUBTITLE_ACTIVATION_COPY } from '@/options/subtitle-activation-copy'
+import { useSubtitleActivation } from '@/options/use-subtitle-activation'
+import { useShortcutEditor, type ShortcutTarget } from '@/options/use-shortcut-editor'
 import { SettingLabelWithTooltip } from '@/components/setting-label-with-tooltip'
 import { Label } from '@/components/ui/label'
 import { Popover, PopoverAnchor, PopoverArrow, PopoverContent } from '@/components/ui/popover'
@@ -71,13 +72,9 @@ import { getCopy } from '@/shared/i18n'
 import { resolveLocalePreference } from '@/shared/browser-locale'
 import { getBrowserCapabilities } from '@/shared/browser-capabilities'
 import {
-  DEFAULT_KEY_BINDINGS,
-  findBindingConflict,
-  findEnabledBindingConflicts,
   formatKeyBinding,
   getReplacedNetflixNativeKeyBindings,
   keyBindingFromEvent,
-  keyBindingsEqual,
 } from '@/shared/shortcut-bindings'
 import {
   HOLD_SPEED_LIMITS,
@@ -89,9 +86,6 @@ import {
   SHORTCUT_ACTIONS,
   type KeyBinding,
   type ShortcutAction,
-  type SubtitlePracticeAction,
-  type ShortcutBinding,
-  type ShortcutSettings,
 } from '@/shared/shortcut-types'
 import { subscribeSettings } from '@/shared/storage'
 import { useShortcutSettingsForm } from '@/shared/use-shortcut-settings-form'
@@ -124,37 +118,6 @@ const ignoredRecordKeys = new Set([
   'MetaLeft',
   'MetaRight',
 ])
-
-type ShortcutTarget = { group: 'general'; action: ShortcutAction } | { group: 'practice'; action: SubtitlePracticeAction }
-type EnableRequest = ShortcutTarget & { savedKey: KeyBinding; key: KeyBinding; reason: 'enable' | 'reset' }
-type RecorderState = ShortcutTarget & {
-  draft: KeyBinding | null
-  savedKey: KeyBinding
-  enableOnSave?: boolean
-  enableReason?: EnableRequest['reason']
-} | null
-
-function applyBindingRequest(
-  settings: ShortcutSettings, request: EnableRequest, enabled: boolean,
-  replaceConflicts: boolean, ignoredActions: readonly ShortcutAction[],
-): ShortcutSettings {
-  if (request.group === 'practice' && request.reason === 'enable' && enabled && !settings.subtitlePractice.bindings[request.action].enabled &&
-    (!settings.enabled || !settings.subtitlePractice.enabled)) return settings
-  const update = <Action extends string>(bindings: Record<Action, ShortcutBinding>, actions: readonly Action[], action: Action, ignored: readonly Action[] = []) => {
-    if (!keyBindingsEqual(bindings[action].key, request.savedKey)) return bindings
-    const conflicts = findEnabledBindingConflicts(bindings, actions, action, request.key, ignored)
-    if (enabled && conflicts.length && !replaceConflicts) return bindings
-    const next = { ...bindings }
-    if (enabled && replaceConflicts) {
-      for (const conflict of conflicts) next[conflict] = { ...bindings[conflict], enabled: false }
-    }
-    next[action] = { key: request.key, enabled }
-    return next
-  }
-  return request.group === 'practice'
-    ? { ...settings, subtitlePractice: { ...settings.subtitlePractice, bindings: update(settings.subtitlePractice.bindings, SUBTITLE_PRACTICE_ACTIONS, request.action) } }
-    : { ...settings, bindings: update(settings.bindings, SHORTCUT_ACTIONS, request.action, ignoredActions) }
-}
 
 type NetflixNativeKeyReplacementProps = ComponentProps<'p'> & {
   bindings: readonly KeyBinding[]
@@ -211,27 +174,11 @@ export function OptionsApp() {
     window.addEventListener('hashchange', navigate)
     return () => window.removeEventListener('hashchange', navigate)
   }, [loaded])
-  const [recorder, setRecorder] = useState<RecorderState>(null)
-  const recorderReturnFocus = useRef<HTMLButtonElement | null>(null)
-  const [enableRequest, setEnableRequest] = useState<EnableRequest | null>(null)
-  const [subtitlePermissionPending, setSubtitlePermissionPending] = useState(false)
-  const [subtitlePermissionError, setSubtitlePermissionError] = useState<'denied' | 'failed' | null>(null)
-  const permissionAttempt = useRef(0)
-  const permissionBusy = useRef(false)
-  const cancelSubtitlePermissionRequest = useCallback(() => {
-    permissionAttempt.current++
-    permissionBusy.current = false
-    setSubtitlePermissionPending(false)
-    setSubtitlePermissionError(null)
-  }, [])
+  const subtitleActivation = useSubtitleActivation({ settings, updateSettings })
+  const { pending: subtitlePermissionPending, error: subtitlePermissionError } = subtitleActivation
   useEffect(() => subscribeSettings(next => {
-    setEnableRequest(null)
-    // Observe every storage update, including off/on changes batched into
-    // one render, so another view cannot revive an older approval.
-    if (!next.enabled) cancelSubtitlePermissionRequest()
     if (next.subtitlePractice.enabled) setSubtitleGuideRequested(false)
-  }), [cancelSubtitlePermissionRequest])
-  useEffect(() => () => { permissionAttempt.current++ }, [])
+  }), [])
   const resolvedLocale = resolveLocalePreference(settings.locale)
   const practiceCopy = SUBTITLE_PRACTICE_COPY[resolvedLocale]
   const activationCopy = SUBTITLE_ACTIVATION_COPY[resolvedLocale]
@@ -242,117 +189,22 @@ export function OptionsApp() {
   const ignoredGeneralActions: readonly ShortcutAction[] = browserCapabilities.supportsSubtitlePreservingPip ? [] : ['pictureInPicture']
   useTheme(settings.theme)
 
-  const setSubtitleNavigationEnabled = (enabled: boolean) => {
-    if (!settings.enabled || permissionBusy.current) return
-    setSubtitlePermissionError(null)
-    if (!enabled) {
-      setSubtitleGuideRequested(false)
-      updateSettings(current => ({ ...current, subtitlePractice: { ...current.subtitlePractice, enabled: false } }))
-      return
-    }
-    const attempt = ++permissionAttempt.current
-    permissionBusy.current = true
-    setSubtitlePermissionPending(true)
-    const fail = (error: 'denied' | 'failed') => {
-      if (attempt === permissionAttempt.current) setSubtitlePermissionError(error)
-    }
-    const finish = () => {
-      if (attempt !== permissionAttempt.current) return
-      permissionBusy.current = false
-      setSubtitlePermissionPending(false)
-    }
-    try {
-      // Invoke synchronously in the switch's user gesture, without awaiting
-      // contains(). Both browsers grant silently when access is already held.
-      void chrome.permissions.request({ origins: [...NETFLIX_PAGE_HOST_PERMISSIONS, ...NETFLIX_CAPTION_HOST_PERMISSIONS] })
-        .then(granted => {
-          if (attempt !== permissionAttempt.current) return
-          if (!granted) { fail('denied'); return }
-          updateSettings(current => current.enabled
-            ? { ...current, subtitlePractice: { ...current.subtitlePractice, enabled: true } }
-            : current)
-        })
-        .catch(() => fail('failed'))
-        .finally(finish)
-    } catch { fail('failed'); finish() }
-  }
-
+  const editor = useShortcutEditor({ settings, updateSettings, ignoredGeneralActions })
+  const { recorder, conflict } = editor
   const actionLabels = { ...copy.actions, ...practiceCopy }
-  const bindingFor = (target: ShortcutTarget) => target.group === 'practice'
-    ? settings.subtitlePractice.bindings[target.action] : settings.bindings[target.action]
-  const conflictsFor = (target: ShortcutTarget, key: KeyBinding) => target.group === 'practice'
-    ? findEnabledBindingConflicts(settings.subtitlePractice.bindings, SUBTITLE_PRACTICE_ACTIONS, target.action, key)
-    : findEnabledBindingConflicts(settings.bindings, SHORTCUT_ACTIONS, target.action, key, ignoredGeneralActions)
-  const requestEnabled = (target: ShortcutTarget, enabled: boolean, key = bindingFor(target).key, reason: EnableRequest['reason'] = 'enable') => {
-    const request: EnableRequest = { ...target, savedKey: bindingFor(target).key, key, reason }
-    if (enabled && conflictsFor(target, key).length) { setEnableRequest(request); return }
-    setEnableRequest(null)
-    updateSettings(current => applyBindingRequest(current, request, enabled, false, ignoredGeneralActions))
-  }
-  const validEnableRequest = enableRequest && keyBindingsEqual(enableRequest.savedKey, bindingFor(enableRequest).key) &&
-    (enableRequest.group === 'general' || (settings.enabled && (enableRequest.reason === 'reset' || settings.subtitlePractice.enabled)))
-    ? enableRequest : null
-  const enableConflicts = validEnableRequest ? conflictsFor(validEnableRequest, validEnableRequest.key) : []
-  const conflictNames = new Intl.ListFormat(resolvedLocale, { style: 'short', type: 'conjunction' }).format(enableConflicts.map(action => actionLabels[action]))
+  const conflictNames = new Intl.ListFormat(resolvedLocale, { style: 'short', type: 'conjunction' }).format(conflict?.actions.map(action => actionLabels[action]) ?? [])
   const conflictSwitch = (target: ShortcutTarget, disabled: boolean) => {
-    const binding = bindingFor(target)
-    const open = Boolean(validEnableRequest?.group === target.group && validEnableRequest.action === target.action && enableConflicts.length)
+    const binding = target.group === 'practice' ? settings.subtitlePractice.bindings[target.action] : settings.bindings[target.action]
+    const open = Boolean(conflict?.group === target.group && conflict.action === target.action && conflict.actions.length)
     return <ShortcutConflictSwitch checked={binding.enabled && (target.group === 'practice' || !disabled)} disabled={disabled}
       label={`${actionLabels[target.action]} ${copy.status}`} open={open} copy={conflictCopy}
-      title={conflictCopy.title.replace('{key}', formatKeyBinding(validEnableRequest?.key ?? binding.key)).replace('{actions}', conflictNames)}
+      title={conflictCopy.title.replace('{key}', formatKeyBinding(conflict?.key ?? binding.key)).replace('{actions}', conflictNames)}
       consequence={conflictCopy.consequence.replace('{actions}', conflictNames)}
       transferLabel={conflictCopy.transfer.replace('{action}', actionLabels[target.action])}
-      onOpenChange={next => { if (!next) setEnableRequest(null) }}
-      onCheckedChange={enabled => requestEnabled(target, enabled)}
-      onChangeKey={returnFocus => {
-        if (!validEnableRequest) return
-        recorderReturnFocus.current = returnFocus
-        setRecorder({ ...target, savedKey: binding.key, draft: validEnableRequest.key, enableOnSave: true, enableReason: validEnableRequest.reason })
-        setEnableRequest(null)
-      }}
-      onTransfer={() => {
-        if (!validEnableRequest) return
-        const request = validEnableRequest
-        setEnableRequest(null)
-        updateSettings(current => applyBindingRequest(current, request, true, true, ignoredGeneralActions))
-      }} />
-  }
-  const activeConflict = recorder?.draft && (recorder.enableOnSave || bindingFor(recorder).enabled)
-    ? recorder.group === 'practice'
-      ? practiceConflict(settings, recorder.action, recorder.draft)
-      : findBindingConflict(settings, recorder.action, recorder.draft, {
-          ignoredActions: ignoredGeneralActions,
-        })
-    : null
-
-  const canSaveDraft = Boolean(recorder?.draft && !activeConflict && (recorder.group === 'general' ||
-    (settings.enabled && (!recorder.enableOnSave || recorder.enableReason === 'reset' || settings.subtitlePractice.enabled))))
-  const canRestoreDraft = Boolean(
-    recorder?.draft && !keyBindingsEqual(recorder.draft, recorder.savedKey)
-  )
-  const recorderReplacedNetflixKeys =
-    recorder?.draft && !activeConflict && recorder.group === 'general'
-      ? getReplacedNetflixNativeKeyBindings(recorder.action, {
-          ...settings.bindings[recorder.action],
-          key: recorder.draft,
-        })
-      : []
-
-  const saveDraft = () => {
-    if (!recorder?.draft || !canSaveDraft) return
-    const { draft } = recorder
-    const request: EnableRequest = { ...recorder, key: draft, reason: recorder.enableReason ?? 'enable' }
-    const enabled = recorder.enableOnSave || bindingFor(recorder).enabled
-    updateSettings(current => applyBindingRequest(current, request, enabled, false, ignoredGeneralActions))
-    setRecorder(null)
-  }
-
-  const restoreSavedDraft = () => {
-    if (!recorder) return
-    setRecorder({
-      ...recorder,
-      draft: recorder.savedKey,
-    })
+      onOpenChange={next => { if (!next) editor.dismissConflict() }}
+      onCheckedChange={enabled => editor.setBindingEnabled(target, enabled)}
+      onChangeKey={editor.changeConflictKey}
+      onTransfer={editor.confirmTransfer} />
   }
 
   if (!loaded) return null
@@ -477,10 +329,7 @@ export function OptionsApp() {
                         ref={globalEnableSwitch}
                         id="enable-shortcut-override"
                         checked={settings.enabled}
-                        onCheckedChange={enabled => {
-                          if (!enabled) cancelSubtitlePermissionRequest()
-                          updateSettings(current => ({ ...current, enabled }))
-                        }}
+                        onCheckedChange={subtitleActivation.setGlobalEnabled}
                         aria-label={copy.enabled}
                       />
                     </Field>
@@ -563,14 +412,7 @@ export function OptionsApp() {
                                   size="icon"
                                   className="text-muted-foreground hover:text-foreground focus-visible:text-foreground"
                                   disabled={!actionSupported}
-                                  onClick={() =>
-                                    setRecorder({
-                                      group: 'general',
-                                      action,
-                                      draft: settings.bindings[action].key,
-                                      savedKey: settings.bindings[action].key,
-                                    })
-                                  }
+                                  onClick={() => editor.edit({ group: 'general', action })}
                                   aria-label={`${copy.edit} ${copy.actions[action]}`}
                                 >
                                   <PencilIcon />
@@ -580,7 +422,7 @@ export function OptionsApp() {
                                   size="icon"
                                   className="text-muted-foreground hover:text-foreground focus-visible:text-foreground"
                                   disabled={!actionSupported}
-                                  onClick={() => requestEnabled({ group: 'general', action }, true, DEFAULT_KEY_BINDINGS[action], 'reset')}
+                                  onClick={() => editor.resetBinding({ group: 'general', action })}
                                   aria-label={`${copy.reset} ${copy.actions[action]}`}
                                 >
                                   <RotateCcwIcon />
@@ -622,7 +464,10 @@ export function OptionsApp() {
                           <Label htmlFor="subtitle-navigation-enabled" className="text-muted-foreground">{activationCopy.enableLabel}</Label>
                           <Switch id="subtitle-navigation-enabled" disabled={!settings.enabled || subtitlePermissionPending} checked={settings.subtitlePractice.enabled} aria-label={practiceCopy.enabled}
                             aria-busy={subtitlePermissionPending} aria-describedby={[showSubtitleGuide && 'subtitle-activation-guide', subtitlePermissionError && 'subtitle-permission-error'].filter(Boolean).join(' ') || undefined}
-                            onCheckedChange={setSubtitleNavigationEnabled} />
+                            onCheckedChange={enabled => {
+                              if (!enabled) setSubtitleGuideRequested(false)
+                              subtitleActivation.setEnabled(enabled)
+                            }} />
                         </div>
                       </PopoverAnchor>
                       <PopoverContent side="bottom" align="end" sideOffset={10} collisionPadding={16} className="w-80 max-w-[calc(100vw-2rem)] gap-2 p-3"
@@ -666,10 +511,10 @@ export function OptionsApp() {
                         <TableCell><div className="flex items-center justify-end gap-2">
                           <Button disabled={!settings.enabled} variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground focus-visible:text-foreground"
                             aria-label={`${copy.edit} ${practiceCopy[action]}`}
-                            onClick={() => setRecorder({ group: 'practice', action, draft: binding.key, savedKey: binding.key })}><PencilIcon /></Button>
+                            onClick={() => editor.edit({ group: 'practice', action })}><PencilIcon /></Button>
                           <Button disabled={!settings.enabled} variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground focus-visible:text-foreground"
                             aria-label={`${copy.reset} ${practiceCopy[action]}`}
-                            onClick={() => requestEnabled({ group: 'practice', action }, true, DEFAULT_PRACTICE_BINDINGS[action].key, 'reset')}><RotateCcwIcon /></Button>
+                            onClick={() => editor.resetBinding({ group: 'practice', action })}><RotateCcwIcon /></Button>
                         </div></TableCell>
                       </TableRow>
                     })}</TableBody>
@@ -874,21 +719,15 @@ export function OptionsApp() {
         </div>
       </main>
 
-      <Dialog open={Boolean(recorder)} onOpenChange={open => !open && setRecorder(null)}>
+      <Dialog open={Boolean(recorder)} onOpenChange={open => !open && editor.closeRecorder()}>
         <DialogContent
-          onCloseAutoFocus={event => {
-            const target = recorderReturnFocus.current
-            recorderReturnFocus.current = null
-            if (!target) return
-            event.preventDefault()
-            if (target.isConnected && !target.disabled) target.focus()
-          }}
+          onCloseAutoFocus={editor.restoreRecorderFocus}
           onKeyDown={event => {
             if (!recorder) return
             if (ignoredRecordKeys.has(event.code)) return
             event.preventDefault()
             event.stopPropagation()
-            setRecorder({ ...recorder, draft: keyBindingFromEvent(event) })
+            editor.capture(keyBindingFromEvent(event))
           }}
         >
           <DialogHeader>
@@ -905,17 +744,17 @@ export function OptionsApp() {
               )}
             </div>
             {recorder?.draft && (
-              <Alert variant={activeConflict ? 'destructive' : 'default'}>
+              <Alert variant={recorder.activeConflict ? 'destructive' : 'default'}>
                 <PlayIcon />
                 <AlertTitle>
-                  {activeConflict
-                    ? copy.conflict.replace('{action}', actionLabels[activeConflict])
+                  {recorder.activeConflict
+                    ? copy.conflict.replace('{action}', actionLabels[recorder.activeConflict])
                     : copy.noConflict}
                 </AlertTitle>
               </Alert>
             )}
             <NetflixNativeKeyReplacement
-              bindings={recorderReplacedNetflixKeys}
+              bindings={recorder?.replacedNetflixKeys ?? []}
               template={copy.willReplaceNetflixKeys}
               className="text-center"
               aria-live="polite"
@@ -927,17 +766,17 @@ export function OptionsApp() {
           <DialogFooter className="sm:justify-between">
             <Button
               variant="ghost"
-              onClick={restoreSavedDraft}
-              disabled={!canRestoreDraft}
+              onClick={editor.restoreSavedDraft}
+              disabled={!recorder?.canRestoreDraft}
               aria-label={`${copy.restore} ${actionLabels[recorder?.action ?? 'playPause']}`}
             >
               {copy.restore}
             </Button>
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button variant="outline" onClick={() => setRecorder(null)}>
+              <Button variant="outline" onClick={editor.closeRecorder}>
                 {copy.cancel}
               </Button>
-              <Button onClick={saveDraft} disabled={!canSaveDraft}>
+              <Button onClick={editor.saveDraft} disabled={!recorder?.canSaveDraft}>
                 {copy.save}
               </Button>
             </div>
