@@ -403,6 +403,21 @@ describe('OptionsApp', () => {
     await waitFor(async () => expect((await getSettings()).subtitlePractice.enabled).toBe(true))
   })
 
+  it('keeps subtitle approval pending through unrelated settings updates while the extension stays enabled', async () => {
+    let approve!: (granted: boolean) => void
+    vi.mocked(chrome.permissions.request).mockImplementationOnce(() => new Promise<boolean>(resolve => { approve = resolve }) as never)
+    render(<OptionsApp />)
+    const toggle = await screen.findByRole('switch', { name: 'Enable subtitle navigation shortcuts' })
+    fireEvent.click(toggle)
+    await act(async () => { await saveSettings({ ...(await getSettings()), theme: 'dark' }) })
+    expect(toggle).toBeDisabled()
+    expect(toggle).toHaveAttribute('aria-busy', 'true')
+    await act(async () => approve(true))
+    expect((await getSettings()).subtitlePractice.enabled).toBe(true)
+    expect((await getSettings()).theme).toBe('dark')
+    expect(toggle).not.toBeDisabled()
+  })
+
   it('does not enable subtitles from a stale approval after the global switch was turned off and on', async () => {
     let approve!: (granted: boolean) => void
     vi.mocked(chrome.permissions.request).mockImplementationOnce(() => new Promise<boolean>(resolve => { approve = resolve }) as never)

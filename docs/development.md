@@ -117,6 +117,7 @@ Key areas:
 - `src/content/shortcuts/`: media command handling and Play / Pause hold interaction state.
 - `src/content/hints/`: hint overlay rendering, layout, icons, and timing.
 - `src/content/pip/`: Document Picture-in-Picture lifecycle, subtitle mirroring, and PiP keyboard routing.
+- `src/content/pip/pip-video-handoff.ts`: candidate selection and explicit waiting, replacement, or episode decisions. Recovery timers and episode evidence remain in this owner.
 - `src/content/netflix-api-bridge.ts`: page-world bridge for Netflix player API access and selected subtitle metadata.
 - `src/content/subtitle-practice.ts`: subtitle navigation, timing cache, loading feedback, and pending-action cancellation.
 - `src/shared/netflix-caption-events.ts`: JSON string message protocol for caption metadata across browser worlds.
@@ -125,7 +126,9 @@ Key areas:
 - `src/background/index.ts`: background-side Netflix API execution fallback, caption-fetch routing, and popup focus handoff coordination.
 - `src/background/netflix-caption-fetch.ts`: allowlisted HTTPS caption downloads with size and timeout limits.
 - `src/popup/popup-app.tsx`: toolbar popup for quick status, toggles, shortcut summary, and options entry.
-- `src/options/options-app.tsx`: extension options UI.
+- `src/options/options-app.tsx`: extension options UI and subtitle-section navigation.
+- `src/options/use-shortcut-editor.ts`: mutually exclusive recording and conflict confirmation, saved-key checks, and recorder focus restoration.
+- `src/options/use-subtitle-activation.ts`: synchronous browser permission requests, duplicate-request prevention, and cancellation of stale approvals on disable or unmount.
 - `src/shared/shortcut-bindings.ts`: shortcut actions, default key bindings, normalization, and conflict checks.
 - `src/shared/shortcut-settings.ts`: default settings, validation, and settings normalization.
 - `src/shared/playback-speed.ts`: playback-speed stepping and speed normalization helpers.
