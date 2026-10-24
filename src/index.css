@@ -2,6 +2,7 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
+@import "./components/app-ui/app-ui.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -37,7 +38,7 @@
   --input: #26201a;
   --ring: #26201a;
   --shadow-color: #26201a;
-  --radius: 14px;
+  --radius: 16px;
 }
 
 body {
@@ -80,6 +81,8 @@ html.popup-page-root {
 
 @theme inline {
   --font-heading: var(--font-sans);
+  --font-head: var(--font-sans);
+  --color-secondary-hover: var(--secondary);
   --shadow-2xs: 1px 1px 0 0 var(--shadow-color);
   --shadow-xs: 1px 1px 0 0 var(--shadow-color);
   --shadow-sm: 3px 3px 0 0 var(--shadow-color);
@@ -148,11 +151,11 @@ html.popup-page-root {
 
 .dark {
   color-scheme: dark;
-  --background: oklch(18% 0.012 70);
+  --background: #3a3129;
   --foreground: oklch(93% 0.025 80);
-  --card: oklch(24% 0.014 70);
+  --card: #4a3e33;
   --card-foreground: oklch(93% 0.025 80);
-  --popover: oklch(24% 0.014 70);
+  --popover: #4a3e33;
   --popover-foreground: oklch(93% 0.025 80);
   --primary: oklch(75% 0.135 82);
   --primary-hover: oklch(79% 0.14 82);
@@ -170,7 +173,7 @@ html.popup-page-root {
   --border: oklch(93% 0.025 80);
   --input: oklch(93% 0.025 80);
   --ring: oklch(75% 0.135 82);
-  --shadow-color: oklch(8% 0.005 70);
+  --shadow-color: #080605;
 }
 
 @layer base {

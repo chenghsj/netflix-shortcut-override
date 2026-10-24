@@ -151,7 +151,6 @@ describe('content media shortcuts', () => {
     ['volumeUp', 'ArrowUp', 'ArrowUp'],
     ['volumeDown', 'ArrowDown', 'ArrowDown'],
     ['mute', 'KeyM', 'm'],
-    ['toggleSubtitles', 'KeyC', 'c'],
     ['fullscreen', 'KeyF', 'f'],
     ['skipIntro', 'KeyS', 's'],
   ] as const)('blocks the original Netflix key after %s is remapped', async (action, code, key) => {
@@ -178,6 +177,32 @@ describe('content media shortcuts', () => {
     window.removeEventListener('keydown', nativeKeyHandler, true)
     expect(event.defaultPrevented).toBe(true)
     expect(nativeKeyHandler).not.toHaveBeenCalled()
+  })
+
+  it('does not block C after the extension subtitle shortcut is remapped', async () => {
+    await saveSettings({
+      ...DEFAULT_SETTINGS,
+      bindings: {
+        ...DEFAULT_SETTINGS.bindings,
+        toggleSubtitles: {
+          ...DEFAULT_SETTINGS.bindings.toggleSubtitles,
+          key: { code: 'KeyV', key: 'v', ctrl: false, alt: false, shift: false, meta: false },
+        },
+      },
+    })
+    await Promise.resolve()
+
+    document.body.append(document.createElement('video'))
+    const pageKeyHandler = vi.fn()
+    window.addEventListener('keydown', pageKeyHandler, true)
+    const event = new KeyboardEvent('keydown', {
+      code: 'KeyC', key: 'c', bubbles: true, cancelable: true,
+    })
+    window.dispatchEvent(event)
+    window.removeEventListener('keydown', pageKeyHandler, true)
+
+    expect(event.defaultPrevented).toBe(false)
+    expect(pageKeyHandler).toHaveBeenCalledOnce()
   })
 
   it('leaves Enter to Netflix after play/pause is remapped', async () => {

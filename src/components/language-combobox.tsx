@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react'
+
 import { ChoiceCombobox } from '@/components/choice-combobox'
 import { LOCALE_LABELS, LOCALE_SHORT_LABELS } from '@/shared/i18n'
 import {
@@ -12,6 +14,7 @@ type LanguageComboboxProps = {
   autoLabel: string
   size?: 'sm' | 'default'
   className?: string
+  triggerIcon?: ReactNode
 }
 
 export function LanguageCombobox({
@@ -21,6 +24,7 @@ export function LanguageCombobox({
   autoLabel,
   size = 'sm',
   className,
+  triggerIcon,
 }: LanguageComboboxProps) {
   return (
     <ChoiceCombobox
@@ -34,6 +38,7 @@ export function LanguageCombobox({
       }))}
       size={size}
       className={className}
+      triggerIcon={triggerIcon}
     />
   )
 }

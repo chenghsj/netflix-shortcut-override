@@ -2,7 +2,7 @@
 
 [README](../README.md) · [User guide](user-guide.md) · [Development](development.md) · [Release](release.md) · [Troubleshooting](troubleshooting.md)
 
-Requires Node.js 22 or newer and npm. CI uses Node.js 24. Run commands from the repository root.
+Requires Node.js 22.18.0 or newer and npm. CI uses Node.js 24. Run commands from the repository root. Scripts run directly with Node.js and are included in `npm run typecheck`.
 
 ## Install From Source
 
@@ -77,7 +77,7 @@ The default `npm run build` command creates both browser-specific outputs under 
 | `npm run lint` | Run ESLint. |
 | `npm test` | Run Vitest tests. |
 | `npm run test:coverage` | Run the complete test suite with enforced coverage thresholds. |
-| `npm run icons` | Regenerate icons from `assets/icons/enabled.png` and `assets/icons/disabled.png` at 16, 32, 48, and 128 px, preserving aspect ratio and transparency. |
+| `npm run icons` | Regenerate icons from `assets/icons/enabled.png`, `assets/icons/disabled.png`, and `assets/icons/dark.png` at 16, 32, 48, and 128 px, preserving aspect ratio and transparency. The dark variant is for Options and popup; toolbar icons follow the enabled/disabled state. |
 | `npm run changelog` | Generate release notes from git commits. |
 
 ## Project Structure
@@ -91,9 +91,9 @@ The default `npm run build` command creates both browser-specific outputs under 
 |   `-- icons
 |-- manifest.config.ts
 |-- scripts
-|   |-- generate-icons.mjs
-|   |-- generate-release-notes.mjs
-|   `-- verify-build.mjs
+|   |-- generate-icons.ts
+|   |-- generate-release-notes.ts
+|   `-- verify-build.ts
 |-- src
 |   |-- background
 |   |   |-- index.ts
@@ -156,3 +156,7 @@ content shortcut handling, Netflix API bridge and background execution behavior,
 readiness, subtitle navigation and its JSON bridge, pending-action cancellation, PiP controls and subtitle mirroring, video handoff, and episode-transition recovery.
 
 The real-Chrome regression flow, including the reload-in-progress popup case, is documented in [docs/chrome-real-browser-test.md](chrome-real-browser-test.md). The Firefox smoke-test flow is documented in [docs/firefox-real-browser-test.md](firefox-real-browser-test.md).
+
+## UI components
+
+See [UI components](ui-components.md) for upstream components, application adapters, and import boundaries.

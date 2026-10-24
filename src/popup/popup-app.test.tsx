@@ -6,7 +6,7 @@ import { registerFeatureAnnouncements } from '@/background/feature-announcements
 import { EXTERNAL_LINKS } from '@/shared/external-links'
 import { PLAYBACK_FOCUS_RESTORATION_MESSAGE_TYPE } from '@/shared/playback-focus-restoration'
 import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
-import { saveSettings } from '@/shared/storage'
+import { getSettings, saveSettings } from '@/shared/storage'
 import { subtitleNavigationAnnouncement } from '@/shared/feature-announcements'
 
 const recordEligibleUpgrade = () => subtitleNavigationAnnouncement.recordInstall(
@@ -230,6 +230,7 @@ describe('PopupApp', () => {
     settings.subtitlePractice.bindings.previous.key = {
       code: 'KeyZ', key: 'z', ctrl: true, alt: false, shift: false, meta: false,
     }
+    settings.bindings.volumeUp.key = { ...settings.subtitlePractice.bindings.previous.key }
     settings.subtitlePractice.bindings.next.enabled = false
     await saveSettings(settings)
     render(<PopupApp />)
@@ -249,7 +250,13 @@ describe('PopupApp', () => {
     expect(within(skipIntro).getByText('Subtitle priority')).toHaveAttribute(
       'aria-label', 'This key is used by Replay current subtitle in Subtitle navigation.'
     )
-    expect(within(skipIntro).queryByText('S')).not.toBeInTheDocument()
+    expect(within(skipIntro).getByText('S')).toBeInTheDocument()
+    const volumeUp = screen.getByText('Volume up').closest('div') as HTMLElement
+    expect(within(volumeUp).getByText('Ctrl')).toBeInTheDocument()
+    expect(within(volumeUp).getByText('Z')).toBeInTheDocument()
+    expect(within(volumeUp).getByText('Subtitle priority')).toHaveAttribute(
+      'aria-label', 'This key is used by Previous subtitle in Subtitle navigation.'
+    )
     expect(within(section).queryByRole('button')).not.toBeInTheDocument()
     expect(within(section).queryByRole('switch')).not.toBeInTheDocument()
     expect(chrome.permissions.request).not.toHaveBeenCalled()
@@ -298,6 +305,7 @@ describe('PopupApp', () => {
     expect(within(seekForward).getByText('字幕導航優先')).toHaveAttribute(
       'aria-label', '這個按鍵由字幕導航的「上一句」使用。'
     )
+    expect(within(seekForward).getByText('→')).toBeInTheDocument()
     expect(within(skipIntro).getByText('S')).toBeInTheDocument()
     expect(within(section).getByText('→')).toBeInTheDocument()
   })
@@ -359,7 +367,7 @@ describe('PopupApp', () => {
       screen.getByRole('link', { name: 'Rate this extension in the extension store' })
     ).toHaveAttribute('href', EXTERNAL_LINKS.shortcutOverrideChromeWebStore)
     expect(screen.getByRole('combobox', { name: 'Other products' })).toBeInTheDocument()
-    expect(screen.getByText('General settings')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'General settings' })).toBeInTheDocument()
     expect(screen.queryByText('Netflix playback features are ready.')).not.toBeInTheDocument()
     await waitFor(() => expect(chrome.tabs.sendMessage).toHaveBeenCalledTimes(1))
     expect(screen.queryByText('Open a Netflix title to use shortcuts.')).not.toBeInTheDocument()
@@ -375,6 +383,12 @@ describe('PopupApp', () => {
     const localeCombobox = screen.getByRole('combobox', { name: 'Language' })
     const themeCombobox = screen.getByRole('combobox', { name: 'Theme' })
     const enabledSwitch = screen.getByRole('switch', { name: 'Enable extension' })
+    const generalSettings = screen.getByRole('heading', { name: 'General settings' }).closest('section')
+    expect(generalSettings).toContainElement(localeCombobox)
+    expect(generalSettings).toContainElement(themeCombobox)
+    expect(generalSettings).toContainElement(enabledSwitch)
+    expect(screen.queryByRole('navigation', { name: 'General settings' })).not.toBeInTheDocument()
+    expect(screen.getByRole('banner')).not.toContainElement(localeCombobox)
     expect(localeCombobox.compareDocumentPosition(enabledSwitch)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
     )
@@ -414,7 +428,7 @@ describe('PopupApp', () => {
     expect(screen.getByRole('button', { name: 'Hold speed info' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Seconds per seek info' })).toBeInTheDocument()
     expect(localeCombobox).toHaveTextContent('Auto')
-    expect(themeCombobox).toHaveTextContent('Auto')
+    expect(screen.getByRole('combobox', { name: 'Theme' })).toHaveTextContent('Auto')
 
     await openCompatibilityDiagnostics()
     expect(await screen.findByText('Netflix playback features are ready.')).toBeInTheDocument()
@@ -438,17 +452,100 @@ describe('PopupApp', () => {
     })
   })
 
-  it('persists popup theme changes', async () => {
-    render(<PopupApp />)
-
-    const themeCombobox = await screen.findByRole('combobox', { name: 'Theme' })
-    fireEvent.click(themeCombobox)
-    fireEvent.click(await screen.findByText('Dark'))
-
-    await waitFor(() => {
+  it('persists popup theme changes and restores the automatic system theme', async () => {
+    const view = render(<PopupApp />)
+    expect((await getSettings()).theme).toBe('auto')
+    expect(await screen.findByRole('combobox', { name: 'Theme' })).toHaveTextContent('Auto')
+    fireEvent.click(screen.getByRole('combobox', { name: 'Theme' }))
+    fireEvent.click(await screen.findByRole('option', { name: 'Dark' }))
+    await waitFor(async () => {
+      expect((await getSettings()).theme).toBe('dark')
       expect(screen.getByRole('combobox', { name: 'Theme' })).toHaveTextContent('Dark')
       expect(document.documentElement).toHaveClass('dark')
     })
+    view.unmount()
+    const restored = render(<PopupApp />)
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Theme' }))
+    fireEvent.click(await screen.findByRole('option', { name: 'Light' }))
+    await waitFor(async () => {
+      expect((await getSettings()).theme).toBe('light')
+      expect(screen.getByRole('combobox', { name: 'Theme' })).toHaveTextContent('Light')
+      expect(document.documentElement).not.toHaveClass('dark')
+    })
+    fireEvent.click(screen.getByRole('combobox', { name: 'Theme' }))
+    fireEvent.click(await screen.findByRole('option', { name: 'Auto' }))
+    await waitFor(async () => {
+      expect((await getSettings()).theme).toBe('auto')
+      expect(screen.getByRole('combobox', { name: 'Theme' })).toHaveTextContent('Auto')
+      expect(document.documentElement).not.toHaveClass('dark')
+    })
+    restored.unmount()
+    render(<PopupApp />)
+    expect(await screen.findByRole('combobox', { name: 'Theme' })).toHaveTextContent('Auto')
+    expect(document.documentElement).not.toHaveClass('dark')
+  })
+
+  it('resumes following the system theme after restoring Auto from a saved light choice', async () => {
+    const originalMatchMedia = window.matchMedia
+    let dark = true
+    const listeners = new Set<(event: MediaQueryListEvent) => void>()
+    const mediaQuery = {
+      get matches() { return dark },
+      addEventListener: vi.fn((_event: string, listener: (event: MediaQueryListEvent) => void) => { listeners.add(listener) }),
+      removeEventListener: vi.fn((_event: string, listener: (event: MediaQueryListEvent) => void) => { listeners.delete(listener) }),
+    }
+    Object.defineProperty(window, 'matchMedia', { configurable: true, value: vi.fn(() => mediaQuery) })
+    try {
+      const view = render(<PopupApp />)
+      expect(await screen.findByRole('combobox', { name: 'Theme' })).toHaveTextContent('Auto')
+      expect((await getSettings()).theme).toBe('auto')
+      expect(document.documentElement).toHaveClass('dark')
+      fireEvent.click(screen.getByRole('switch', { name: 'Enable extension' }))
+      await waitFor(async () => expect((await getSettings()).enabled).toBe(false))
+      expect((await getSettings()).theme).toBe('auto')
+      fireEvent.click(screen.getByRole('combobox', { name: 'Theme' }))
+      fireEvent.click(await screen.findByRole('option', { name: 'Light' }))
+      await waitFor(async () => {
+        expect((await getSettings()).theme).toBe('light')
+        expect(screen.getByRole('combobox', { name: 'Theme' })).toHaveTextContent('Light')
+        expect(document.documentElement).not.toHaveClass('dark')
+      })
+      expect(listeners.size).toBe(0)
+      expect(mediaQuery.removeEventListener).toHaveBeenCalledOnce()
+      act(() => {
+        dark = false
+        for (const listener of listeners) listener({ matches: dark } as MediaQueryListEvent)
+        dark = true
+        for (const listener of listeners) listener({ matches: dark } as MediaQueryListEvent)
+      })
+      expect(document.documentElement).not.toHaveClass('dark')
+      view.unmount()
+      render(<PopupApp />)
+      expect(await screen.findByRole('combobox', { name: 'Theme' })).toHaveTextContent('Light')
+      expect(document.documentElement).not.toHaveClass('dark')
+      expect((await getSettings()).theme).toBe('light')
+      fireEvent.click(screen.getByRole('combobox', { name: 'Theme' }))
+      fireEvent.click(await screen.findByRole('option', { name: 'Auto' }))
+      await waitFor(async () => {
+        expect((await getSettings()).theme).toBe('auto')
+        expect(screen.getByRole('combobox', { name: 'Theme' })).toHaveTextContent('Auto')
+        expect(document.documentElement).toHaveClass('dark')
+      })
+      expect(listeners.size).toBe(1)
+      act(() => {
+        dark = false
+        for (const listener of listeners) listener({ matches: dark } as MediaQueryListEvent)
+      })
+      expect(document.documentElement).not.toHaveClass('dark')
+      expect(screen.getByRole('combobox', { name: 'Theme' })).toHaveTextContent('Auto')
+      act(() => {
+        dark = true
+        for (const listener of listeners) listener({ matches: dark } as MediaQueryListEvent)
+      })
+      expect(document.documentElement).toHaveClass('dark')
+    } finally {
+      Object.defineProperty(window, 'matchMedia', { configurable: true, value: originalMatchMedia })
+    }
   })
 
   it('persists popup language changes', async () => {

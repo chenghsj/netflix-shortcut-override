@@ -14,7 +14,107 @@ const recordEligibleUpgrade = () => subtitleNavigationAnnouncement.recordInstall
   { reason: 'update', previousVersion: '0.6.2' } as chrome.runtime.InstalledDetails, '0.6.3',
 )
 
+function focusAsKeyboard(element: HTMLElement) {
+  const matches = element.matches.bind(element)
+  vi.spyOn(element, 'matches').mockImplementation(selector =>
+    selector === ':focus-visible' ? true : matches(selector),
+  )
+  act(() => element.focus())
+}
+
 describe('OptionsApp', () => {
+  it('shows the subtitle owner beside the default S key without disabling the general shortcut', async () => {
+    const settings = structuredClone(DEFAULT_SETTINGS)
+    settings.subtitlePractice.enabled = true
+    await saveSettings(settings)
+    render(<OptionsApp />)
+
+    const row = await screen.findByRole('row', { name: /Skip intro/ })
+    const badge = within(row).getByLabelText('This key is used by Replay current subtitle in Subtitle navigation.')
+    expect(badge).toHaveTextContent('Subtitle priority')
+    expect(badge).toHaveAttribute('title', 'This key is used by Replay current subtitle in Subtitle navigation.')
+    expect(within(row).getByText('S')).toBeInTheDocument()
+    expect(within(row).getByRole('switch', { name: 'Skip intro Enabled' })).toHaveAttribute('aria-checked', 'true')
+    expect((await getSettings()).bindings.skipIntro).toEqual(settings.bindings.skipIntro)
+  })
+
+  it('matches custom physical keys and modifiers even when the displayed key differs', async () => {
+    const settings = structuredClone(DEFAULT_SETTINGS)
+    settings.locale = 'zh-TW'
+    settings.subtitlePractice.enabled = true
+    settings.bindings.skipIntro.key = { code: 'KeyQ', key: 'q', ctrl: true, alt: true, shift: true, meta: true }
+    settings.subtitlePractice.bindings.next.key = { ...settings.bindings.skipIntro.key, key: 'Ω' }
+    await saveSettings(settings)
+    render(<OptionsApp />)
+
+    const row = await screen.findByRole('row', { name: /略過片頭/ })
+    expect(within(row).getByLabelText('這個按鍵由字幕導航的「下一句」使用。')).toHaveTextContent('字幕導航優先')
+    expect(within(row).getByText('已取代 Netflix：S')).toBeInTheDocument()
+  })
+
+  it.each(['ctrl', 'alt', 'shift', 'meta', 'code'] as const)('does not mark a shortcut overridden when its %s differs', async field => {
+    const settings = structuredClone(DEFAULT_SETTINGS)
+    settings.subtitlePractice.enabled = true
+    settings.bindings.skipIntro.key = { code: 'KeyQ', key: 'q', ctrl: false, alt: false, shift: false, meta: false }
+    settings.subtitlePractice.bindings.next.key = { ...settings.bindings.skipIntro.key }
+    if (field === 'code') settings.subtitlePractice.bindings.next.key.code = 'KeyR'
+    else settings.subtitlePractice.bindings.next.key[field] = true
+    await saveSettings(settings)
+    render(<OptionsApp />)
+
+    const row = await screen.findByRole('row', { name: /Skip intro/ })
+    expect(within(row).queryByText('Subtitle priority')).not.toBeInTheDocument()
+  })
+
+  it.each(['global', 'subtitle', 'general binding', 'subtitle binding'] as const)('hides subtitle priority when %s is disabled', async disabled => {
+    const settings = structuredClone(DEFAULT_SETTINGS)
+    settings.subtitlePractice.enabled = true
+    if (disabled === 'global') settings.enabled = false
+    if (disabled === 'subtitle') settings.subtitlePractice.enabled = false
+    if (disabled === 'general binding') settings.bindings.skipIntro.enabled = false
+    if (disabled === 'subtitle binding') settings.subtitlePractice.bindings.replay.enabled = false
+    await saveSettings(settings)
+    render(<OptionsApp />)
+
+    const row = await screen.findByRole('row', { name: /Skip intro/ })
+    expect(within(row).queryByText('Subtitle priority')).not.toBeInTheDocument()
+  })
+
+  it('does not show subtitle priority for unsupported Picture-in-Picture', async () => {
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:141.0) Gecko/20100101 Firefox/141.0'
+    )
+    const settings = structuredClone(DEFAULT_SETTINGS)
+    settings.subtitlePractice.enabled = true
+    settings.subtitlePractice.bindings.next.key = { ...settings.bindings.pictureInPicture.key }
+    await saveSettings(settings)
+    render(<OptionsApp />)
+
+    const row = await screen.findByRole('row', { name: /Picture-in-Picture/ })
+    expect(within(row).queryByText('Subtitle priority')).not.toBeInTheDocument()
+    expect(within(row).getByRole('switch', { name: 'Picture-in-Picture Enabled' })).toBeDisabled()
+  })
+
+  it('removes and restores subtitle priority immediately without changing the general binding', async () => {
+    const settings = structuredClone(DEFAULT_SETTINGS)
+    settings.subtitlePractice.enabled = true
+    await saveSettings(settings)
+    render(<OptionsApp />)
+
+    const row = await screen.findByRole('row', { name: /Skip intro/ })
+    const master = screen.getByRole('switch', { name: 'Enable subtitle navigation shortcuts' })
+    const general = within(row).getByRole('switch', { name: 'Skip intro Enabled' })
+    expect(within(row).getByText('Subtitle priority')).toBeInTheDocument()
+    fireEvent.click(master)
+    await waitFor(() => expect(within(row).queryByText('Subtitle priority')).not.toBeInTheDocument())
+    expect(general).toHaveAttribute('aria-checked', 'true')
+    expect((await getSettings()).bindings.skipIntro).toEqual(settings.bindings.skipIntro)
+    fireEvent.click(master)
+    await waitFor(() => expect(within(row).getByText('Subtitle priority')).toBeInTheDocument())
+    expect(general).toHaveAttribute('aria-checked', 'true')
+    expect((await getSettings()).bindings.skipIntro).toEqual(settings.bindings.skipIntro)
+  })
+
   it('focuses and scrolls to the subtitle section from an announcement without enabling it', async () => {
     await recordEligibleUpgrade()
     window.history.replaceState(null, '', '/options.html#subtitle-navigation')
@@ -425,7 +525,7 @@ describe('OptionsApp', () => {
     render(<OptionsApp />)
     const info = await screen.findByRole('button', { name: 'Subtitle navigation info' })
     expect(screen.queryByText(SUBTITLE_PRACTICE_COPY.en.description)).not.toBeInTheDocument()
-    fireEvent.focus(info)
+    focusAsKeyboard(info)
     const tooltip = await screen.findByRole('tooltip')
     for (const paragraph of SUBTITLE_PRACTICE_COPY.en.description.split('\n\n')) {
       expect(within(tooltip).getByText(paragraph)).toBeInTheDocument()
@@ -473,7 +573,7 @@ describe('OptionsApp', () => {
     const info = within(card).getByRole('button', { name: 'Subtitle navigation info' })
     expect(info).not.toBeDisabled()
     expect(within(card).getByText(SUBTITLE_PRACTICE_COPY.en.requiresEnabled)).toBeVisible()
-    fireEvent.focus(info)
+    focusAsKeyboard(info)
     const tooltip = await screen.findByRole('tooltip')
     for (const paragraph of SUBTITLE_PRACTICE_COPY.en.description.split('\n\n')) {
       expect(within(tooltip).getByText(paragraph)).toBeInTheDocument()
@@ -489,6 +589,25 @@ describe('OptionsApp', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
+  })
+
+  it('groups language, theme, and the global switch in the first General settings card', async () => {
+    render(<OptionsApp />)
+    const title = await screen.findByText('General settings')
+    const card = title.closest('[data-slot="card"]')
+    expect(card).toBe(document.querySelector('[data-slot="card"]'))
+    expect(card).toContainElement(screen.getByRole('combobox', { name: 'Language' }))
+    expect(card).toContainElement(screen.getByRole('combobox', { name: 'Theme' }))
+    const enabled = screen.getByRole('switch', { name: 'Enable extension' })
+    expect(card).toContainElement(enabled)
+    expect(screen.getByRole('link', { name: 'Open GitHub repository' })).toHaveTextContent('GitHub')
+    expect(screen.getByRole('link', { name: 'Rate this extension in the extension store' })).toHaveTextContent('Rate this extension')
+    expect(screen.getByRole('combobox', { name: 'Other products' })).toHaveTextContent('Other products')
+    expect(screen.queryByRole('navigation', { name: 'General settings' })).not.toBeInTheDocument()
+    fireEvent.click(enabled)
+    await waitFor(async () => expect((await getSettings()).enabled).toBe(false))
+    expect(screen.getByRole('button', { name: 'Enable extension info' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reset all shortcuts' }).closest('[data-slot="card"]')).not.toContainElement(enabled)
   })
 
   it('renders the extension name and speed step input defaults', async () => {
@@ -513,16 +632,16 @@ describe('OptionsApp', () => {
     expect(themeCombobox.compareDocumentPosition(enabledSwitch)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
     )
-    expect(themeCombobox).toHaveTextContent('Auto')
+    expect(screen.getByRole('combobox', { name: 'Theme' })).toHaveTextContent('Auto')
     const enabledInfo = screen.getByRole('button', { name: 'Enable extension info' })
     expect(enabledInfo).toBeInTheDocument()
-    fireEvent.focus(enabledInfo)
+    focusAsKeyboard(enabledInfo)
     expect(await screen.findByRole('tooltip')).toHaveTextContent(
       'When off, all extension shortcuts are disabled.'
     )
     const pictureInPictureInfo = screen.getByRole('button', { name: 'Picture-in-Picture info' })
     expect(pictureInPictureInfo).toBeInTheDocument()
-    fireEvent.focus(pictureInPictureInfo)
+    focusAsKeyboard(pictureInPictureInfo)
     expect(await screen.findByRole('tooltip')).toHaveTextContent(
       'Netflix built-in shortcuts do not work in Picture-in-Picture. Use the shortcuts enabled on this page.'
     )
@@ -550,7 +669,7 @@ describe('OptionsApp', () => {
     expect(holdInput).toHaveAttribute('step', '0.05')
     expect(holdInput).toHaveValue(2)
     const holdSpeedInfo = screen.getByRole('button', { name: 'Hold speed info' })
-    fireEvent.focus(holdSpeedInfo)
+    focusAsKeyboard(holdSpeedInfo)
     expect(await screen.findByRole('tooltip')).toHaveTextContent(
       'Hold the configured Play / Pause shortcut to temporarily use this speed. Release it to restore the previous speed and playback state. Range 0.25x-4.0x.'
     )
@@ -610,8 +729,8 @@ describe('OptionsApp', () => {
       within(playPauseRow as HTMLElement).getByText('Replaces Netflix: Space')
     ).toBeInTheDocument()
     expect(
-      within(subtitleRow as HTMLElement).getByText('Replaces Netflix: C')
-    ).toBeInTheDocument()
+      within(subtitleRow as HTMLElement).queryByText('Replaces Netflix: C')
+    ).not.toBeInTheDocument()
 
     fireEvent.click(
       within(playPauseRow as HTMLElement).getByRole('button', { name: /^Edit / })
@@ -632,7 +751,7 @@ describe('OptionsApp', () => {
     expect(pipSwitch).toHaveAttribute('aria-checked', 'false')
 
     const pictureInPictureInfo = screen.getByRole('button', { name: 'Picture-in-Picture info' })
-    fireEvent.focus(pictureInPictureInfo)
+    focusAsKeyboard(pictureInPictureInfo)
     expect(await screen.findByRole('tooltip')).toHaveTextContent(
       'Firefox does not support the subtitle-preserving Picture-in-Picture window used by this extension.'
     )
@@ -751,17 +870,41 @@ describe('OptionsApp', () => {
     await waitFor(() => expect(hintSwitch).toHaveAttribute('aria-checked', 'false'))
   })
 
-  it('persists theme changes from the combobox', async () => {
-    render(<OptionsApp />)
+  it('persists explicit theme choices and restores the automatic system theme', async () => {
+    const view = render(<OptionsApp />)
+    const theme = await screen.findByRole('combobox', { name: 'Theme' })
+    expect(theme).toHaveTextContent('Auto')
+    expect(document.documentElement).not.toHaveClass('dark')
+    expect((await getSettings()).theme).toBe('auto')
+    fireEvent.click(screen.getByRole('switch', { name: 'Enable extension' }))
+    await waitFor(async () => expect((await getSettings()).enabled).toBe(false))
+    expect((await getSettings()).theme).toBe('auto')
+    fireEvent.click(theme)
+    fireEvent.click(await screen.findByRole('option', { name: 'Light' }))
+    await waitFor(async () => expect((await getSettings()).theme).toBe('light'))
+    fireEvent.click(theme)
+    fireEvent.click(await screen.findByRole('option', { name: 'Dark' }))
 
-    const themeCombobox = await screen.findByRole('combobox', { name: 'Theme' })
-    fireEvent.click(themeCombobox)
-    fireEvent.click(await screen.findByText('Dark'))
-
-    await waitFor(() => {
+    await waitFor(async () => {
+      expect((await getSettings()).theme).toBe('dark')
       expect(screen.getByRole('combobox', { name: 'Theme' })).toHaveTextContent('Dark')
       expect(document.documentElement).toHaveClass('dark')
     })
+    view.unmount()
+    const restored = render(<OptionsApp />)
+    expect(await screen.findByRole('combobox', { name: 'Theme' })).toHaveTextContent('Dark')
+    expect(document.documentElement).toHaveClass('dark')
+    fireEvent.click(screen.getByRole('combobox', { name: 'Theme' }))
+    fireEvent.click(await screen.findByRole('option', { name: 'Auto' }))
+    await waitFor(async () => {
+      expect((await getSettings()).theme).toBe('auto')
+      expect(screen.getByRole('combobox', { name: 'Theme' })).toHaveTextContent('Auto')
+      expect(document.documentElement).not.toHaveClass('dark')
+    })
+    restored.unmount()
+    render(<OptionsApp />)
+    expect(await screen.findByRole('combobox', { name: 'Theme' })).toHaveTextContent('Auto')
+    expect(document.documentElement).not.toHaveClass('dark')
   })
 
   it('uses the detected browser language when no settings exist yet', async () => {

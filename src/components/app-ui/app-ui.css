@@ -1,0 +1,67 @@
+.dark body[data-app-ui] .border-2 {
+  border-width: 1px;
+}
+
+.dark body[data-app-ui] .border-t-2 {
+  border-top-width: 1px;
+}
+
+.dark body[data-app-ui] .border-b-2,
+.dark body[data-app-ui] [data-slot='table-header'] > tr {
+  border-bottom-width: 1px;
+}
+
+.dark body[data-app-ui] .app-switch[data-size='default'] [data-slot='switch-thumb'][data-state='checked'] {
+  translate: 22px 0;
+}
+
+.dark body[data-app-ui] .app-switch[data-size='sm'] [data-slot='switch-thumb'][data-state='checked'] {
+  translate: 18px 0;
+}
+
+body[data-app-ui] [data-slot='dialog-overlay'] {
+  background-color: rgb(0 0 0 / 40%);
+  backdrop-filter: none;
+}
+
+body[data-app-ui] nav > :is(button, a) [data-icon='inline-start'] {
+  rotate: 0deg;
+  transition: none;
+}
+
+body[data-app-ui] [data-slot='table-container']:has(> .app-table) {
+  border-color: var(--border);
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+.app-switch [data-slot='switch-thumb'] {
+  border-color: var(--border);
+  border-radius: 9999px;
+  background-color: var(--card);
+}
+
+.app-tooltip-content > span > svg {
+  border-radius: 0;
+}
+
+[data-slot='input-group']:has(> .app-command-input) {
+  border-color: var(--border);
+  background-color: var(--card);
+}
+
+.app-dialog-content > [data-slot='dialog-close'] {
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.app-dialog-content > [data-slot='dialog-close']:focus-visible {
+  border-color: var(--ring);
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent);
+}

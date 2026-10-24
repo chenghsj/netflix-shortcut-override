@@ -1,6 +1,6 @@
 import { useId } from 'react'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/app-ui/badge'
+import { Button } from '@/components/app-ui/button'
 import { useFeatureAnnouncement } from '@/popup/use-feature-announcement'
 import type { FeatureAnnouncementCopy } from '@/popup/feature-announcement-copy'
 import type { FeatureAnnouncement } from '@/shared/feature-announcement'

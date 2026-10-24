@@ -8,6 +8,7 @@ const sizes = [16, 32, 48, 128]
 const variants = [
   { source: 'assets/icons/enabled.png', prefix: 'icon' },
   { source: 'assets/icons/disabled.png', prefix: 'icon-disabled' },
+  { source: 'assets/icons/dark.png', prefix: 'icon-dark' },
 ]
 
 await mkdir(outDir, { recursive: true })
@@ -25,4 +26,4 @@ await Promise.all(
   )
 )
 
-console.log('Generated enabled and disabled icons at 16, 32, 48, and 128 px')
+console.log('Generated enabled, disabled, and dark icons at 16, 32, 48, and 128 px')

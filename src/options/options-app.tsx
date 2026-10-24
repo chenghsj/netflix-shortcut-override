@@ -1,6 +1,7 @@
 import { DEFAULT_PRACTICE_BINDINGS, practiceConflict, SUBTITLE_PERMISSION_COPY, SUBTITLE_PRACTICE_COPY } from '@/shared/subtitle-practice'
 import { NETFLIX_CAPTION_HOST_PERMISSIONS, NETFLIX_PAGE_HOST_PERMISSIONS } from '@/shared/netflix-caption-permissions'
 import {
+  CaptionsIcon,
   ChevronsLeftRightIcon,
   CircleHelpIcon,
   GaugeIcon,
@@ -23,20 +24,22 @@ import { SettingsTransferCard } from '@/options/settings-transfer-card'
 import { SHORTCUT_CONFLICT_COPY } from '@/options/shortcut-conflict-copy'
 import { ShortcutConflictSwitch } from '@/options/shortcut-conflict-switch'
 import { SUBTITLE_ACTIVATION_COPY } from '@/options/subtitle-activation-copy'
+import { SUBTITLE_NAVIGATION_POPUP_COPY } from '@/popup/subtitle-navigation-copy'
 import { SettingLabelWithTooltip } from '@/components/setting-label-with-tooltip'
-import { Label } from '@/components/ui/label'
-import { Popover, PopoverAnchor, PopoverArrow, PopoverContent } from '@/components/ui/popover'
+import { Label } from '@/components/app-ui/label'
+import { Popover, PopoverAnchor, PopoverArrow, PopoverContent } from '@/components/app-ui/popover'
 import { SettingsSaveStatus } from '@/components/settings-save-status'
-import { ThemeCombobox } from '@/components/theme-combobox'
-import { Alert, AlertTitle } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
+import { ChoiceCombobox } from '@/components/choice-combobox'
+import { Alert, AlertTitle } from '@/components/app-ui/alert'
+import { Badge } from '@/components/app-ui/badge'
+import { Button } from '@/components/app-ui/button'
 import {
   Card,
   CardAction,
   CardContent,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card'
+} from '@/components/app-ui/card'
 import {
   Dialog,
   DialogContent,
@@ -44,20 +47,20 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
+} from '@/components/app-ui/dialog'
 import {
   Field,
   FieldGroup,
   FieldLabel,
-} from '@/components/ui/field'
-import { Separator } from '@/components/ui/separator'
-import { Switch } from '@/components/ui/switch'
+} from '@/components/app-ui/field'
+import { Separator } from '@/components/app-ui/separator'
+import { Switch } from '@/components/app-ui/switch'
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/components/ui/tooltip'
+} from '@/components/app-ui/tooltip'
 import {
   Table,
   TableBody,
@@ -65,7 +68,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
+} from '@/components/app-ui/table'
 import { cn } from '@/lib/utils'
 import { getCopy } from '@/shared/i18n'
 import { resolveLocalePreference } from '@/shared/browser-locale'
@@ -234,6 +237,8 @@ export function OptionsApp() {
   useEffect(() => () => { permissionAttempt.current++ }, [])
   const resolvedLocale = resolveLocalePreference(settings.locale)
   const practiceCopy = SUBTITLE_PRACTICE_COPY[resolvedLocale]
+  const subtitlePopupCopy = SUBTITLE_NAVIGATION_POPUP_COPY[resolvedLocale]
+  const subtitleNavigationEnabled = settings.enabled && settings.subtitlePractice.enabled
   const activationCopy = SUBTITLE_ACTIVATION_COPY[resolvedLocale]
   const showSubtitleGuide = subtitleGuideRequested && !settings.subtitlePractice.enabled
   const copy = getCopy(resolvedLocale)
@@ -376,14 +381,15 @@ export function OptionsApp() {
       <main className="min-h-svh bg-background text-foreground">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
           <header className="flex flex-col gap-2 py-2">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex min-w-0 items-center gap-4">
-                <img src="/icons/icon48.png" alt="" className="size-12 shrink-0" />
+            <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+              <div className="flex min-w-0 items-center gap-4 pl-2">
+                <img src="/icons/icon48.png" alt="" className="size-12 shrink-0 dark:hidden" />
+                <img src="/icons/icon-dark48.png" alt="" className="hidden size-12 shrink-0 dark:block" />
                 <h1 className="font-heading text-2xl font-black leading-tight tracking-tight">
                   {copy.appTitle}
                 </h1>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
+              <nav className="flex flex-wrap items-center gap-2 self-end pr-2 sm:self-auto">
                 <Button variant="outline" asChild>
                   <a
                     href={EXTERNAL_LINKS.githubRepository}
@@ -391,7 +397,7 @@ export function OptionsApp() {
                     rel="noreferrer"
                     aria-label={copy.githubRepositoryAriaLabel}
                   >
-                    <GitHubIcon data-icon="inline-start" />
+                    <GitHubIcon data-icon="inline-start" aria-hidden="true" />
                     {copy.githubRepository}
                   </a>
                 </Button>
@@ -413,7 +419,7 @@ export function OptionsApp() {
                   streamDanmakuLabel={copy.streamDanmakuStore}
                   streamDanmakuTitle={copy.streamDanmakuStoreAriaLabel}
                 />
-              </div>
+              </nav>
             </div>
             <SettingsSaveStatus
               error={saveError}
@@ -440,30 +446,24 @@ export function OptionsApp() {
                         label={copy.locale}
                         size="default"
                         value={settings.locale}
-                        onChange={locale =>
-                          updateSettings(current => ({ ...current, locale }))
-                        }
+                        onChange={locale => updateSettings(current => ({ ...current, locale }))}
                       />
                     </Field>
-
                     <Field orientation="horizontal" className="items-center justify-between">
                       <FieldLabel>{copy.theme}</FieldLabel>
-                      <ThemeCombobox
+                      <ChoiceCombobox
                         className="w-36"
                         label={copy.theme}
-                        labels={{
-                          auto: copy.themeAuto,
-                          light: copy.themeLight,
-                          dark: copy.themeDark,
-                        }}
                         size="default"
                         value={settings.theme}
-                        onChange={theme =>
-                          updateSettings(current => ({ ...current, theme }))
-                        }
+                        options={[
+                          { value: 'auto', label: copy.themeAuto },
+                          { value: 'light', label: copy.themeLight },
+                          { value: 'dark', label: copy.themeDark },
+                        ]}
+                        onChange={theme => updateSettings(current => ({ ...current, theme }))}
                       />
                     </Field>
-
                     <Field orientation="horizontal" className="items-center justify-between">
                       <SettingLabelWithTooltip
                         htmlFor="enable-shortcut-override"
@@ -473,6 +473,7 @@ export function OptionsApp() {
                       <Switch
                         ref={globalEnableSwitch}
                         id="enable-shortcut-override"
+                        className="focus:ring-3 focus:ring-ring/50 focus:ring-offset-2 focus:ring-offset-card"
                         checked={settings.enabled}
                         onCheckedChange={enabled => {
                           if (!enabled) cancelSubtitlePermissionRequest()
@@ -481,7 +482,6 @@ export function OptionsApp() {
                         aria-label={copy.enabled}
                       />
                     </Field>
-
                   </FieldGroup>
                 </CardContent>
               </Card>
@@ -512,6 +512,15 @@ export function OptionsApp() {
                         const actionSupported =
                           action !== 'pictureInPicture' ||
                           browserCapabilities.supportsSubtitlePreservingPip
+                        const overridingSubtitleAction = subtitleNavigationEnabled && binding.enabled && actionSupported
+                          ? SUBTITLE_PRACTICE_ACTIONS.find(subtitleAction => {
+                              const subtitleBinding = settings.subtitlePractice.bindings[subtitleAction]
+                              return subtitleBinding.enabled && keyBindingsEqual(subtitleBinding.key, binding.key)
+                            })
+                          : undefined
+                        const overrideDescription = overridingSubtitleAction
+                          ? subtitlePopupCopy.overriddenBy.replace('{action}', practiceCopy[overridingSubtitleAction])
+                          : undefined
                         return (
                           <TableRow key={action}>
                             <TableCell className="font-medium whitespace-normal">
@@ -522,7 +531,7 @@ export function OptionsApp() {
                                     <TooltipTrigger asChild>
                                       <button
                                         type="button"
-                                        className="inline-flex size-4 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                        className="inline-flex size-4 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                                         aria-label={`${copy.actions[action]} info`}
                                       >
                                         <CircleHelpIcon className="size-3.5" />
@@ -530,7 +539,7 @@ export function OptionsApp() {
                                     </TooltipTrigger>
                                     <TooltipContent
                                       side="top"
-                                      sideOffset={6}
+                                      sideOffset={8}
                                       className="max-w-80 whitespace-pre-line"
                                     >
                                       {actionSupported
@@ -543,7 +552,19 @@ export function OptionsApp() {
                             </TableCell>
                             <TableCell>
                               <div className="flex flex-col items-start gap-1">
-                                <KeyBindingKbd binding={binding.key} className="flex-wrap" />
+                                <div className="flex min-w-0 max-w-full flex-wrap items-center gap-1.5">
+                                  <KeyBindingKbd binding={binding.key} className={cn('flex-wrap', overridingSubtitleAction && 'opacity-60')} />
+                                  {overridingSubtitleAction && (
+                                    <Badge
+                                      variant="secondary"
+                                      className="h-auto min-h-5 max-w-full rounded px-1.5 text-xs whitespace-normal shadow-xs"
+                                      title={overrideDescription}
+                                      aria-label={overrideDescription}
+                                    >
+                                      {subtitlePopupCopy.overridden}
+                                    </Badge>
+                                  )}
+                                </div>
                                 <NetflixNativeKeyReplacement
                                   bindings={replacedNetflixKeys}
                                   template={copy.replacedNetflixKeys}
@@ -558,7 +579,7 @@ export function OptionsApp() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground focus-visible:bg-foreground/10 focus-visible:text-foreground"
+                                  className="text-muted-foreground focus-visible:text-foreground"
                                   disabled={!actionSupported}
                                   onClick={() =>
                                     setRecorder({
@@ -575,7 +596,7 @@ export function OptionsApp() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground focus-visible:bg-foreground/10 focus-visible:text-foreground"
+                                  className="text-muted-foreground focus-visible:text-foreground"
                                   disabled={!actionSupported}
                                   onClick={() => requestEnabled({ group: 'general', action }, true, DEFAULT_KEY_BINDINGS[action], 'reset')}
                                   aria-label={`${copy.reset} ${copy.actions[action]}`}
@@ -596,16 +617,17 @@ export function OptionsApp() {
                 className="scroll-mt-6 focus-visible:outline-2 focus-visible:outline-ring">
                 <CardHeader className="flex flex-wrap items-center justify-between gap-3">
                   <CardTitle className={cn("flex items-center gap-1.5", !settings.enabled && "text-muted-foreground")}>
+                    <CaptionsIcon data-icon="inline-start" aria-hidden="true" />
                     <span>{practiceCopy.title}</span>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button type="button"
-                          className="inline-flex size-4 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                          className="inline-flex size-4 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                           aria-label={`${practiceCopy.title} info`}>
                           <CircleHelpIcon className="size-3.5" />
                         </button>
                       </TooltipTrigger>
-                      <TooltipContent side="top" sideOffset={6} className="max-w-80">
+                      <TooltipContent side="top" sideOffset={8} className="max-w-80">
                         <div className="space-y-2 whitespace-normal">
                           {practiceCopy.description.split('\n\n').map(paragraph => <p key={paragraph}>{paragraph}</p>)}
                         </div>
@@ -661,10 +683,10 @@ export function OptionsApp() {
                         <TableCell><KeyBindingKbd binding={binding.key} className="flex-wrap" /></TableCell>
                         <TableCell>{conflictSwitch({ group: 'practice', action }, !settings.enabled || !settings.subtitlePractice.enabled)}</TableCell>
                         <TableCell><div className="flex items-center justify-end gap-2">
-                          <Button disabled={!settings.enabled} variant="ghost" size="icon" className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground focus-visible:bg-foreground/10 focus-visible:text-foreground"
+                          <Button disabled={!settings.enabled} variant="ghost" size="icon" className="text-muted-foreground focus-visible:text-foreground"
                             aria-label={`${copy.edit} ${practiceCopy[action]}`}
                             onClick={() => setRecorder({ group: 'practice', action, draft: binding.key, savedKey: binding.key })}><PencilIcon /></Button>
-                          <Button disabled={!settings.enabled} variant="ghost" size="icon" className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground focus-visible:bg-foreground/10 focus-visible:text-foreground"
+                          <Button disabled={!settings.enabled} variant="ghost" size="icon" className="text-muted-foreground focus-visible:text-foreground"
                             aria-label={`${copy.reset} ${practiceCopy[action]}`}
                             onClick={() => requestEnabled({ group: 'practice', action }, true, DEFAULT_PRACTICE_BINDINGS[action].key, 'reset')}><RotateCcwIcon /></Button>
                         </div></TableCell>

@@ -1,8 +1,8 @@
 import { useRef, type ComponentProps, type PointerEvent as ReactPointerEvent } from 'react'
 
 import { SettingLabelWithTooltip } from '@/components/setting-label-with-tooltip'
-import { Field } from '@/components/ui/field'
-import { Input } from '@/components/ui/input'
+import { Field } from '@/components/app-ui/field'
+import { Input } from '@/components/app-ui/input'
 
 type NumericSettingFieldProps = Omit<
   ComponentProps<typeof Input>,

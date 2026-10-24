@@ -138,6 +138,8 @@ type Copy = {
   themeAuto: string
   themeLight: string
   themeDark: string
+  themeToggleLight: string
+  themeToggleDark: string
   speed: string
   speedDesc: string
   minSpeed: string
@@ -269,6 +271,8 @@ export const COPY: Record<Locale, Copy> = {
     themeAuto: 'Auto',
     themeLight: 'Light',
     themeDark: 'Dark',
+    themeToggleLight: 'Switch to light theme',
+    themeToggleDark: 'Switch to dark theme',
     speed: 'Playback speed',
     speedDesc: 'Set preferred speed plus the range and step for speed up/down shortcuts.',
     minSpeed: 'Lowest speed',
@@ -415,6 +419,8 @@ export const COPY: Record<Locale, Copy> = {
     themeAuto: '自動',
     themeLight: '淺色',
     themeDark: '深色',
+    themeToggleLight: '切換為淺色主題',
+    themeToggleDark: '切換為深色主題',
     speed: '播放速度',
     speedDesc: '設定常用倍速，以及加快 / 降低播放速度的範圍與每次增減。',
     minSpeed: '最低倍速',
@@ -580,6 +586,8 @@ export const COPY: Record<Locale, Copy> = {
     themeAuto: '自动',
     themeLight: '浅色',
     themeDark: '深色',
+    themeToggleLight: '切换为浅色主题',
+    themeToggleDark: '切换为深色主题',
     speed: '播放速度',
     speedDesc: '设置常用倍速，以及加快 / 降低播放速度的范围与每次增减。',
     minSpeed: '最低倍速',
@@ -747,6 +755,8 @@ export const COPY: Record<Locale, Copy> = {
     themeAuto: '自動',
     themeLight: 'ライト',
     themeDark: 'ダーク',
+    themeToggleLight: 'ライトテーマに切り替える',
+    themeToggleDark: 'ダークテーマに切り替える',
     speed: '再生速度',
     speedDesc: 'よく使う速度と、速度を上げる/下げる範囲および増減幅を設定します。',
     minSpeed: '最低速度',
@@ -914,6 +924,8 @@ export const COPY: Record<Locale, Copy> = {
     themeAuto: '자동',
     themeLight: '라이트',
     themeDark: '다크',
+    themeToggleLight: '라이트 테마로 전환',
+    themeToggleDark: '다크 테마로 전환',
     speed: '재생 속도',
     speedDesc: '자주 쓰는 배속과 속도 올리기/내리기의 범위 및 변경값을 설정합니다.',
     minSpeed: '최저 배속',

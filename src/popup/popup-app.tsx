@@ -1,10 +1,11 @@
 import {
+  CaptionsIcon,
   ChevronsLeftRightIcon,
   AlertCircleIcon,
   GaugeIcon,
   KeyboardIcon,
-  Settings2Icon,
   SettingsIcon,
+  Settings2Icon,
   StarIcon,
 } from 'lucide-react'
 import { GitHubIcon } from '@/components/github-icon'
@@ -17,11 +18,11 @@ import { NumericSettingField } from '@/components/numeric-setting-field'
 import { OtherProjectsSelect } from '@/components/other-projects-select'
 import { SettingLabelWithTooltip } from '@/components/setting-label-with-tooltip'
 import { SettingsSaveStatus } from '@/components/settings-save-status'
-import { ThemeCombobox } from '@/components/theme-combobox'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Switch } from '@/components/ui/switch'
-import { TooltipProvider } from '@/components/ui/tooltip'
+import { ChoiceCombobox } from '@/components/choice-combobox'
+import { Badge } from '@/components/app-ui/badge'
+import { Button } from '@/components/app-ui/button'
+import { Switch } from '@/components/app-ui/switch'
+import { TooltipProvider } from '@/components/app-ui/tooltip'
 import { cn } from '@/lib/utils'
 import { useCompatibilitySession } from '@/popup/use-compatibility-session'
 import { usePopupFocusRestoration } from '@/popup/use-popup-focus-restoration'
@@ -124,10 +125,11 @@ export function PopupApp() {
 
   return (
     <TooltipProvider>
-      <main className="w-[22rem] bg-background text-foreground">
+      <main className="w-[22rem] bg-background font-medium text-foreground">
         <div className="flex flex-col gap-3 p-3">
           <header className="flex items-center gap-2 border-b-2 border-border pb-3">
-            <img src="/icons/icon48.png" alt="" className="size-6 shrink-0" />
+            <img src="/icons/icon48.png" alt="" className="size-6 shrink-0 dark:hidden" />
+            <img src="/icons/icon-dark48.png" alt="" className="hidden size-6 shrink-0 dark:block" />
             <div className="min-w-0 flex-1">
               <h1 className="truncate font-heading text-sm font-black leading-tight">Shortcut Override</h1>
             </div>
@@ -146,7 +148,7 @@ export function PopupApp() {
               type="button"
               variant="ghost"
               size="icon-sm"
-              className="shrink-0"
+              className="shrink-0 bg-clip-border"
               aria-label={copy.openOptions}
               title={copy.openOptions}
               onClick={() => openOptionsPage(suppressFocusRestoration)}
@@ -167,8 +169,8 @@ export function PopupApp() {
               role="status"
             >
               <div className="flex items-start gap-2.5">
-                <AlertCircleIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                <p className="text-xs leading-relaxed text-muted-foreground">
+                <AlertCircleIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground dark:text-card-foreground" />
+                <p className="text-xs leading-relaxed text-muted-foreground dark:text-card-foreground">
                   {copy.diagnosticsPageLoadingLong}
                 </p>
               </div>
@@ -178,8 +180,8 @@ export function PopupApp() {
           {shouldShowPageStatus && (
             <section className="rounded-lg border-2 border-border bg-card p-3 shadow-sm">
               <div className="flex items-start gap-2.5">
-                <AlertCircleIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                <p className="text-xs leading-relaxed text-muted-foreground">{statusText}</p>
+                <AlertCircleIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground dark:text-card-foreground" />
+                <p className="text-xs leading-relaxed text-muted-foreground dark:text-card-foreground">{statusText}</p>
               </div>
             </section>
           )}
@@ -189,33 +191,28 @@ export function PopupApp() {
               <SettingsIcon className="size-3.5" />
               {copy.quickSettings}
             </h2>
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between gap-3">
-                <span className="min-w-0 text-sm font-medium">{copy.locale}</span>
+                <span className="min-w-0 text-xs font-medium">{copy.locale}</span>
                 <LanguageCombobox
                   autoLabel={copy.localeAuto}
-                  className="w-28"
+                  className="h-6 w-28 text-xs font-medium"
                   label={copy.locale}
                   value={settings.locale}
-                  onChange={locale =>
-                    updateSettings(current => ({
-                      ...current,
-                      locale,
-                    }))
-                  }
+                  onChange={locale => updateSettings(current => ({ ...current, locale }))}
                 />
               </div>
               <div className="flex items-center justify-between gap-3">
-                <span className="min-w-0 text-sm font-medium">{copy.theme}</span>
-                <ThemeCombobox
-                  className="w-28"
+                <span className="min-w-0 text-xs font-medium">{copy.theme}</span>
+                <ChoiceCombobox
+                  className="h-6 w-28 text-xs font-medium"
                   label={copy.theme}
-                  labels={{
-                    auto: copy.themeAuto,
-                    light: copy.themeLight,
-                    dark: copy.themeDark,
-                  }}
                   value={settings.theme}
+                  options={[
+                    { value: 'auto', label: copy.themeAuto },
+                    { value: 'light', label: copy.themeLight },
+                    { value: 'dark', label: copy.themeDark },
+                  ]}
                   onChange={theme => updateSettings(current => ({ ...current, theme }))}
                 />
               </div>
@@ -224,14 +221,13 @@ export function PopupApp() {
                   htmlFor="popup-enable-shortcut-override"
                   label={copy.enabled}
                   tooltip={copy.enabledDesc}
-                  labelClassName="text-sm"
+                  labelClassName="text-xs"
                 />
                 <Switch
+                  size="sm"
                   id="popup-enable-shortcut-override"
                   checked={settings.enabled}
-                  onCheckedChange={enabled =>
-                    updateSettings(current => ({ ...current, enabled }))
-                  }
+                  onCheckedChange={enabled => updateSettings(current => ({ ...current, enabled }))}
                   aria-label={copy.enabled}
                 />
               </div>
@@ -281,14 +277,20 @@ export function PopupApp() {
                       {copy.diagnosticsUnsupportedValue}
                     </Badge>
                   ) : overridingSubtitleAction ? (
-                    <Badge
-                      variant="secondary"
-                      className="max-w-32 justify-start truncate px-1.5 text-xs"
-                      title={overrideDescription}
-                      aria-label={overrideDescription}
-                    >
-                      {subtitlePopupCopy.overridden}
-                    </Badge>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <KeyBindingKbd
+                        binding={binding.key}
+                        className="max-w-32 justify-end overflow-hidden opacity-60"
+                      />
+                      <Badge
+                        variant="secondary"
+                        className="max-w-32 justify-start truncate rounded px-1.5 text-xs shadow-xs"
+                        title={overrideDescription}
+                        aria-label={overrideDescription}
+                      >
+                        {subtitlePopupCopy.overridden}
+                      </Badge>
+                    </div>
                   ) : binding.enabled ? (
                     <KeyBindingKbd
                       binding={binding.key}
@@ -315,15 +317,15 @@ export function PopupApp() {
           >
             <div className={cn('flex items-center justify-between gap-3', subtitleNavigationEnabled && 'mb-2.5')}>
               <h2 id="popup-subtitle-navigation-title" className="flex items-center gap-2 text-xs font-extrabold text-foreground">
-                <KeyboardIcon className="size-3.5" />
+                <CaptionsIcon className="size-3.5" aria-hidden="true" />
                 {subtitleCopy.title}
               </h2>
               {!subtitleNavigationEnabled && (
                 <div className="flex shrink-0 items-center gap-2">
-                  <Badge variant="secondary" className="px-1.5 text-xs" title={!settings.enabled ? subtitleCopy.requiresEnabled : undefined}>
+                  <Badge variant="secondary" className="rounded px-1.5 text-xs shadow-xs" title={!settings.enabled ? subtitleCopy.requiresEnabled : undefined}>
                     {subtitlePopupCopy.inactive}
                   </Badge>
-                  <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={openSubtitleOptions}>
+                  <Button size="sm" variant="ghost" className="h-6 bg-clip-border px-2 text-xs" onClick={openSubtitleOptions}>
                     {announcementCopy.enable}
                   </Button>
                 </div>
@@ -341,7 +343,7 @@ export function PopupApp() {
                       {binding.enabled ? (
                         <KeyBindingKbd binding={binding.key} className="max-w-32 shrink-0 justify-end overflow-hidden" />
                       ) : (
-                        <Badge variant="secondary" className="max-w-24 justify-start truncate px-1.5 text-xs" title={copy.disabledStatus}>
+                        <Badge variant="secondary" className="max-w-24 justify-start truncate rounded px-1.5 text-xs shadow-xs" title={copy.disabledStatus}>
                           {copy.disabledStatus}
                         </Badge>
                       )}
@@ -474,6 +476,7 @@ export function PopupApp() {
                   {copy.holdSpeedEnabled}
                 </label>
                 <Switch
+                  size="sm"
                   id="popup-enable-hold-speed"
                   checked={holdSpeedForm.enabled}
                   disabled={holdSpeedForm.enableControlDisabled}
@@ -490,6 +493,7 @@ export function PopupApp() {
                   {copy.holdSpeedHint}
                 </label>
                 <Switch
+                  size="sm"
                   id="popup-show-hold-speed-hint"
                   checked={holdSpeedForm.showHint}
                   disabled={holdSpeedForm.detailsDisabled}

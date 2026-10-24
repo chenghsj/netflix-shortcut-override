@@ -1,7 +1,7 @@
 import { useId, useRef } from 'react'
-import { Button } from '@/components/ui/button'
-import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
-import { Switch } from '@/components/ui/switch'
+import { Button } from '@/components/app-ui/button'
+import { Popover, PopoverAnchor, PopoverContent } from '@/components/app-ui/popover'
+import { Switch } from '@/components/app-ui/switch'
 import type { SHORTCUT_CONFLICT_COPY } from './shortcut-conflict-copy'
 
 type ShortcutConflictSwitchProps = {
@@ -40,9 +40,9 @@ export function ShortcutConflictSwitch({ checked, disabled, label, open, title, 
         <p id={`${id}-title`} className="text-sm font-medium">{title}</p>
         <p id={`${id}-description`} className="text-xs text-muted-foreground">{consequence}</p>
         <div className="flex flex-col gap-1.5">
-          <Button variant="outline" className="h-auto min-h-8 justify-start whitespace-normal text-left"
+          <Button variant="outline" className="h-auto min-h-8 justify-start whitespace-normal px-3 py-1.5 text-left"
             onClick={() => { restoreFocus.current = false; onChangeKey(switchRef.current) }}>{copy.changeKey}</Button>
-          <Button className="h-auto min-h-8 justify-start whitespace-normal text-left" onClick={onTransfer}>{transferLabel}</Button>
+          <Button className="h-auto min-h-8 justify-start whitespace-normal px-3 py-1.5 text-left" onClick={onTransfer}>{transferLabel}</Button>
         </div>
       </PopoverContent>
     </Popover>
