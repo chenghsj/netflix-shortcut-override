@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 
 function InputGroup({ className, ...props }: React.ComponentProps<typeof Upstream.InputGroup>) {
   return <Upstream.InputGroup {...props} className={cn(
-    "border-input bg-card shadow-none has-disabled:bg-muted has-[[data-slot=input-group-control]:focus-visible]:outline-none has-[[data-slot=input-group-control]:focus-visible]:border-ring has-[[data-slot=input-group-control]:focus-visible]:ring-3 has-[[data-slot=input-group-control]:focus-visible]:ring-ring/50 has-[[data-slot][aria-invalid=true]]:ring-3 has-[[data-slot][aria-invalid=true]]:ring-destructive/20 dark:bg-card dark:has-disabled:bg-muted dark:has-[[data-slot][aria-invalid=true]]:ring-destructive/40",
+    "rounded-[var(--ui-input-radius)] border-input bg-card shadow-none has-disabled:bg-muted has-[[data-slot=input-group-control]:focus-visible]:outline-none has-[[data-slot=input-group-control]:focus-visible]:border-ring has-[[data-slot=input-group-control]:focus-visible]:ring-3 has-[[data-slot=input-group-control]:focus-visible]:ring-ring/50 has-[[data-slot][aria-invalid=true]]:ring-3 has-[[data-slot][aria-invalid=true]]:ring-destructive/20 dark:bg-card dark:has-disabled:bg-muted dark:has-[[data-slot][aria-invalid=true]]:ring-destructive/40",
     className
   )} />
 }

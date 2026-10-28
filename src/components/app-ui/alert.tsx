@@ -9,7 +9,10 @@ type AlertProps = Omit<React.ComponentProps<typeof Upstream.Alert>, 'status' | '
 
 function Alert({ className, variant = 'default', ...props }: AlertProps) {
   return <Upstream.Alert {...props} variant={variant} className={cn(
-    'grid-cols-1 items-center gap-0.5 rounded-[16px] border-border bg-card px-2.5 py-2 shadow-sm has-data-[slot=alert-action]:pr-18 has-[>svg]:grid-cols-[auto_1fr] has-[>svg]:gap-x-2 [&>svg]:row-span-1 [&>svg]:size-4 [&>svg]:translate-y-0 has-data-[slot=alert-description]:items-start has-data-[slot=alert-description]:[&>svg]:row-span-2 has-data-[slot=alert-description]:[&>svg]:translate-y-0.5',
+    'grid-cols-1 items-center gap-0.5 rounded-lg border-border bg-card px-2.5 py-2 shadow-sm has-data-[slot=alert-action]:pr-18 has-[>svg]:grid-cols-[auto_1fr] has-[>svg]:gap-x-2 [&>svg]:row-span-1 [&>svg]:size-4 [&>svg]:translate-y-0',
+    'has-data-[slot=alert-title]:has-data-[slot=alert-description]:items-start',
+    'has-data-[slot=alert-title]:has-data-[slot=alert-description]:[&>svg]:row-span-2',
+    'has-data-[slot=alert-title]:has-data-[slot=alert-description]:[&>svg]:translate-y-0.5',
     variant === 'default' && 'text-card-foreground',
     variant === 'destructive' && 'text-destructive *:data-[slot=alert-description]:text-destructive/90',
     className

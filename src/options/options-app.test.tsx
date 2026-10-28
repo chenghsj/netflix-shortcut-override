@@ -606,15 +606,23 @@ describe('OptionsApp', () => {
     vi.restoreAllMocks()
   })
 
-  it('groups language, theme, and the global switch in the first General settings card', async () => {
+  it('places the global switch above General settings and groups appearance controls in the card', async () => {
     render(<OptionsApp />)
     const title = await screen.findByText('General settings')
     const card = title.closest('[data-slot="card"]')
-    expect(card).toBe(document.querySelector('[data-slot="card"]'))
     expect(card).toContainElement(screen.getByRole('combobox', { name: 'Language' }))
+    expect(card).toContainElement(screen.getByRole('combobox', { name: 'Interface style' }))
     expect(card).toContainElement(screen.getByRole('combobox', { name: 'Theme' }))
     const enabled = screen.getByRole('switch', { name: 'Enable extension' })
-    expect(card).toContainElement(enabled)
+    const enabledCard = enabled.closest('[data-slot="card"]')
+    expect(enabledCard).toBe(document.querySelector('[data-slot="card"]'))
+    expect(enabledCard).not.toBe(card)
+    expect(enabledCard).not.toContainElement(title)
+    expect(card).not.toContainElement(enabled)
+    const header = screen.getByRole('heading', { name: 'Shortcut Override for Netflix' }).closest('header')
+    expect(header).not.toContainElement(enabled)
+    expect(header?.compareDocumentPosition(enabled)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(enabled.compareDocumentPosition(title)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
     expect(screen.getByRole('link', { name: 'Open GitHub repository' })).toHaveTextContent('GitHub')
     expect(screen.getByRole('link', { name: 'Rate this extension in the extension store' })).toHaveTextContent('Rate this extension')
     expect(screen.getByRole('combobox', { name: 'Other products' })).toHaveTextContent('Other products')
@@ -638,15 +646,6 @@ describe('OptionsApp', () => {
     ).toHaveAttribute('href', EXTERNAL_LINKS.shortcutOverrideChromeWebStore)
     expect(screen.getByRole('combobox', { name: 'Other products' })).toBeInTheDocument()
     expect(screen.getByText('General settings')).toBeInTheDocument()
-    const localeCombobox = screen.getByRole('combobox', { name: 'Language' })
-    const themeCombobox = screen.getByRole('combobox', { name: 'Theme' })
-    const enabledSwitch = screen.getByRole('switch', { name: 'Enable extension' })
-    expect(localeCombobox.compareDocumentPosition(enabledSwitch)).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING
-    )
-    expect(themeCombobox.compareDocumentPosition(enabledSwitch)).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING
-    )
     expect(screen.getByRole('combobox', { name: 'Theme' })).toHaveTextContent('Auto')
     const enabledInfo = screen.getByRole('button', { name: 'Enable extension info' })
     expect(enabledInfo).toBeInTheDocument()
@@ -1148,6 +1147,27 @@ describe('OptionsApp', () => {
       expect(holdInput).toHaveValue(2)
     })
 
+  })
+
+  it('keeps focus in the recording area while capturing a shortcut', async () => {
+    render(<OptionsApp />)
+
+    const edit = await screen.findByRole('button', { name: 'Edit Play / Pause (hold for speed)' })
+    fireEvent.click(edit)
+
+    const dialog = screen.getByRole('dialog')
+    const recordingArea = within(dialog).getByRole('group', { name: 'Record shortcut' })
+    expect(recordingArea).toHaveFocus()
+
+    fireEvent.keyDown(recordingArea, { code: 'KeyQ', key: 'q' })
+
+    expect(within(dialog).getByTitle('Q')).toBeInTheDocument()
+    expect(recordingArea).toHaveFocus()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect((await getSettings()).bindings.playPause).toEqual(DEFAULT_SETTINGS.bindings.playPause)
   })
 
   it('restores the recorder draft to the saved shortcut before saving', async () => {

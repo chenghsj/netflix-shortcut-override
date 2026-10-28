@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 
 function PopoverContent({ className, ...props }: React.ComponentProps<typeof Upstream.PopoverContent>) {
   return <Upstream.PopoverContent {...props} className={cn(
-    "rounded-[12px] border-border",
+    "rounded-[var(--ui-popover-radius)] border-border",
     className
   )} />
 }

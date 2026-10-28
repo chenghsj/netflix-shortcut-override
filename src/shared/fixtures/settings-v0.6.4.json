@@ -1,0 +1,1428 @@
+{
+  "extensionVersion": "0.6.4",
+  "cases": [
+    {
+      "name": "default",
+      "settings": {
+        "version": 12,
+        "enabled": true,
+        "locale": "auto",
+        "theme": "auto",
+        "subtitlePractice": {
+          "enabled": false,
+          "bindings": {
+            "previous": {
+              "enabled": true,
+              "key": {
+                "code": "KeyA",
+                "key": "a",
+                "ctrl": false,
+                "alt": false,
+                "shift": false,
+                "meta": false
+              }
+            },
+            "next": {
+              "enabled": true,
+              "key": {
+                "code": "KeyD",
+                "key": "d",
+                "ctrl": false,
+                "alt": false,
+                "shift": false,
+                "meta": false
+              }
+            },
+            "replay": {
+              "enabled": true,
+              "key": {
+                "code": "KeyS",
+                "key": "s",
+                "ctrl": false,
+                "alt": false,
+                "shift": false,
+                "meta": false
+              }
+            },
+            "playback": {
+              "enabled": true,
+              "key": {
+                "code": "KeyW",
+                "key": "w",
+                "ctrl": false,
+                "alt": false,
+                "shift": false,
+                "meta": false
+              }
+            }
+          }
+        },
+        "speed": {
+          "min": 0.25,
+          "max": 3,
+          "step": 0.25,
+          "preferred": 1.5
+        },
+        "holdSpeed": {
+          "enabled": true,
+          "speed": 2,
+          "showHint": true
+        },
+        "seek": {
+          "seconds": 10
+        },
+        "pip": {
+          "subtitlesEnabled": true,
+          "subtitleSize": "medium",
+          "subtitleBackground": "translucent"
+        },
+        "bindings": {
+          "playPause": {
+            "enabled": true,
+            "key": {
+              "code": "Space",
+              "key": " ",
+              "ctrl": false,
+              "alt": false,
+              "shift": false,
+              "meta": false
+            }
+          },
+          "seekBackward": {
+            "enabled": true,
+            "key": {
+              "code": "ArrowLeft",
+              "key": "ArrowLeft",
+              "ctrl": false,
+              "alt": false,
+              "shift": false,
+              "meta": false
+            }
+          },
+          "seekForward": {
+            "enabled": true,
+            "key": {
+              "code": "ArrowRight",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "alt": false,
+              "shift": false,
+              "meta": false
+            }
+          },
+          "volumeUp": {
+            "enabled": true,
+            "key": {
+              "code": "ArrowUp",
+              "key": "ArrowUp",
+              "ctrl": false,
+              "alt": false,
+              "shift": false,
+              "meta": false
+            }
+          },
+          "volumeDown": {
+            "enabled": true,
+            "key": {
+              "code": "ArrowDown",
+              "key": "ArrowDown",
+              "ctrl": false,
+              "alt": false,
+              "shift": false,
+              "meta": false
+            }
+          },
+          "mute": {
+            "enabled": true,
+            "key": {
+              "code": "KeyM",
+              "key": "m",
+              "ctrl": false,
+              "alt": false,
+              "shift": false,
+              "meta": false
+            }
+          },
+          "toggleSubtitles": {
+            "enabled": true,
+            "key": {
+              "code": "KeyC",
+              "key": "c",
+              "ctrl": false,
+              "alt": false,
+              "shift": false,
+              "meta": false
+            }
+          },
+          "fullscreen": {
+            "enabled": true,
+            "key": {
+              "code": "KeyF",
+              "key": "f",
+              "ctrl": false,
+              "alt": false,
+              "shift": false,
+              "meta": false
+            }
+          },
+          "pictureInPicture": {
+            "enabled": true,
+            "key": {
+              "code": "KeyP",
+              "key": "P",
+              "ctrl": false,
+              "alt": false,
+              "shift": true,
+              "meta": false
+            }
+          },
+          "skipIntro": {
+            "enabled": true,
+            "key": {
+              "code": "KeyS",
+              "key": "s",
+              "ctrl": false,
+              "alt": false,
+              "shift": false,
+              "meta": false
+            }
+          },
+          "speedUp": {
+            "enabled": true,
+            "key": {
+              "code": "Period",
+              "key": ">",
+              "ctrl": false,
+              "alt": false,
+              "shift": true,
+              "meta": false
+            }
+          },
+          "speedDown": {
+            "enabled": true,
+            "key": {
+              "code": "Comma",
+              "key": "<",
+              "ctrl": false,
+              "alt": false,
+              "shift": true,
+              "meta": false
+            }
+          },
+          "setPreferredSpeed": {
+            "enabled": true,
+            "key": {
+              "code": "Quote",
+              "key": "\"",
+              "ctrl": false,
+              "alt": false,
+              "shift": true,
+              "meta": false
+            }
+          },
+          "speedReset": {
+            "enabled": true,
+            "key": {
+              "code": "Slash",
+              "key": "?",
+              "ctrl": false,
+              "alt": false,
+              "shift": true,
+              "meta": false
+            }
+          }
+        },
+        "spaceHold": {
+          "enabled": true,
+          "speed": 2,
+          "showHint": true
+        }
+      },
+      "backup": {
+        "format": "netflix-shortcut-override-settings",
+        "formatVersion": 1,
+        "exportedAt": "2026-10-24T00:00:00.000Z",
+        "extensionVersion": "0.6.4",
+        "settings": {
+          "version": 12,
+          "enabled": true,
+          "locale": "auto",
+          "theme": "auto",
+          "subtitlePractice": {
+            "enabled": false,
+            "bindings": {
+              "previous": {
+                "enabled": true,
+                "key": {
+                  "code": "KeyA",
+                  "key": "a",
+                  "ctrl": false,
+                  "alt": false,
+                  "shift": false,
+                  "meta": false
+                }
+              },
+              "next": {
+                "enabled": true,
+                "key": {
+                  "code": "KeyD",
+                  "key": "d",
+                  "ctrl": false,
+                  "alt": false,
+                  "shift": false,
+                  "meta": false
+                }
+              },
+              "replay": {
+                "enabled": true,
+                "key": {
+                  "code": "KeyS",
+                  "key": "s",
+                  "ctrl": false,
+                  "alt": false,
+                  "shift": false,
+                  "meta": false
+                }
+              },
+              "playback": {
+                "enabled": true,
+                "key": {
+                  "code": "KeyW",
+                  "key": "w",
+                  "ctrl": false,
+                  "alt": false,
+                  "shift": false,
+                  "meta": false
+                }
+              }
+            }
+          },
+          "speed": {
+            "min": 0.25,
+            "max": 3,
+            "step": 0.25,
+            "preferred": 1.5
+          },
+          "holdSpeed": {
+            "enabled": true,
+            "speed": 2,
+            "showHint": true
+          },
+          "seek": {
+            "seconds": 10
+          },
+          "pip": {
+            "subtitlesEnabled": true,
+            "subtitleSize": "medium",
+            "subtitleBackground": "translucent"
+          },
+          "bindings": {
+            "playPause": {
+              "enabled": true,
+              "key": {
+                "code": "Space",
+                "key": " ",
+                "ctrl": false,
+                "alt": false,
+                "shift": false,
+                "meta": false
+              }
+            },
+            "seekBackward": {
+              "enabled": true,
+              "key": {
+                "code": "ArrowLeft",
+                "key": "ArrowLeft",
+                "ctrl": false,
+                "alt": false,
+                "shift": false,
+                "meta": false
+              }
+            },
+            "seekForward": {
+              "enabled": true,
+              "key": {
+                "code": "ArrowRight",
+                "key": "ArrowRight",
+                "ctrl": false,
+                "alt": false,
+                "shift": false,
+                "meta": false
+              }
+            },
+            "volumeUp": {
+              "enabled": true,
+              "key": {
+                "code": "ArrowUp",
+                "key": "ArrowUp",
+                "ctrl": false,
+                "alt": false,
+                "shift": false,
+                "meta": false
+              }
+            },
+            "volumeDown": {
+              "enabled": true,
+              "key": {
+                "code": "ArrowDown",
+                "key": "ArrowDown",
+                "ctrl": false,
+                "alt": false,
+                "shift": false,
+                "meta": false
+              }
+            },
+            "mute": {
+              "enabled": true,
+              "key": {
+                "code": "KeyM",
+                "key": "m",
+                "ctrl": false,
+                "alt": false,
+                "shift": false,
+                "meta": false
+              }
+            },
+            "toggleSubtitles": {
+              "enabled": true,
+              "key": {
+                "code": "KeyC",
+                "key": "c",
+                "ctrl": false,
+                "alt": false,
+                "shift": false,
+                "meta": false
+              }
+            },
+            "fullscreen": {
+              "enabled": true,
+              "key": {
+                "code": "KeyF",
+                "key": "f",
+                "ctrl": false,
+                "alt": false,
+                "shift": false,
+                "meta": false
+              }
+            },
+            "pictureInPicture": {
+              "enabled": true,
+              "key": {
+                "code": "KeyP",
+                "key": "P",
+                "ctrl": false,
+                "alt": false,
+                "shift": true,
+                "meta": false
+              }
+            },
+            "skipIntro": {
+              "enabled": true,
+              "key": {
+                "code": "KeyS",
+                "key": "s",
+                "ctrl": false,
+                "alt": false,
+                "shift": false,
+                "meta": false
+              }
+            },
+            "speedUp": {
+              "enabled": true,
+              "key": {
+                "code": "Period",
+                "key": ">",
+                "ctrl": false,
+                "alt": false,
+                "shift": true,
+                "meta": false
+              }
+            },
+            "speedDown": {
+              "enabled": true,
+              "key": {
+                "code": "Comma",
+                "key": "<",
+                "ctrl": false,
+                "alt": false,
+                "shift": true,
+                "meta": false
+              }
+            },
+            "setPreferredSpeed": {
+              "enabled": true,
+              "key": {
+                "code": "Quote",
+                "key": "\"",
+                "ctrl": false,
+                "alt": false,
+                "shift": true,
+                "meta": false
+              }
+            },
+            "speedReset": {
+              "enabled": true,
+              "key": {
+                "code": "Slash",
+                "key": "?",
+                "ctrl": false,
+                "alt": false,
+                "shift": true,
+                "meta": false
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "custom",
+      "settings": {
+        "version": 12,
+        "enabled": true,
+        "locale": "zh-TW",
+        "theme": "dark",
+        "subtitlePractice": {
+          "enabled": true,
+          "bindings": {
+            "previous": {
+              "enabled": true,
+              "key": {
+                "code": "KeyZ",
+                "key": "z",
+                "ctrl": false,
+                "alt": false,
+                "shift": false,
+                "meta": false
+              }
+            },
+            "next": {
+              "enabled": false,
+              "key": {
+                "code": "KeyD",
+                "key": "d",
+                "ctrl": false,
+                "alt": false,
+                "shift": false,
+                "meta": false
+              }
+            },
+            "replay": {
+              "enabled": true,
+              "key": {
+                "code": "KeyS",
+                "key": "s",
+                "ctrl": false,
+                "alt": false,
+                "shift": false,
+                "meta": false
+              }
+            },
+            "playback": {
+              "enabled": true,
+              "key": {
+                "code": "KeyW",
+                "key": "w",
+                "ctrl": false,
+                "alt": false,
+                "shift": false,
+                "meta": false
+              }
+            }
+          }
+        },
+        "speed": {
+          "min": 0.5,
+          "max": 3.5,
+          "step": 0.5,
+          "preferred": 1.75
+        },
+        "holdSpeed": {
+          "enabled": false,
+          "speed": 2.25,
+          "showHint": false
+        },
+        "seek": {
+          "seconds": 17
+        },
+        "pip": {
+          "subtitlesEnabled": true,
+          "subtitleSize": "medium",
+          "subtitleBackground": "translucent"
+        },
+        "bindings": {
+          "playPause": {
+            "enabled": true,
+            "key": {
+              "code": "Space",
+              "key": " ",
+              "ctrl": false,
+              "alt": false,
+              "shift": false,
+              "meta": false
+            }
+          },
+          "seekBackward": {
+            "enabled": true,
+            "key": {
+              "code": "ArrowLeft",
+              "key": "ArrowLeft",
+              "ctrl": false,
+              "alt": false,
+              "shift": false,
+              "meta": false
+            }
+          },
+          "seekForward": {
+            "enabled": true,
+            "key": {
+              "code": "ArrowRight",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "alt": false,
+              "shift": false,
+              "meta": false
+            }
+          },
+          "volumeUp": {
+            "enabled": true,
+            "key": {
+              "code": "ArrowUp",
+              "key": "ArrowUp",
+              "ctrl": false,
+              "alt": false,
+              "shift": false,
+              "meta": false
+            }
+          },
+          "volumeDown": {
+            "enabled": false,
+            "key": {
+              "code": "ArrowDown",
+              "key": "ArrowDown",
+              "ctrl": false,
+              "alt": false,
+              "shift": false,
+              "meta": false
+            }
+          },
+          "mute": {
+            "enabled": true,
+            "key": {
+              "code": "KeyM",
+              "key": "m",
+              "ctrl": false,
+              "alt": false,
+              "shift": false,
+              "meta": false
+            }
+          },
+          "toggleSubtitles": {
+            "enabled": true,
+            "key": {
+              "code": "KeyC",
+              "key": "c",
+              "ctrl": false,
+              "alt": false,
+              "shift": false,
+              "meta": false
+            }
+          },
+          "fullscreen": {
+            "enabled": true,
+            "key": {
+              "code": "KeyG",
+              "key": "G",
+              "ctrl": true,
+              "alt": false,
+              "shift": true,
+              "meta": false
+            }
+          },
+          "pictureInPicture": {
+            "enabled": true,
+            "key": {
+              "code": "KeyP",
+              "key": "P",
+              "ctrl": false,
+              "alt": false,
+              "shift": true,
+              "meta": false
+            }
+          },
+          "skipIntro": {
+            "enabled": true,
+            "key": {
+              "code": "KeyS",
+              "key": "s",
+              "ctrl": false,
+              "alt": false,
+              "shift": false,
+              "meta": false
+            }
+          },
+          "speedUp": {
+            "enabled": true,
+            "key": {
+              "code": "Period",
+              "key": ">",
+              "ctrl": false,
+              "alt": false,
+              "shift": true,
+              "meta": false
+            }
+          },
+          "speedDown": {
+            "enabled": true,
+            "key": {
+              "code": "Comma",
+              "key": "<",
+              "ctrl": false,
+              "alt": false,
+              "shift": true,
+              "meta": false
+            }
+          },
+          "setPreferredSpeed": {
+            "enabled": true,
+            "key": {
+              "code": "Quote",
+              "key": "\"",
+              "ctrl": false,
+              "alt": false,
+              "shift": true,
+              "meta": false
+            }
+          },
+          "speedReset": {
+            "enabled": true,
+            "key": {
+              "code": "Slash",
+              "key": "?",
+              "ctrl": false,
+              "alt": false,
+              "shift": true,
+              "meta": false
+            }
+          }
+        },
+        "spaceHold": {
+          "enabled": false,
+          "speed": 2.25,
+          "showHint": false
+        }
+      },
+      "backup": {
+        "format": "netflix-shortcut-override-settings",
+        "formatVersion": 1,
+        "exportedAt": "2026-10-24T00:00:00.000Z",
+        "extensionVersion": "0.6.4",
+        "settings": {
+          "version": 12,
+          "enabled": true,
+          "locale": "zh-TW",
+          "theme": "dark",
+          "subtitlePractice": {
+            "enabled": true,
+            "bindings": {
+              "previous": {
+                "enabled": true,
+                "key": {
+                  "code": "KeyZ",
+                  "key": "z",
+                  "ctrl": false,
+                  "alt": false,
+                  "shift": false,
+                  "meta": false
+                }
+              },
+              "next": {
+                "enabled": false,
+                "key": {
+                  "code": "KeyD",
+                  "key": "d",
+                  "ctrl": false,
+                  "alt": false,
+                  "shift": false,
+                  "meta": false
+                }
+              },
+              "replay": {
+                "enabled": true,
+                "key": {
+                  "code": "KeyS",
+                  "key": "s",
+                  "ctrl": false,
+                  "alt": false,
+                  "shift": false,
+                  "meta": false
+                }
+              },
+              "playback": {
+                "enabled": true,
+                "key": {
+                  "code": "KeyW",
+                  "key": "w",
+                  "ctrl": false,
+                  "alt": false,
+                  "shift": false,
+                  "meta": false
+                }
+              }
+            }
+          },
+          "speed": {
+            "min": 0.5,
+            "max": 3.5,
+            "step": 0.5,
+            "preferred": 1.75
+          },
+          "holdSpeed": {
+            "enabled": false,
+            "speed": 2.25,
+            "showHint": false
+          },
+          "seek": {
+            "seconds": 17
+          },
+          "pip": {
+            "subtitlesEnabled": true,
+            "subtitleSize": "medium",
+            "subtitleBackground": "translucent"
+          },
+          "bindings": {
+            "playPause": {
+              "enabled": true,
+              "key": {
+                "code": "Space",
+                "key": " ",
+                "ctrl": false,
+                "alt": false,
+                "shift": false,
+                "meta": false
+              }
+            },
+            "seekBackward": {
+              "enabled": true,
+              "key": {
+                "code": "ArrowLeft",
+                "key": "ArrowLeft",
+                "ctrl": false,
+                "alt": false,
+                "shift": false,
+                "meta": false
+              }
+            },
+            "seekForward": {
+              "enabled": true,
+              "key": {
+                "code": "ArrowRight",
+                "key": "ArrowRight",
+                "ctrl": false,
+                "alt": false,
+                "shift": false,
+                "meta": false
+              }
+            },
+            "volumeUp": {
+              "enabled": true,
+              "key": {
+                "code": "ArrowUp",
+                "key": "ArrowUp",
+                "ctrl": false,
+                "alt": false,
+                "shift": false,
+                "meta": false
+              }
+            },
+            "volumeDown": {
+              "enabled": false,
+              "key": {
+                "code": "ArrowDown",
+                "key": "ArrowDown",
+                "ctrl": false,
+                "alt": false,
+                "shift": false,
+                "meta": false
+              }
+            },
+            "mute": {
+              "enabled": true,
+              "key": {
+                "code": "KeyM",
+                "key": "m",
+                "ctrl": false,
+                "alt": false,
+                "shift": false,
+                "meta": false
+              }
+            },
+            "toggleSubtitles": {
+              "enabled": true,
+              "key": {
+                "code": "KeyC",
+                "key": "c",
+                "ctrl": false,
+                "alt": false,
+                "shift": false,
+                "meta": false
+              }
+            },
+            "fullscreen": {
+              "enabled": true,
+              "key": {
+                "code": "KeyG",
+                "key": "G",
+                "ctrl": true,
+                "alt": false,
+                "shift": true,
+                "meta": false
+              }
+            },
+            "pictureInPicture": {
+              "enabled": true,
+              "key": {
+                "code": "KeyP",
+                "key": "P",
+                "ctrl": false,
+                "alt": false,
+                "shift": true,
+                "meta": false
+              }
+            },
+            "skipIntro": {
+              "enabled": true,
+              "key": {
+                "code": "KeyS",
+                "key": "s",
+                "ctrl": false,
+                "alt": false,
+                "shift": false,
+                "meta": false
+              }
+            },
+            "speedUp": {
+              "enabled": true,
+              "key": {
+                "code": "Period",
+                "key": ">",
+                "ctrl": false,
+                "alt": false,
+                "shift": true,
+                "meta": false
+              }
+            },
+            "speedDown": {
+              "enabled": true,
+              "key": {
+                "code": "Comma",
+                "key": "<",
+                "ctrl": false,
+                "alt": false,
+                "shift": true,
+                "meta": false
+              }
+            },
+            "setPreferredSpeed": {
+              "enabled": true,
+              "key": {
+                "code": "Quote",
+                "key": "\"",
+                "ctrl": false,
+                "alt": false,
+                "shift": true,
+                "meta": false
+              }
+            },
+            "speedReset": {
+              "enabled": true,
+              "key": {
+                "code": "Slash",
+                "key": "?",
+                "ctrl": false,
+                "alt": false,
+                "shift": true,
+                "meta": false
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "globally-disabled",
+      "settings": {
+        "version": 12,
+        "enabled": false,
+        "locale": "zh-TW",
+        "theme": "dark",
+        "subtitlePractice": {
+          "enabled": true,
+          "bindings": {
+            "previous": {
+              "enabled": true,
+              "key": {
+                "code": "KeyZ",
+                "key": "z",
+                "ctrl": false,
+                "alt": false,
+                "shift": false,
+                "meta": false
+              }
+            },
+            "next": {
+              "enabled": false,
+              "key": {
+                "code": "KeyD",
+                "key": "d",
+                "ctrl": false,
+                "alt": false,
+                "shift": false,
+                "meta": false
+              }
+            },
+            "replay": {
+              "enabled": true,
+              "key": {
+                "code": "KeyS",
+                "key": "s",
+                "ctrl": false,
+                "alt": false,
+                "shift": false,
+                "meta": false
+              }
+            },
+            "playback": {
+              "enabled": true,
+              "key": {
+                "code": "KeyW",
+                "key": "w",
+                "ctrl": false,
+                "alt": false,
+                "shift": false,
+                "meta": false
+              }
+            }
+          }
+        },
+        "speed": {
+          "min": 0.5,
+          "max": 3.5,
+          "step": 0.5,
+          "preferred": 1.75
+        },
+        "holdSpeed": {
+          "enabled": false,
+          "speed": 2.25,
+          "showHint": false
+        },
+        "seek": {
+          "seconds": 17
+        },
+        "pip": {
+          "subtitlesEnabled": true,
+          "subtitleSize": "medium",
+          "subtitleBackground": "translucent"
+        },
+        "bindings": {
+          "playPause": {
+            "enabled": true,
+            "key": {
+              "code": "Space",
+              "key": " ",
+              "ctrl": false,
+              "alt": false,
+              "shift": false,
+              "meta": false
+            }
+          },
+          "seekBackward": {
+            "enabled": true,
+            "key": {
+              "code": "ArrowLeft",
+              "key": "ArrowLeft",
+              "ctrl": false,
+              "alt": false,
+              "shift": false,
+              "meta": false
+            }
+          },
+          "seekForward": {
+            "enabled": true,
+            "key": {
+              "code": "ArrowRight",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "alt": false,
+              "shift": false,
+              "meta": false
+            }
+          },
+          "volumeUp": {
+            "enabled": true,
+            "key": {
+              "code": "ArrowUp",
+              "key": "ArrowUp",
+              "ctrl": false,
+              "alt": false,
+              "shift": false,
+              "meta": false
+            }
+          },
+          "volumeDown": {
+            "enabled": false,
+            "key": {
+              "code": "ArrowDown",
+              "key": "ArrowDown",
+              "ctrl": false,
+              "alt": false,
+              "shift": false,
+              "meta": false
+            }
+          },
+          "mute": {
+            "enabled": true,
+            "key": {
+              "code": "KeyM",
+              "key": "m",
+              "ctrl": false,
+              "alt": false,
+              "shift": false,
+              "meta": false
+            }
+          },
+          "toggleSubtitles": {
+            "enabled": true,
+            "key": {
+              "code": "KeyC",
+              "key": "c",
+              "ctrl": false,
+              "alt": false,
+              "shift": false,
+              "meta": false
+            }
+          },
+          "fullscreen": {
+            "enabled": true,
+            "key": {
+              "code": "KeyG",
+              "key": "G",
+              "ctrl": true,
+              "alt": false,
+              "shift": true,
+              "meta": false
+            }
+          },
+          "pictureInPicture": {
+            "enabled": true,
+            "key": {
+              "code": "KeyP",
+              "key": "P",
+              "ctrl": false,
+              "alt": false,
+              "shift": true,
+              "meta": false
+            }
+          },
+          "skipIntro": {
+            "enabled": true,
+            "key": {
+              "code": "KeyS",
+              "key": "s",
+              "ctrl": false,
+              "alt": false,
+              "shift": false,
+              "meta": false
+            }
+          },
+          "speedUp": {
+            "enabled": true,
+            "key": {
+              "code": "Period",
+              "key": ">",
+              "ctrl": false,
+              "alt": false,
+              "shift": true,
+              "meta": false
+            }
+          },
+          "speedDown": {
+            "enabled": true,
+            "key": {
+              "code": "Comma",
+              "key": "<",
+              "ctrl": false,
+              "alt": false,
+              "shift": true,
+              "meta": false
+            }
+          },
+          "setPreferredSpeed": {
+            "enabled": true,
+            "key": {
+              "code": "Quote",
+              "key": "\"",
+              "ctrl": false,
+              "alt": false,
+              "shift": true,
+              "meta": false
+            }
+          },
+          "speedReset": {
+            "enabled": true,
+            "key": {
+              "code": "Slash",
+              "key": "?",
+              "ctrl": false,
+              "alt": false,
+              "shift": true,
+              "meta": false
+            }
+          }
+        },
+        "spaceHold": {
+          "enabled": false,
+          "speed": 2.25,
+          "showHint": false
+        }
+      },
+      "backup": {
+        "format": "netflix-shortcut-override-settings",
+        "formatVersion": 1,
+        "exportedAt": "2026-10-24T00:00:00.000Z",
+        "extensionVersion": "0.6.4",
+        "settings": {
+          "version": 12,
+          "enabled": false,
+          "locale": "zh-TW",
+          "theme": "dark",
+          "subtitlePractice": {
+            "enabled": true,
+            "bindings": {
+              "previous": {
+                "enabled": true,
+                "key": {
+                  "code": "KeyZ",
+                  "key": "z",
+                  "ctrl": false,
+                  "alt": false,
+                  "shift": false,
+                  "meta": false
+                }
+              },
+              "next": {
+                "enabled": false,
+                "key": {
+                  "code": "KeyD",
+                  "key": "d",
+                  "ctrl": false,
+                  "alt": false,
+                  "shift": false,
+                  "meta": false
+                }
+              },
+              "replay": {
+                "enabled": true,
+                "key": {
+                  "code": "KeyS",
+                  "key": "s",
+                  "ctrl": false,
+                  "alt": false,
+                  "shift": false,
+                  "meta": false
+                }
+              },
+              "playback": {
+                "enabled": true,
+                "key": {
+                  "code": "KeyW",
+                  "key": "w",
+                  "ctrl": false,
+                  "alt": false,
+                  "shift": false,
+                  "meta": false
+                }
+              }
+            }
+          },
+          "speed": {
+            "min": 0.5,
+            "max": 3.5,
+            "step": 0.5,
+            "preferred": 1.75
+          },
+          "holdSpeed": {
+            "enabled": false,
+            "speed": 2.25,
+            "showHint": false
+          },
+          "seek": {
+            "seconds": 17
+          },
+          "pip": {
+            "subtitlesEnabled": true,
+            "subtitleSize": "medium",
+            "subtitleBackground": "translucent"
+          },
+          "bindings": {
+            "playPause": {
+              "enabled": true,
+              "key": {
+                "code": "Space",
+                "key": " ",
+                "ctrl": false,
+                "alt": false,
+                "shift": false,
+                "meta": false
+              }
+            },
+            "seekBackward": {
+              "enabled": true,
+              "key": {
+                "code": "ArrowLeft",
+                "key": "ArrowLeft",
+                "ctrl": false,
+                "alt": false,
+                "shift": false,
+                "meta": false
+              }
+            },
+            "seekForward": {
+              "enabled": true,
+              "key": {
+                "code": "ArrowRight",
+                "key": "ArrowRight",
+                "ctrl": false,
+                "alt": false,
+                "shift": false,
+                "meta": false
+              }
+            },
+            "volumeUp": {
+              "enabled": true,
+              "key": {
+                "code": "ArrowUp",
+                "key": "ArrowUp",
+                "ctrl": false,
+                "alt": false,
+                "shift": false,
+                "meta": false
+              }
+            },
+            "volumeDown": {
+              "enabled": false,
+              "key": {
+                "code": "ArrowDown",
+                "key": "ArrowDown",
+                "ctrl": false,
+                "alt": false,
+                "shift": false,
+                "meta": false
+              }
+            },
+            "mute": {
+              "enabled": true,
+              "key": {
+                "code": "KeyM",
+                "key": "m",
+                "ctrl": false,
+                "alt": false,
+                "shift": false,
+                "meta": false
+              }
+            },
+            "toggleSubtitles": {
+              "enabled": true,
+              "key": {
+                "code": "KeyC",
+                "key": "c",
+                "ctrl": false,
+                "alt": false,
+                "shift": false,
+                "meta": false
+              }
+            },
+            "fullscreen": {
+              "enabled": true,
+              "key": {
+                "code": "KeyG",
+                "key": "G",
+                "ctrl": true,
+                "alt": false,
+                "shift": true,
+                "meta": false
+              }
+            },
+            "pictureInPicture": {
+              "enabled": true,
+              "key": {
+                "code": "KeyP",
+                "key": "P",
+                "ctrl": false,
+                "alt": false,
+                "shift": true,
+                "meta": false
+              }
+            },
+            "skipIntro": {
+              "enabled": true,
+              "key": {
+                "code": "KeyS",
+                "key": "s",
+                "ctrl": false,
+                "alt": false,
+                "shift": false,
+                "meta": false
+              }
+            },
+            "speedUp": {
+              "enabled": true,
+              "key": {
+                "code": "Period",
+                "key": ">",
+                "ctrl": false,
+                "alt": false,
+                "shift": true,
+                "meta": false
+              }
+            },
+            "speedDown": {
+              "enabled": true,
+              "key": {
+                "code": "Comma",
+                "key": "<",
+                "ctrl": false,
+                "alt": false,
+                "shift": true,
+                "meta": false
+              }
+            },
+            "setPreferredSpeed": {
+              "enabled": true,
+              "key": {
+                "code": "Quote",
+                "key": "\"",
+                "ctrl": false,
+                "alt": false,
+                "shift": true,
+                "meta": false
+              }
+            },
+            "speedReset": {
+              "enabled": true,
+              "key": {
+                "code": "Slash",
+                "key": "?",
+                "ctrl": false,
+                "alt": false,
+                "shift": true,
+                "meta": false
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "sourceCommit": "4cc9d218a43fae95be0d95fd4ead482f1ea12d28"
+}

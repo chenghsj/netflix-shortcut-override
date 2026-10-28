@@ -17,7 +17,7 @@ import {
 } from '@/shared/shortcut-bindings'
 import { DEFAULT_SETTINGS, normalizeSettings } from '@/shared/shortcut-settings'
 import type { ShortcutSettings } from '@/shared/shortcut-types'
-import { getSettings, saveSettings, subscribeSettings } from '@/shared/storage'
+import { observeSettings, updateSettings } from '@/shared/storage'
 import {
   isCompatibilityDiagnosticsRequest,
   type CompatibilityDiagnostics,
@@ -28,6 +28,12 @@ import { sendNetflixApi } from '@/content/netflix-api-client'
 let settings: ShortcutSettings = DEFAULT_SETTINGS
 let settingsLoaded = false
 let pipManager: PipManager | null = null
+type PipSettingsPatch = Partial<ShortcutSettings['pip']>
+
+const persistPipSettings = (patch: PipSettingsPatch) => updateSettings(current => ({
+  ...current,
+  pip: { ...current.pip, ...patch },
+}))
 
 const playbackSession = createNetflixPlaybackSession()
 const subtitlePractice = createSubtitlePractice(() => settings, playbackSession, () => pipManager?.recordUserSeek())
@@ -45,7 +51,7 @@ const commandController = createShortcutCommandController(
         pip: { ...settings.pip, subtitlesEnabled },
       })
       applySettings(nextSettings, true)
-      void saveSettings(nextSettings).catch(() => undefined)
+      void persistPipSettings({ subtitlesEnabled }).catch(() => undefined)
     },
   }
 )
@@ -194,8 +200,19 @@ pipManager = new PipManager({
   settings,
   onSettingsChange: nextSettings => {
     const normalizedSettings = normalizeSettings(nextSettings)
+    const patch: PipSettingsPatch = {
+      ...(settings.pip.subtitlesEnabled !== normalizedSettings.pip.subtitlesEnabled
+        ? { subtitlesEnabled: normalizedSettings.pip.subtitlesEnabled }
+        : {}),
+      ...(settings.pip.subtitleSize !== normalizedSettings.pip.subtitleSize
+        ? { subtitleSize: normalizedSettings.pip.subtitleSize }
+        : {}),
+      ...(settings.pip.subtitleBackground !== normalizedSettings.pip.subtitleBackground
+        ? { subtitleBackground: normalizedSettings.pip.subtitleBackground }
+        : {}),
+    }
     applySettings(normalizedSettings)
-    void saveSettings(normalizedSettings).catch(() => undefined)
+    void persistPipSettings(patch).catch(() => undefined)
   },
 })
 const applySettings = (
@@ -209,15 +226,14 @@ const applySettings = (
   else pipManager?.updateSettings(nextSettings)
 }
 
-void getSettings()
-  .then(nextSettings => {
-    applySettings(nextSettings)
-  })
-  .catch(() => {
-    applySettings(DEFAULT_SETTINGS)
-  })
-subscribeSettings(nextSettings => {
-  applySettings(normalizeSettings(nextSettings))
+const settingsObservation = observeSettings(nextSettings => {
+  applySettings(normalizeSettings({
+    ...nextSettings,
+    uiStyle: nextSettings.uiStyle ?? settings.uiStyle,
+  }))
+})
+void settingsObservation.ready.catch(() => {
+  if (!settingsLoaded) applySettings(DEFAULT_SETTINGS)
 })
 
 chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
-import { getSettings, saveSettings } from '@/shared/storage'
+import { getSettings, saveSettings, SETTINGS_STORAGE_KEY, UI_STYLE_STORAGE_KEY } from '@/shared/storage'
 
 import { setupContentIndexTests } from '../shortcuts/content-script.test-support'
 
@@ -686,11 +686,112 @@ describe('content PiP shortcuts', () => {
       pipWindow.document
         .querySelector<HTMLInputElement>('[data-pip-subtitle-background="dark"]')
         ?.click()
-      await Promise.resolve()
-      await Promise.resolve()
-      expect((await getSettings()).pip.subtitleBackground).toBe('dark')
+      await vi.waitFor(async () => {
+        expect((await getSettings()).pip.subtitleBackground).toBe('dark')
+      })
     } finally {
       cleanup()
+    }
+  })
+
+  it('preserves newer settings when a PiP save completes after a global disable', async () => {
+    const { pipWindow, cleanup } = createDocumentPipFixture()
+    const originalGet = vi.mocked(chrome.storage.sync.get).getMockImplementation()
+    if (!originalGet) throw new Error('Missing storage mock')
+    let finishRead: (() => void) | undefined
+    try {
+      await saveSettings({ ...DEFAULT_SETTINGS, uiStyle: 'markdown' })
+      document.body.appendChild(document.createElement('video'))
+      window.dispatchEvent(new KeyboardEvent('keydown', {
+        code: 'KeyP', key: 'P', shiftKey: true, bubbles: true, cancelable: true,
+      }))
+      await vi.waitFor(() => {
+        expect(pipWindow.document.querySelector('[data-pip-control="subtitles-button"]')).not.toBeNull()
+      })
+      pipWindow.document.querySelector<HTMLButtonElement>('[data-pip-control="subtitles-button"]')?.click()
+      pipWindow.document.querySelector<HTMLButtonElement>('[data-pip-subtitle-nav="background"]')?.click()
+      const darkBackground = pipWindow.document.querySelector<HTMLInputElement>('[data-pip-subtitle-background="dark"]')
+      if (!darkBackground) throw new Error('Missing dark background option')
+      vi.spyOn(chrome.storage.sync, 'get').mockImplementationOnce((keys, callback) => {
+        originalGet(keys, values => { finishRead = () => callback?.(values) })
+        return Promise.resolve({})
+      })
+      vi.mocked(chrome.storage.sync.set).mockClear()
+      darkBackground.click()
+      await vi.waitFor(() => expect(finishRead).toBeTypeOf('function'))
+      const newerSettings = {
+        ...DEFAULT_SETTINGS,
+        enabled: false,
+        locale: 'zh-TW' as const,
+        uiStyle: 'classic' as const,
+        bindings: {
+          ...DEFAULT_SETTINGS.bindings,
+          seekBackward: { ...DEFAULT_SETTINGS.bindings.seekBackward, enabled: false },
+        },
+        seek: { seconds: 17 },
+        pip: { ...DEFAULT_SETTINGS.pip, subtitleSize: 'large' as const },
+      }
+      await new Promise<void>(resolve => chrome.storage.sync.set({
+        [SETTINGS_STORAGE_KEY]: newerSettings,
+        [UI_STYLE_STORAGE_KEY]: newerSettings.uiStyle,
+      }, () => resolve()))
+      expect((await getSettings()).enabled).toBe(false)
+      finishRead?.()
+      finishRead = undefined
+      await vi.waitFor(() => expect(chrome.storage.sync.set).toHaveBeenCalledTimes(2))
+      expect(await getSettings()).toEqual({
+        ...newerSettings,
+        pip: { ...newerSettings.pip, subtitleBackground: 'dark' },
+      })
+    } finally {
+      finishRead?.()
+      cleanup()
+      vi.restoreAllMocks()
+    }
+  })
+
+  it.each([false, true])('persists rapid PiP preference edits in order when an earlier appearance read is delayed (read failure: %s)', async failFirstRead => {
+    const { pipWindow, cleanup } = createDocumentPipFixture()
+    const originalGet = vi.mocked(chrome.storage.sync.get).getMockImplementation()
+    if (!originalGet) throw new Error('Missing storage mock')
+    let finishRead: (() => void) | undefined
+    try {
+      document.body.appendChild(document.createElement('video'))
+      window.dispatchEvent(new KeyboardEvent('keydown', {
+        code: 'KeyP', key: 'P', shiftKey: true, bubbles: true, cancelable: true,
+      }))
+      await vi.waitFor(() => {
+        expect(pipWindow.document.querySelector('[data-pip-control="subtitles-button"]')).not.toBeNull()
+      })
+      pipWindow.document.querySelector<HTMLButtonElement>('[data-pip-control="subtitles-button"]')?.click()
+      pipWindow.document.querySelector<HTMLButtonElement>('[data-pip-subtitle-nav="background"]')?.click()
+      const darkBackground = pipWindow.document.querySelector<HTMLInputElement>('[data-pip-subtitle-background="dark"]')
+      const noBackground = pipWindow.document.querySelector<HTMLInputElement>('[data-pip-subtitle-background="none"]')
+      if (!darkBackground || !noBackground) throw new Error('Missing subtitle background options')
+      vi.spyOn(chrome.storage.sync, 'get').mockImplementationOnce((keys, callback) => {
+        originalGet(keys, values => {
+          finishRead = () => {
+            if (failFirstRead) Object.assign(chrome.runtime, { lastError: { message: 'Read failed' } })
+            try {
+              callback?.(values)
+            } finally {
+              Reflect.deleteProperty(chrome.runtime, 'lastError')
+            }
+          }
+        })
+        return Promise.resolve({})
+      })
+      vi.mocked(chrome.storage.sync.set).mockClear()
+      darkBackground.click()
+      await vi.waitFor(() => expect(finishRead).toBeTypeOf('function'))
+      noBackground.click()
+      finishRead?.()
+      await vi.waitFor(() => expect(chrome.storage.sync.set).toHaveBeenCalledTimes(failFirstRead ? 1 : 2))
+      expect((await getSettings()).pip.subtitleBackground).toBe('none')
+    } finally {
+      finishRead?.()
+      cleanup()
+      vi.restoreAllMocks()
     }
   })
 

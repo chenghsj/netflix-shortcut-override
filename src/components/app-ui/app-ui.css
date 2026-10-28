@@ -1,22 +1,45 @@
-.dark body[data-app-ui] .border-2 {
-  border-width: 1px;
+body[data-app-ui] .border-2 {
+  border-width: var(--ui-border-width);
 }
 
-.dark body[data-app-ui] .border-t-2 {
-  border-top-width: 1px;
+body[data-app-ui] .border-t-2 {
+  border-top-width: var(--ui-border-width);
 }
 
-.dark body[data-app-ui] .border-b-2,
-.dark body[data-app-ui] [data-slot='table-header'] > tr {
-  border-bottom-width: 1px;
+body[data-app-ui] .border-b-2,
+body[data-app-ui] [data-slot='table-header'] > tr {
+  border-bottom-width: var(--ui-border-width);
 }
 
-.dark body[data-app-ui] .app-switch[data-size='default'] [data-slot='switch-thumb'][data-state='checked'] {
-  translate: 22px 0;
+body[data-app-ui] .font-extrabold {
+  font-weight: var(--ui-title-weight);
 }
 
-.dark body[data-app-ui] .app-switch[data-size='sm'] [data-slot='switch-thumb'][data-state='checked'] {
-  translate: 18px 0;
+body[data-app-ui] .font-black {
+  font-weight: var(--ui-brand-weight);
+}
+
+body[data-app-ui] .app-switch {
+  --app-switch-width: var(--ui-switch-width);
+  --app-switch-height: var(--ui-switch-height);
+  --app-switch-thumb-size: var(--ui-switch-thumb-size);
+  width: var(--app-switch-width);
+  height: var(--app-switch-height);
+  border-color: var(--ui-switch-border-color);
+}
+
+body[data-app-ui] .app-switch[data-size='sm'] {
+  --app-switch-width: var(--ui-switch-sm-width);
+  --app-switch-height: var(--ui-switch-sm-height);
+  --app-switch-thumb-size: var(--ui-switch-sm-thumb-size);
+}
+
+body[data-app-ui] .app-switch[data-state='unchecked'] {
+  background-color: var(--ui-switch-off-bg);
+}
+
+body[data-app-ui] .app-switch [data-slot='switch-thumb'][data-state='checked'] {
+  translate: calc(var(--app-switch-width) - var(--app-switch-thumb-size) - 2 * var(--ui-border-width) - 2 * var(--ui-switch-padding)) 0;
 }
 
 body[data-app-ui] [data-slot='dialog-overlay'] {
@@ -31,14 +54,17 @@ body[data-app-ui] nav > :is(button, a) [data-icon='inline-start'] {
 
 body[data-app-ui] [data-slot='table-container']:has(> .app-table) {
   border-color: var(--border);
-  border-radius: 12px;
+  border-radius: var(--ui-table-radius);
   box-shadow: none;
 }
 
-.app-switch [data-slot='switch-thumb'] {
+body[data-app-ui] .app-switch [data-slot='switch-thumb'] {
+  width: var(--app-switch-thumb-size);
+  height: var(--app-switch-thumb-size);
+  margin-inline: var(--ui-switch-padding);
   border-color: var(--border);
   border-radius: 9999px;
-  background-color: var(--card);
+  border-width: var(--ui-thumb-border-width);
 }
 
 .app-tooltip-content > span > svg {
@@ -54,14 +80,94 @@ body[data-app-ui] [data-slot='table-container']:has(> .app-table) {
   width: 1.75rem;
   height: 1.75rem;
   padding: 0;
-  border: 2px solid transparent;
-  border-radius: 9999px;
+  border: var(--ui-border-width) solid transparent;
+  border-radius: var(--ui-dialog-close-radius);
   font-size: 0.875rem;
-  font-weight: 700;
+  font-weight: var(--ui-control-weight);
 }
 
 .app-dialog-content > [data-slot='dialog-close']:focus-visible {
   border-color: var(--ring);
   outline: none;
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent);
+}
+
+body[data-app-ui] [data-slot='table-header'] {
+  background-color: var(--ui-table-header-bg);
+  color: var(--ui-table-header-fg);
+}
+
+body[data-app-ui] [data-slot='card-title'],
+body.popup-page[data-app-ui] main h2,
+body.popup-page[data-app-ui] main h2 > button {
+  font-weight: var(--ui-card-title-weight);
+}
+
+body[data-app-ui] [data-slot='card-title'] > svg,
+body.popup-page[data-app-ui] main h2 > svg,
+body.popup-page[data-app-ui] main h2 > button > span > svg {
+  width: var(--ui-title-icon-size);
+  height: var(--ui-title-icon-size);
+  flex-shrink: 0;
+}
+
+body[data-app-ui] [data-slot='dialog-title'] {
+  font-weight: var(--ui-dialog-title-weight);
+}
+
+body[data-app-ui] [data-slot='input']:not(:disabled) {
+  background-color: var(--ui-input-bg);
+}
+
+body[data-app-ui] [data-slot='switch-thumb'][data-state='checked'] {
+  background-color: var(--ui-thumb-checked-bg);
+}
+
+body[data-app-ui] [data-slot='switch-thumb'][data-state='unchecked'] {
+  background-color: var(--ui-thumb-unchecked-bg);
+}
+
+body[data-app-ui] [data-slot='kbd'] {
+  padding-inline: var(--ui-key-padding-x);
+  border-width: var(--ui-key-border-width);
+  border-radius: var(--ui-key-radius);
+  background-color: var(--ui-key-bg);
+  color: var(--ui-key-fg);
+  font-family: var(--ui-key-font);
+  font-weight: var(--ui-key-weight);
+  box-shadow: var(--ui-key-shadow);
+}
+
+body[data-app-ui] [data-variant='outline'] {
+  background-color: var(--ui-outline-bg);
+  color: var(--foreground);
+}
+
+body[data-app-ui] [data-variant='outline'][aria-expanded='true'] {
+  background-color: var(--ui-outline-expanded-bg);
+}
+
+body[data-app-ui] [data-variant='outline']:is(:hover, :focus-visible) {
+  background-color: var(--ui-outline-hover-bg);
+}
+
+body[data-app-ui] [data-variant='ghost']:is(:hover, :focus-visible) {
+  background-color: var(--ui-ghost-hover-bg);
+}
+
+body[data-app-ui] [data-slot='table'] [data-variant='ghost']:is(:hover, :focus-visible) {
+  background-color: color-mix(in oklab, var(--accent) 96%, black);
+  color: var(--foreground);
+}
+
+.dark body[data-app-ui] [data-slot='table'] [data-variant='ghost']:is(:hover, :focus-visible) {
+  background-color: color-mix(in oklab, var(--accent) 88%, black);
+}
+
+body[data-app-ui] .app-brand-icon {
+  content: var(--ui-brand-icon);
+}
+
+body[data-app-ui] [data-slot='command-item'] {
+  border-radius: var(--ui-option-radius);
 }

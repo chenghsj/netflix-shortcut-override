@@ -2,6 +2,9 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
+@import "@fontsource/ibm-plex-mono/latin-400.css";
+@import "@fontsource/ibm-plex-mono/latin-500.css";
+@import "@fontsource/ibm-plex-mono/latin-700.css";
 @import "./components/app-ui/app-ui.css";
 
 @custom-variant dark (&:is(.dark *));
@@ -15,30 +18,6 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  --background: #fff4dd;
-  --foreground: #26201a;
-  --card: #fffdf7;
-  --card-foreground: #26201a;
-  --popover: #fffdf7;
-  --popover-foreground: #26201a;
-  --primary: #ffd84d;
-  --primary-hover: #ffe070;
-  --primary-foreground: #26201a;
-  --secondary: #a5dcff;
-  --secondary-foreground: #26201a;
-  --muted: #f1e3c4;
-  --muted-foreground: #5c5347;
-  --accent: #fff0bd;
-  --accent-foreground: #26201a;
-  --brand-accent: #ff5c2b;
-  --brand-accent-foreground: #26201a;
-  --destructive: #b91c1c;
-  --destructive-foreground: #fffdf7;
-  --border: #26201a;
-  --input: #26201a;
-  --ring: #26201a;
-  --shadow-color: #26201a;
-  --radius: 16px;
 }
 
 body {
@@ -70,9 +49,9 @@ body.popup-page[data-scroll-locked] {
 html.popup-page-root,
 html.popup-page-root body,
 html.popup-page-root #root {
-  width: 22rem;
-  min-width: 22rem;
-  max-width: 22rem;
+  width: 26rem;
+  min-width: 26rem;
+  max-width: 26rem;
 }
 
 html.popup-page-root {
@@ -83,13 +62,13 @@ html.popup-page-root {
   --font-heading: var(--font-sans);
   --font-head: var(--font-sans);
   --color-secondary-hover: var(--secondary);
-  --shadow-2xs: 1px 1px 0 0 var(--shadow-color);
-  --shadow-xs: 1px 1px 0 0 var(--shadow-color);
-  --shadow-sm: 3px 3px 0 0 var(--shadow-color);
-  --shadow-md: 4px 4px 0 0 var(--shadow-color);
-  --shadow-lg: 6px 6px 0 0 var(--shadow-color);
-  --shadow-xl: 10px 10px 0 1px var(--shadow-color);
-  --shadow-2xl: 16px 16px 0 1px var(--shadow-color);
+  --shadow-2xs: var(--ui-shadow-2xs);
+  --shadow-xs: var(--ui-shadow-xs);
+  --shadow-sm: var(--ui-shadow-sm);
+  --shadow-md: var(--ui-shadow-md);
+  --shadow-lg: var(--ui-shadow-lg);
+  --shadow-xl: var(--ui-shadow-xl);
+  --shadow-2xl: var(--ui-shadow-2xl);
   --color-primary-hover: var(--primary-hover);
   --color-brand-accent: var(--brand-accent);
   --color-brand-accent-foreground: var(--brand-accent-foreground);
@@ -149,32 +128,7 @@ html.popup-page-root {
     calc(var(--radius) * 2.6);
 }
 
-.dark {
-  color-scheme: dark;
-  --background: #3a3129;
-  --foreground: oklch(93% 0.025 80);
-  --card: #4a3e33;
-  --card-foreground: oklch(93% 0.025 80);
-  --popover: #4a3e33;
-  --popover-foreground: oklch(93% 0.025 80);
-  --primary: oklch(75% 0.135 82);
-  --primary-hover: oklch(79% 0.14 82);
-  --primary-foreground: oklch(22% 0.04 82);
-  --secondary: oklch(71% 0.095 232);
-  --secondary-foreground: oklch(20% 0.03 235);
-  --muted: oklch(35% 0.022 75);
-  --muted-foreground: oklch(76% 0.025 75);
-  --accent: oklch(30% 0.055 72);
-  --accent-foreground: oklch(93% 0.025 80);
-  --brand-accent: oklch(67% 0.2 38);
-  --brand-accent-foreground: oklch(20% 0.03 38);
-  --destructive: #ff8a8a;
-  --destructive-foreground: oklch(18% 0.012 70);
-  --border: oklch(93% 0.025 80);
-  --input: oklch(93% 0.025 80);
-  --ring: oklch(75% 0.135 82);
-  --shadow-color: #080605;
-}
+
 
 @layer base {
   * {

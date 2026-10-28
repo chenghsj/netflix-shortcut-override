@@ -1,3 +1,8 @@
+import type { UiStyle } from './ui-styles'
+
+export { UI_STYLES } from './ui-styles'
+export type { UiStyle } from './ui-styles'
+
 export const SHORTCUT_ACTIONS = [
   'playPause',
   'seekBackward',
@@ -87,6 +92,7 @@ export type ShortcutSettings = {
   enabled: boolean
   locale: LocalePreference
   theme: ThemeMode
+  uiStyle: UiStyle
   speed: SpeedSettings
   subtitlePractice: SubtitlePracticeSettings
   holdSpeed: HoldSpeedSettings

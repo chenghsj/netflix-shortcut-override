@@ -42,6 +42,8 @@ npm run build
 
 Then open `about:debugging#/runtime/this-firefox`, choose "Load Temporary Add-on…", and select `dist/firefox/manifest.json`. See [the Firefox browser test guide](firefox-real-browser-test.md) for the smoke-test checklist.
 
+For update compatibility and installed-browser checks, see [Verify settings upgrades](settings-upgrade.md).
+
 ## Development
 
 Install dependencies once:
@@ -77,7 +79,7 @@ The default `npm run build` command creates both browser-specific outputs under 
 | `npm run lint` | Run ESLint. |
 | `npm test` | Run Vitest tests. |
 | `npm run test:coverage` | Run the complete test suite with enforced coverage thresholds. |
-| `npm run icons` | Regenerate icons from `assets/icons/enabled.png`, `assets/icons/disabled.png`, and `assets/icons/dark.png` at 16, 32, 48, and 128 px, preserving aspect ratio and transparency. The dark variant is for Options and popup; toolbar icons follow the enabled/disabled state. |
+| `npm run icons` | Regenerate enabled, disabled, dark, Classic, and Classic dark icons from `assets/icons` at 16, 32, 48, and 128 px, preserving aspect ratio and transparency. Options and popup use the selected interface style; toolbar icons follow the enabled/disabled state. |
 | `npm run changelog` | Generate release notes from git commits. |
 
 ## Project Structure
@@ -128,7 +130,7 @@ Key areas:
 - `src/popup/popup-app.tsx`: toolbar popup for quick status, toggles, shortcut summary, and options entry.
 - `src/options/options-app.tsx`: extension options UI and subtitle-section navigation.
 - `src/options/use-shortcut-editor.ts`: mutually exclusive recording and conflict confirmation, saved-key checks, and recorder focus restoration.
-- `src/options/use-subtitle-activation.ts`: synchronous browser permission requests, duplicate-request prevention, and cancellation of stale approvals on disable or unmount.
+- `src/shared/use-subtitle-activation.ts`: synchronous browser permission requests, duplicate-request prevention, and cancellation of stale approvals on disable or unmount.
 - `src/shared/shortcut-bindings.ts`: shortcut actions, default key bindings, normalization, and conflict checks.
 - `src/shared/shortcut-settings.ts`: default settings, validation, and settings normalization.
 - `src/shared/playback-speed.ts`: playback-speed stepping and speed normalization helpers.

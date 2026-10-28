@@ -12,7 +12,7 @@ function TooltipTrigger({ onFocus, ...props }: React.ComponentProps<typeof Upstr
 
 function TooltipContent({ className, sideOffset = 8, ...props }: React.ComponentProps<typeof Upstream.TooltipContent>) {
   return <Upstream.TooltipContent {...props} sideOffset={sideOffset} className={cn(
-    "app-tooltip-content max-w-sm rounded-[8px] border-0 px-3 py-2 text-[13px] leading-5 font-medium shadow-none [&>span>svg]:hidden!",
+    "app-tooltip-content max-w-sm rounded-[var(--ui-tooltip-radius)] border-0 px-3 py-2 text-[13px] leading-5 font-medium shadow-none [&>span>svg]:hidden!",
     className
   )} />
 }

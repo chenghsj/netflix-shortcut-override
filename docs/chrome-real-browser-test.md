@@ -282,7 +282,7 @@ npm run build
 
 ## 11. Subtitle Navigation Regression Checks
 
-Open the popup with subtitle navigation off: its separate summary shows only its title and Not enabled. Enable both masters in Options and reopen the popup: all four configured subtitle keys appear, disabled rows show Disabled, and ordinary shortcuts claimed by enabled subtitle rows show Subtitle priority with the overriding action in their tooltip. Verify the default S/Skip Intro overlap, a custom key with modifiers, and release after disabling the overlapping row. Turning off the global override collapses the subtitle summary without clearing its saved values. Editing, resets, and authorization stay in Options.
+Open the popup on its Shortcuts tab with subtitle navigation off. Confirm the subtitle header shows its master switch and hides the action rows. Enable both masters in Options or the popup and confirm all four configured subtitle keys appear. Disabled rows show Disabled, and ordinary shortcuts claimed by enabled subtitle rows show Subtitle priority with the overriding action in their tooltip. Verify the default S/Skip Intro overlap, a custom key with modifiers, and release after disabling the overlapping row. Turning off the global override hides the subtitle rows and disables the subtitle master without clearing its saved values. Key editing and resets stay in Options. The popup master requests website access through the same permission flow as Options.
 
 This is an acceptance checklist, not a record of a completed run. Record the browser and extension version, loaded directory, selected subtitle language, and each result. Reload the unpacked `dist/chromium` extension and Netflix tab before testing source changes.
 

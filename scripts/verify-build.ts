@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
+import packageJson from '../package.json' with { type: 'json' }
 
 for (const browser of ['chromium', 'firefox']) {
   const root = resolve('dist', browser)
   const manifest: unknown = JSON.parse(readFileSync(resolve(root, 'manifest.json'), 'utf8'))
   assert.ok(manifest && typeof manifest === 'object' && 'background' in manifest && 'content_scripts' in manifest, `${browser}: invalid build manifest`)
+  assert.ok('version' in manifest, `${browser}: missing version`)
+  assert.equal(manifest.version, packageJson.version, `${browser}: package/manifest version mismatch`)
   const background = manifest.background
   assert.ok(background && typeof background === 'object', `${browser}: missing background configuration`)
   const workerPath = 'service_worker' in background && background.service_worker != null
@@ -35,5 +38,5 @@ for (const browser of ['chromium', 'firefox']) {
   if (!source.includes('FETCH_NETFLIX_CAPTION') || !source.includes('chrome.action')) {
     throw new Error(`${browser}: background entry is missing its runtime message handlers`)
   }
-  console.log(`${browser}: background entry verified`)
+  console.log(`${browser}: version ${packageJson.version} and background entry verified`)
 }

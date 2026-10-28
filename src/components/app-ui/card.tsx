@@ -5,14 +5,14 @@ import { cn } from '@/lib/utils'
 
 function Card({ className, ...props }: React.ComponentProps<typeof Upstream.Card>) {
   return <Upstream.Card {...props} className={cn(
-    "rounded-lg border-border",
+    "rounded-[var(--ui-card-radius)] border-border",
     className
   )} />
 }
 
 function CardHeader({ className, ...props }: React.ComponentProps<typeof Upstream.CardHeader>) {
   return <Upstream.CardHeader {...props} className={cn(
-    "rounded-t-[max(0px,calc(var(--radius-lg)-2px))]",
+    "rounded-t-[max(0px,calc(var(--ui-card-radius)-var(--ui-border-width)))]",
     className
   )} />
 }
@@ -26,7 +26,7 @@ function CardTitle({ className, ...props }: React.ComponentProps<typeof Upstream
 
 function CardFooter({ className, ...props }: React.ComponentProps<typeof Upstream.CardFooter>) {
   return <Upstream.CardFooter {...props} className={cn(
-    "rounded-b-[max(0px,calc(var(--radius-lg)-2px))] bg-muted",
+    "rounded-b-[max(0px,calc(var(--ui-card-radius)-var(--ui-border-width)))] bg-muted",
     className
   )} />
 }

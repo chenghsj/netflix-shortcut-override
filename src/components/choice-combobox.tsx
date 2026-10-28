@@ -69,7 +69,11 @@ export function ChoiceCombobox<Value extends string>({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       {trigger}
-      <PopoverContent align="end" className="w-(--radix-popover-trigger-width) min-w-36 p-0">
+      <PopoverContent
+        align="end"
+        collisionPadding={8}
+        className="w-max min-w-[max(10rem,var(--radix-popover-trigger-width))] max-w-(--radix-popover-content-available-width) p-0"
+      >
         <Command
           filter={(itemValue, search, keywords) => {
             const haystack = `${itemValue} ${(keywords ?? []).join(' ')}`.toLowerCase()
@@ -89,7 +93,7 @@ export function ChoiceCombobox<Value extends string>({
                     setOpen(false)
                   }}
                 >
-                  <span className="min-w-0 flex-1 truncate" title={option.title ?? option.label}>
+                  <span className="min-w-0 flex-1 whitespace-normal break-words" title={option.title ?? option.label}>
                     {option.label}
                   </span>
                 </CommandItem>

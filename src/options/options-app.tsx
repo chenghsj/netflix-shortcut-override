@@ -24,7 +24,7 @@ import { SHORTCUT_CONFLICT_COPY } from '@/options/shortcut-conflict-copy'
 import { ShortcutConflictSwitch } from '@/options/shortcut-conflict-switch'
 import { SUBTITLE_ACTIVATION_COPY } from '@/options/subtitle-activation-copy'
 import { SUBTITLE_NAVIGATION_POPUP_COPY } from '@/popup/subtitle-navigation-copy'
-import { useSubtitleActivation } from '@/options/use-subtitle-activation'
+import { useSubtitleActivation } from '@/shared/use-subtitle-activation'
 import { useShortcutEditor, type ShortcutTarget } from '@/options/use-shortcut-editor'
 import { SettingLabelWithTooltip } from '@/components/setting-label-with-tooltip'
 import { Label } from '@/components/app-ui/label'
@@ -95,6 +95,8 @@ import { subscribeSettings } from '@/shared/storage'
 import { useShortcutSettingsForm } from '@/shared/use-shortcut-settings-form'
 import { EXTERNAL_LINKS, getShortcutOverrideRatingUrl } from '@/shared/external-links'
 import { useTheme } from '@/shared/use-theme'
+import { useUiStyle } from '@/shared/use-ui-style'
+import { getUiStyleOptions } from '@/shared/ui-styles'
 import { SUBTITLE_OPTIONS_HASH } from '@/shared/feature-announcements'
 
 function ShortcutTableHeader({ labels }: {
@@ -159,6 +161,7 @@ export function OptionsApp() {
     holdSpeed: holdSpeedForm,
   } = useShortcutSettingsForm()
   const subtitleSection = useRef<HTMLDivElement>(null)
+  const recordingArea = useRef<HTMLDivElement>(null)
   const globalEnableSwitch = useRef<HTMLButtonElement>(null)
   const subtitleActivationAnchor = useRef<HTMLDivElement>(null)
   const [subtitleGuideRequested, setSubtitleGuideRequested] = useState(() => window.location.hash === SUBTITLE_OPTIONS_HASH)
@@ -194,6 +197,7 @@ export function OptionsApp() {
   const conflictCopy = SHORTCUT_CONFLICT_COPY[resolvedLocale]
   const ignoredGeneralActions: readonly ShortcutAction[] = browserCapabilities.supportsSubtitlePreservingPip ? [] : ['pictureInPicture']
   useTheme(settings.theme)
+  useUiStyle(settings.uiStyle)
 
   const editor = useShortcutEditor({ settings, updateSettings, ignoredGeneralActions })
   const { recorder, conflict } = editor
@@ -236,8 +240,7 @@ export function OptionsApp() {
           <header className="flex flex-col gap-2 py-2">
             <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
               <div className="flex min-w-0 items-center gap-4 pl-2">
-                <img src="/icons/icon48.png" alt="" className="size-12 shrink-0 dark:hidden" />
-                <img src="/icons/icon-dark48.png" alt="" className="hidden size-12 shrink-0 dark:block" />
+                <img src="/icons/icon48.png" alt="" className="app-brand-icon size-10 shrink-0" />
                 <h1 className="font-heading text-2xl font-black leading-tight tracking-tight">
                   {copy.appTitle}
                 </h1>
@@ -282,6 +285,26 @@ export function OptionsApp() {
 
           <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
             <div className="flex min-w-0 flex-col gap-6">
+              <Card size="sm">
+                <CardContent className="px-4">
+                  <Field orientation="horizontal" className="min-h-6 gap-3">
+                    <SettingLabelWithTooltip
+                      htmlFor="enable-shortcut-override"
+                      label={copy.enabled}
+                      tooltip={copy.enabledDesc}
+                    />
+                    <Switch
+                      ref={globalEnableSwitch}
+                      id="enable-shortcut-override"
+                      className="focus:ring-3 focus:ring-ring/50 focus:ring-offset-2 focus:ring-offset-card"
+                      checked={settings.enabled}
+                      onCheckedChange={subtitleActivation.setGlobalEnabled}
+                      aria-label={copy.enabled}
+                    />
+                  </Field>
+                </CardContent>
+              </Card>
+
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -303,6 +326,17 @@ export function OptionsApp() {
                       />
                     </Field>
                     <Field orientation="horizontal" className="items-center justify-between">
+                      <FieldLabel>{copy.uiStyle}</FieldLabel>
+                      <ChoiceCombobox
+                        className="w-36"
+                        size="default"
+                        label={copy.uiStyle}
+                        value={settings.uiStyle}
+                        options={getUiStyleOptions(resolvedLocale)}
+                        onChange={uiStyle => updateSettings(current => ({ ...current, uiStyle }))}
+                      />
+                    </Field>
+                    <Field orientation="horizontal" className="items-center justify-between">
                       <FieldLabel>{copy.theme}</FieldLabel>
                       <ChoiceCombobox
                         className="w-36"
@@ -315,21 +349,6 @@ export function OptionsApp() {
                           { value: 'dark', label: copy.themeDark },
                         ]}
                         onChange={theme => updateSettings(current => ({ ...current, theme }))}
-                      />
-                    </Field>
-                    <Field orientation="horizontal" className="items-center justify-between">
-                      <SettingLabelWithTooltip
-                        htmlFor="enable-shortcut-override"
-                        label={copy.enabled}
-                        tooltip={copy.enabledDesc}
-                      />
-                      <Switch
-                        ref={globalEnableSwitch}
-                        id="enable-shortcut-override"
-                        className="focus:ring-3 focus:ring-ring/50 focus:ring-offset-2 focus:ring-offset-card"
-                        checked={settings.enabled}
-                        onCheckedChange={subtitleActivation.setGlobalEnabled}
-                        aria-label={copy.enabled}
                       />
                     </Field>
                   </FieldGroup>
@@ -741,6 +760,10 @@ export function OptionsApp() {
 
       <Dialog open={Boolean(recorder)} onOpenChange={open => !open && editor.closeRecorder()}>
         <DialogContent
+          onOpenAutoFocus={event => {
+            event.preventDefault()
+            recordingArea.current?.focus({ preventScroll: true })
+          }}
           onCloseAutoFocus={editor.restoreRecorderFocus}
           onKeyDown={event => {
             if (!recorder) return
@@ -756,7 +779,13 @@ export function OptionsApp() {
           </DialogHeader>
 
           <div className="flex flex-col gap-4">
-            <div className="flex min-h-20 items-center justify-center rounded-lg border-2 border-dashed bg-muted px-4 text-center">
+            <div
+              ref={recordingArea}
+              role="group"
+              aria-label={copy.recordTitle}
+              tabIndex={-1}
+              className="flex min-h-20 items-center justify-center rounded-lg border-2 border-dashed bg-[var(--ui-recording-bg)] px-4 text-center outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+            >
               {recorder?.draft ? (
                 <KeyBindingKbd binding={recorder.draft} className="justify-center" />
               ) : (

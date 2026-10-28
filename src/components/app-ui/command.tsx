@@ -5,14 +5,14 @@ import { cn } from '@/lib/utils'
 
 function Command({ className, ...props }: React.ComponentProps<typeof Upstream.Command>) {
   return <Upstream.Command {...props} className={cn(
-    "rounded-[10px] border-0",
+    "rounded-[calc(var(--ui-popover-radius)-var(--ui-border-width))] border-0",
     className
   )} />
 }
 
 function CommandDialog({ className, ...props }: React.ComponentProps<typeof Upstream.CommandDialog>) {
   return <Upstream.CommandDialog {...props} className={cn(
-    "app-dialog-content rounded-lg border-border shadow-lg [&_[data-slot=command]]:rounded-[14px] [&_[data-slot=command]]:border-0",
+    "app-dialog-content rounded-lg border-border shadow-lg [&_[data-slot=command]]:rounded-[calc(var(--radius-lg)-var(--ui-border-width))] [&_[data-slot=command]]:border-0",
     className
   )} />
 }
@@ -26,7 +26,7 @@ function CommandInput({ className, ...props }: React.ComponentProps<typeof Upstr
 
 function CommandItem({ className, ...props }: React.ComponentProps<typeof Upstream.CommandItem>) {
   return <Upstream.CommandItem {...props} className={cn(
-    "cursor-pointer outline-hidden data-selected:bg-primary data-selected:text-primary-foreground data-selected:*:[svg]:text-primary-foreground",
+    "cursor-pointer outline-hidden data-selected:bg-[var(--ui-option-active-bg)] data-selected:text-[color:var(--ui-option-active-fg)] data-selected:*:[svg]:text-[color:var(--ui-option-active-fg)]",
     className
   )} />
 }

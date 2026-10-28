@@ -65,6 +65,7 @@ type Copy = {
   enabled: string
   enabledDesc: string
   quickSettings: string
+  popupSettings: string
   settingsSaveError: string
   backupRestore: string
   backupRestoreDesc: string
@@ -135,6 +136,7 @@ type Copy = {
   locale: string
   localeAuto: string
   theme: string
+  uiStyle: string
   themeAuto: string
   themeLight: string
   themeDark: string
@@ -196,6 +198,7 @@ export const COPY: Record<Locale, Copy> = {
     enabled: 'Enable extension',
     enabledDesc: 'When off, all extension shortcuts are disabled.',
     quickSettings: 'General settings',
+    popupSettings: 'Settings',
     settingsSaveError: 'Settings were not saved',
     backupRestore: 'Backup and restore',
     backupRestoreDesc: 'Export all settings, including subtitle navigation, or restore them from a backup file.',
@@ -268,6 +271,7 @@ export const COPY: Record<Locale, Copy> = {
     locale: 'Language',
     localeAuto: 'Auto',
     theme: 'Theme',
+    uiStyle: 'Interface style',
     themeAuto: 'Auto',
     themeLight: 'Light',
     themeDark: 'Dark',
@@ -345,6 +349,7 @@ export const COPY: Record<Locale, Copy> = {
     enabled: '啟用擴充功能',
     enabledDesc: '關閉後，所有擴充功能快捷鍵都會停用。',
     quickSettings: '一般設定',
+    popupSettings: '設定',
     settingsSaveError: '設定未儲存',
     backupRestore: '備份與還原',
     backupRestoreDesc: '匯出全部設定（包含字幕導航），或從備份檔還原。',
@@ -416,6 +421,7 @@ export const COPY: Record<Locale, Copy> = {
     locale: '語言',
     localeAuto: '自動',
     theme: '主題',
+    uiStyle: '介面風格',
     themeAuto: '自動',
     themeLight: '淺色',
     themeDark: '深色',
@@ -512,6 +518,7 @@ export const COPY: Record<Locale, Copy> = {
     enabled: '启用扩展程序',
     enabledDesc: '关闭后，所有扩展程序快捷键都会停用。',
     quickSettings: '常规设置',
+    popupSettings: '设置',
     settingsSaveError: '设置未保存',
     backupRestore: '备份与恢复',
     backupRestoreDesc: '导出全部设置（包含字幕导航），或从备份文件恢复。',
@@ -583,6 +590,7 @@ export const COPY: Record<Locale, Copy> = {
     locale: '语言',
     localeAuto: '自动',
     theme: '主题',
+    uiStyle: '界面风格',
     themeAuto: '自动',
     themeLight: '浅色',
     themeDark: '深色',
@@ -679,6 +687,7 @@ export const COPY: Record<Locale, Copy> = {
     enabled: '拡張機能を有効にする',
     enabledDesc: '無効にすると、拡張機能のすべてのショートカットが無効になります。',
     quickSettings: '一般設定',
+    popupSettings: '設定',
     settingsSaveError: '設定は保存されませんでした',
     backupRestore: 'バックアップと復元',
     backupRestoreDesc: '字幕ナビゲーションを含むすべての設定を書き出すか、バックアップファイルから復元します。',
@@ -752,6 +761,7 @@ export const COPY: Record<Locale, Copy> = {
     locale: '言語',
     localeAuto: '自動',
     theme: 'テーマ',
+    uiStyle: '外観スタイル',
     themeAuto: '自動',
     themeLight: 'ライト',
     themeDark: 'ダーク',
@@ -849,6 +859,7 @@ export const COPY: Record<Locale, Copy> = {
     enabled: '확장 프로그램 사용',
     enabledDesc: '끄면 확장 프로그램의 모든 단축키가 비활성화됩니다.',
     quickSettings: '일반 설정',
+    popupSettings: '설정',
     settingsSaveError: '설정이 저장되지 않았습니다',
     backupRestore: '백업 및 복원',
     backupRestoreDesc: '자막 탐색을 포함한 모든 설정을 내보내거나 백업 파일에서 복원합니다.',
@@ -921,6 +932,7 @@ export const COPY: Record<Locale, Copy> = {
     locale: '언어',
     localeAuto: '자동',
     theme: '테마',
+    uiStyle: '인터페이스 스타일',
     themeAuto: '자동',
     themeLight: '라이트',
     themeDark: '다크',
