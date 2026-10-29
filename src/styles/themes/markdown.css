@@ -4,11 +4,11 @@
   --markdown-text: #454545;
   --markdown-comment: #6f6f6f;
   --muted-foreground: #6f6f6f;
-  --background: #f4f4f2;
-  --markdown-surface: #f8f8f6;
-  --secondary: #e9e9e6;
+  --background: #fafaf9;
+  --markdown-surface: #ffffff;
+  --secondary: #f1f1ef;
   --markdown-dim: #d1d1ce;
-  --primary-foreground: #f4f4f2;
+  --primary-foreground: #fafaf9;
   --destructive: #c81e1e;
   --foreground: var(--markdown-text);
   --card: var(--markdown-surface);
