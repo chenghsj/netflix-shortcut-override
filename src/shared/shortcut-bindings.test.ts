@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  findActionForKey,
   findBindingConflict,
   findRemappedNetflixNativeActionForKey,
   formatKeyBinding,
@@ -111,7 +112,7 @@ describe('shortcut bindings', () => {
       getReplacedNetflixNativeKeyBindings('toggleSubtitles', remappedSubtitles).map(
         binding => formatKeyBinding(binding)
       )
-    ).toEqual(['C'])
+    ).toEqual([])
     expect(
       getReplacedNetflixNativeKeyBindings('playPause', {
         ...remappedPlayPause,
@@ -130,6 +131,26 @@ describe('shortcut bindings', () => {
         DEFAULT_SETTINGS.bindings.speedUp
       )
     ).toEqual([])
+  })
+
+  it('keeps subtitle shortcuts extension-owned when remapped', () => {
+    const settings = {
+      ...DEFAULT_SETTINGS,
+      bindings: {
+        ...DEFAULT_SETTINGS.bindings,
+        toggleSubtitles: {
+          ...DEFAULT_SETTINGS.bindings.toggleSubtitles,
+          key: { code: 'KeyV', key: 'v', ctrl: false, alt: false, shift: false, meta: false },
+        },
+      },
+    }
+    const originalSubtitleKey = new KeyboardEvent('keydown', { code: 'KeyC', key: 'c' })
+    const remappedSubtitleKey = new KeyboardEvent('keydown', { code: 'KeyV', key: 'v' })
+
+    expect(findRemappedNetflixNativeActionForKey(settings, originalSubtitleKey)).toBeNull()
+    expect(findActionForKey(settings, originalSubtitleKey)).toBeNull()
+    expect(findActionForKey(settings, remappedSubtitleKey)).toBe('toggleSubtitles')
+    expect(findActionForKey(DEFAULT_SETTINGS, originalSubtitleKey)).toBe('toggleSubtitles')
   })
 
   it('uses platform-native labels for the Meta modifier', () => {

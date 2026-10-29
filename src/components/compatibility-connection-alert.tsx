@@ -1,6 +1,6 @@
 import { RefreshCwIcon, TriangleAlertIcon } from 'lucide-react'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@/components/app-ui/button'
 import { getCopy } from '@/shared/i18n'
 
 type CompatibilityConnectionAlertProps = {
@@ -14,7 +14,7 @@ export function CompatibilityConnectionAlert({
 }: CompatibilityConnectionAlertProps) {
   return (
     <section
-      className="rounded-lg border bg-card p-3 shadow-xs"
+      className="rounded-[var(--ui-card-radius)] border-2 border-border bg-card p-4 shadow-md"
       role="alert"
       aria-labelledby="compatibility-connection-alert-title"
     >
@@ -23,18 +23,17 @@ export function CompatibilityConnectionAlert({
         <div className="min-w-0">
           <h2
             id="compatibility-connection-alert-title"
-            className="text-xs font-semibold text-foreground"
+            className="text-sm font-semibold text-foreground"
           >
             {copy.diagnosticsInactive}
           </h2>
-          <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+          <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
             {copy.diagnosticsReloadRequired}
           </p>
         </div>
       </div>
       <Button
         variant="outline"
-        size="sm"
         className="mt-2.5 w-full"
         onClick={onReloadPage}
       >

@@ -9,7 +9,9 @@ import { requestPlaybackFocusRestoration } from '@/background/playback-focus-res
 import { isPlaybackFocusRestorationRequest } from '@/shared/playback-focus-restoration'
 import { registerFeatureAnnouncements } from '@/background/feature-announcements'
 import { registerActionIcon } from '@/background/action-icon'
+import { registerSettingsMigration } from '@/background/settings-migration'
 
+registerSettingsMigration()
 registerFeatureAnnouncements()
 registerActionIcon()
 

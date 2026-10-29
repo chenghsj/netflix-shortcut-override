@@ -29,7 +29,7 @@ Open a Netflix watch page and check with Subtitle navigation off for the ordinar
 
 ## Subtitle navigation smoke test
 
-Check the popup's separate read-only subtitle summary: it is collapsed with Not enabled while either master is off, and shows all four configured keys and disabled row states while both are on. Enabled subtitle rows replace overlapping ordinary key displays with Subtitle priority; the tooltip identifies the subtitle action. Check the default S/Skip Intro overlap, a custom modified key, and release after disabling its subtitle row. The popup must not request website access or offer subtitle editing/reset controls.
+Check Subtitle navigation on the popup's Shortcuts tab. Its header has a master switch, and the action rows are hidden while either master is off. All four configured keys and disabled row states appear while both masters are on. Enabled subtitle rows replace overlapping ordinary key displays with Subtitle priority; the tooltip identifies the subtitle action. Check the default S/Skip Intro overlap, a custom modified key, and release after disabling its subtitle row. The popup master uses the same website permission flow as Options. Key editing and reset controls remain in Options.
 
 This checklist does not establish a completed Firefox run. Record the Firefox version, extension version, loaded `dist/firefox` build, selected subtitle language, and pass/fail/unverified status.
 

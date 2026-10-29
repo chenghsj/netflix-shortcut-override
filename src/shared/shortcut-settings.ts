@@ -1,3 +1,4 @@
+import { DEFAULT_UI_STYLE, isUiStyle } from './ui-styles'
 import { DEFAULT_PRACTICE_BINDINGS } from './subtitle-practice'
 import { DEFAULT_KEY_BINDINGS, isKeyBinding, keyBindingsEqual } from './shortcut-bindings'
 import {
@@ -58,7 +59,7 @@ export const DEFAULT_PIP_SETTINGS: PipSettings = {
   subtitleBackground: 'translucent',
 }
 
-export const SHORTCUT_SETTINGS_VERSION = 12
+export const SHORTCUT_SETTINGS_VERSION = 13
 export const MIN_SETTINGS_BACKUP_VERSION = 8
 
 const SETTINGS_ACTIONS_BY_VERSION: Record<number, readonly ShortcutAction[]> = {
@@ -69,6 +70,7 @@ const SETTINGS_ACTIONS_BY_VERSION: Record<number, readonly ShortcutAction[]> = {
   10: SHORTCUT_ACTIONS,
   11: SHORTCUT_ACTIONS,
   12: SHORTCUT_ACTIONS,
+  13: SHORTCUT_ACTIONS,
 }
 
 const LEGACY_PICTURE_IN_PICTURE_BINDING = {
@@ -85,6 +87,7 @@ export const DEFAULT_SETTINGS: ShortcutSettings = {
   enabled: true,
   locale: 'auto',
   theme: 'auto',
+  uiStyle: DEFAULT_UI_STYLE,
   speed: DEFAULT_SPEED_SETTINGS,
   subtitlePractice: { enabled: false, bindings: DEFAULT_PRACTICE_BINDINGS },
   holdSpeed: DEFAULT_HOLD_SPEED_SETTINGS,
@@ -128,6 +131,7 @@ export const isCompleteSettingsForBackup = (
       const item = binding[action]
       return isRecord(item) && typeof item.enabled === 'boolean' && isKeyBinding(item.key)
     }))) ||
+    (version >= 13 && !isUiStyle(settings.uiStyle)) ||
     !requiredActions ||
     settings.version !== version ||
     typeof settings.enabled !== 'boolean' ||
@@ -300,6 +304,7 @@ export const normalizeSettings = (raw: unknown): ShortcutSettings => {
       typeof source.theme === 'string' && isThemeMode(source.theme)
         ? source.theme
         : DEFAULT_SETTINGS.theme,
+    uiStyle: isUiStyle(source.uiStyle) ? source.uiStyle : sourceVersion < 13 && raw != null ? 'classic' : DEFAULT_SETTINGS.uiStyle,
     subtitlePractice: {
       enabled: source.subtitlePractice?.enabled === true,
       bindings: Object.fromEntries(SUBTITLE_PRACTICE_ACTIONS.map(action => {

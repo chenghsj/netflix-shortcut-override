@@ -1,11 +1,11 @@
 {
   "name": "netflix-shortcut-override",
   "private": true,
-  "version": "0.6.4",
+  "version": "0.6.5",
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.18.0"
   },
   "scripts": {
     "dev": "vite",
@@ -17,12 +17,13 @@
     "typecheck": "tsc -b",
     "lint": "eslint .",
     "lint:firefox": "web-ext lint --source-dir dist/firefox",
-    "icons": "node scripts/generate-icons.mjs",
-    "changelog": "node scripts/generate-release-notes.mjs",
-    "verify:build": "node scripts/verify-build.mjs"
+    "icons": "node scripts/generate-icons.ts",
+    "changelog": "node scripts/generate-release-notes.ts",
+    "verify:build": "node scripts/verify-build.ts"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.2.8",
+    "@fontsource/ibm-plex-mono": "^5.3.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",

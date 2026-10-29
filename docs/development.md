@@ -2,7 +2,7 @@
 
 [README](../README.md) · [User guide](user-guide.md) · [Development](development.md) · [Release](release.md) · [Troubleshooting](troubleshooting.md)
 
-Requires Node.js 22 or newer and npm. CI uses Node.js 24. Run commands from the repository root.
+Requires Node.js 22.18.0 or newer and npm. CI uses Node.js 24. Run commands from the repository root. Scripts run directly with Node.js and are included in `npm run typecheck`.
 
 ## Install From Source
 
@@ -42,6 +42,8 @@ npm run build
 
 Then open `about:debugging#/runtime/this-firefox`, choose "Load Temporary Add-on…", and select `dist/firefox/manifest.json`. See [the Firefox browser test guide](firefox-real-browser-test.md) for the smoke-test checklist.
 
+For update compatibility and installed-browser checks, see [Verify settings upgrades](settings-upgrade.md).
+
 ## Development
 
 Install dependencies once:
@@ -77,7 +79,7 @@ The default `npm run build` command creates both browser-specific outputs under 
 | `npm run lint` | Run ESLint. |
 | `npm test` | Run Vitest tests. |
 | `npm run test:coverage` | Run the complete test suite with enforced coverage thresholds. |
-| `npm run icons` | Regenerate enabled icons from `public/icons/icon.svg` and disabled icons from `assets/icons/disabled.png` at 16, 32, 48, and 128 px. |
+| `npm run icons` | Regenerate enabled, disabled, dark, Classic, and Classic dark icons from `assets/icons` at 16, 32, 48, and 128 px, preserving aspect ratio and transparency. Options and popup use the selected interface style; toolbar icons follow the enabled/disabled state. |
 | `npm run changelog` | Generate release notes from git commits. |
 
 ## Project Structure
@@ -91,9 +93,9 @@ The default `npm run build` command creates both browser-specific outputs under 
 |   `-- icons
 |-- manifest.config.ts
 |-- scripts
-|   |-- generate-icons.mjs
-|   |-- generate-release-notes.mjs
-|   `-- verify-build.mjs
+|   |-- generate-icons.ts
+|   |-- generate-release-notes.ts
+|   `-- verify-build.ts
 |-- src
 |   |-- background
 |   |   |-- index.ts
@@ -117,6 +119,7 @@ Key areas:
 - `src/content/shortcuts/`: media command handling and Play / Pause hold interaction state.
 - `src/content/hints/`: hint overlay rendering, layout, icons, and timing.
 - `src/content/pip/`: Document Picture-in-Picture lifecycle, subtitle mirroring, and PiP keyboard routing.
+- `src/content/pip/pip-video-handoff.ts`: candidate selection and explicit waiting, replacement, or episode decisions. Recovery timers and episode evidence remain in this owner.
 - `src/content/netflix-api-bridge.ts`: page-world bridge for Netflix player API access and selected subtitle metadata.
 - `src/content/subtitle-practice.ts`: subtitle navigation, timing cache, loading feedback, and pending-action cancellation.
 - `src/shared/netflix-caption-events.ts`: JSON string message protocol for caption metadata across browser worlds.
@@ -125,7 +128,9 @@ Key areas:
 - `src/background/index.ts`: background-side Netflix API execution fallback, caption-fetch routing, and popup focus handoff coordination.
 - `src/background/netflix-caption-fetch.ts`: allowlisted HTTPS caption downloads with size and timeout limits.
 - `src/popup/popup-app.tsx`: toolbar popup for quick status, toggles, shortcut summary, and options entry.
-- `src/options/options-app.tsx`: extension options UI.
+- `src/options/options-app.tsx`: extension options UI and subtitle-section navigation.
+- `src/options/use-shortcut-editor.ts`: mutually exclusive recording and conflict confirmation, saved-key checks, and recorder focus restoration.
+- `src/shared/use-subtitle-activation.ts`: synchronous browser permission requests, duplicate-request prevention, and cancellation of stale approvals on disable or unmount.
 - `src/shared/shortcut-bindings.ts`: shortcut actions, default key bindings, normalization, and conflict checks.
 - `src/shared/shortcut-settings.ts`: default settings, validation, and settings normalization.
 - `src/shared/playback-speed.ts`: playback-speed stepping and speed normalization helpers.
@@ -156,3 +161,7 @@ content shortcut handling, Netflix API bridge and background execution behavior,
 readiness, subtitle navigation and its JSON bridge, pending-action cancellation, PiP controls and subtitle mirroring, video handoff, and episode-transition recovery.
 
 The real-Chrome regression flow, including the reload-in-progress popup case, is documented in [docs/chrome-real-browser-test.md](chrome-real-browser-test.md). The Firefox smoke-test flow is documented in [docs/firefox-real-browser-test.md](firefox-real-browser-test.md).
+
+## UI components
+
+See [UI components](ui-components.md) for upstream components, application adapters, and import boundaries.

@@ -1,0 +1,43 @@
+"use client"
+
+import { Collapsible as CollapsiblePrimitive } from "radix-ui"
+
+import { cn } from "@/lib/utils"
+
+function Collapsible({
+  ...props
+}: React.ComponentProps<typeof CollapsiblePrimitive.Root>) {
+  return <CollapsiblePrimitive.Root data-slot="collapsible" {...props} />
+}
+
+function CollapsibleTrigger({
+  ...props
+}: React.ComponentProps<typeof CollapsiblePrimitive.CollapsibleTrigger>) {
+  return (
+    <CollapsiblePrimitive.CollapsibleTrigger
+      data-slot="collapsible-trigger"
+      {...props}
+    />
+  )
+}
+
+function CollapsibleContent({
+  className,
+  ...props
+}: React.ComponentProps<typeof CollapsiblePrimitive.CollapsibleContent>) {
+  return (
+    <CollapsiblePrimitive.CollapsibleContent
+      data-slot="collapsible-content"
+      // Radix publishes the measured height as
+      // `--radix-collapsible-content-height`; the collapsible-down/up keyframes
+      // interpolate against it for a real slide open/close.
+      className={cn(
+        "overflow-hidden data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+export { Collapsible, CollapsibleTrigger, CollapsibleContent }

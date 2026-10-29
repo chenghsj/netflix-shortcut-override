@@ -1,6 +1,6 @@
-import { DEFAULT_PRACTICE_BINDINGS, practiceConflict, SUBTITLE_PERMISSION_COPY, SUBTITLE_PRACTICE_COPY } from '@/shared/subtitle-practice'
-import { NETFLIX_CAPTION_HOST_PERMISSIONS, NETFLIX_PAGE_HOST_PERMISSIONS } from '@/shared/netflix-caption-permissions'
+import { DEFAULT_PRACTICE_BINDINGS, SUBTITLE_PERMISSION_COPY, SUBTITLE_PRACTICE_COPY } from '@/shared/subtitle-practice'
 import {
+  CaptionsIcon,
   ChevronsLeftRightIcon,
   CircleHelpIcon,
   GaugeIcon,
@@ -11,7 +11,7 @@ import {
   SettingsIcon,
   StarIcon,
 } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState, type ComponentProps } from 'react'
+import { useEffect, useRef, useState, type ComponentProps } from 'react'
 
 import { GitHubIcon } from '@/components/github-icon'
 import { HoldSpeedIcon } from '@/components/hold-speed-icon'
@@ -23,20 +23,24 @@ import { SettingsTransferCard } from '@/options/settings-transfer-card'
 import { SHORTCUT_CONFLICT_COPY } from '@/options/shortcut-conflict-copy'
 import { ShortcutConflictSwitch } from '@/options/shortcut-conflict-switch'
 import { SUBTITLE_ACTIVATION_COPY } from '@/options/subtitle-activation-copy'
+import { SUBTITLE_NAVIGATION_POPUP_COPY } from '@/popup/subtitle-navigation-copy'
+import { useSubtitleActivation } from '@/shared/use-subtitle-activation'
+import { useShortcutEditor, type ShortcutTarget } from '@/options/use-shortcut-editor'
 import { SettingLabelWithTooltip } from '@/components/setting-label-with-tooltip'
-import { Label } from '@/components/ui/label'
-import { Popover, PopoverAnchor, PopoverArrow, PopoverContent } from '@/components/ui/popover'
+import { Label } from '@/components/app-ui/label'
+import { Popover, PopoverAnchor, PopoverArrow, PopoverContent } from '@/components/app-ui/popover'
 import { SettingsSaveStatus } from '@/components/settings-save-status'
-import { ThemeCombobox } from '@/components/theme-combobox'
-import { Alert, AlertTitle } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
+import { ChoiceCombobox } from '@/components/choice-combobox'
+import { Alert, AlertTitle } from '@/components/app-ui/alert'
+import { Badge } from '@/components/app-ui/badge'
+import { Button } from '@/components/app-ui/button'
 import {
   Card,
   CardAction,
   CardContent,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card'
+} from '@/components/app-ui/card'
 import {
   Dialog,
   DialogContent,
@@ -44,20 +48,20 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
+} from '@/components/app-ui/dialog'
 import {
   Field,
   FieldGroup,
   FieldLabel,
-} from '@/components/ui/field'
-import { Separator } from '@/components/ui/separator'
-import { Switch } from '@/components/ui/switch'
+} from '@/components/app-ui/field'
+import { Separator } from '@/components/app-ui/separator'
+import { Switch } from '@/components/app-ui/switch'
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/components/ui/tooltip'
+} from '@/components/app-ui/tooltip'
 import {
   Table,
   TableBody,
@@ -65,15 +69,12 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
+} from '@/components/app-ui/table'
 import { cn } from '@/lib/utils'
 import { getCopy } from '@/shared/i18n'
 import { resolveLocalePreference } from '@/shared/browser-locale'
 import { getBrowserCapabilities } from '@/shared/browser-capabilities'
 import {
-  DEFAULT_KEY_BINDINGS,
-  findBindingConflict,
-  findEnabledBindingConflicts,
   formatKeyBinding,
   getReplacedNetflixNativeKeyBindings,
   keyBindingFromEvent,
@@ -89,14 +90,13 @@ import {
   SHORTCUT_ACTIONS,
   type KeyBinding,
   type ShortcutAction,
-  type SubtitlePracticeAction,
-  type ShortcutBinding,
-  type ShortcutSettings,
 } from '@/shared/shortcut-types'
 import { subscribeSettings } from '@/shared/storage'
 import { useShortcutSettingsForm } from '@/shared/use-shortcut-settings-form'
 import { EXTERNAL_LINKS, getShortcutOverrideRatingUrl } from '@/shared/external-links'
 import { useTheme } from '@/shared/use-theme'
+import { useUiStyle } from '@/shared/use-ui-style'
+import { getUiStyleOptions } from '@/shared/ui-styles'
 import { SUBTITLE_OPTIONS_HASH } from '@/shared/feature-announcements'
 
 function ShortcutTableHeader({ labels }: {
@@ -124,37 +124,6 @@ const ignoredRecordKeys = new Set([
   'MetaLeft',
   'MetaRight',
 ])
-
-type ShortcutTarget = { group: 'general'; action: ShortcutAction } | { group: 'practice'; action: SubtitlePracticeAction }
-type EnableRequest = ShortcutTarget & { savedKey: KeyBinding; key: KeyBinding; reason: 'enable' | 'reset' }
-type RecorderState = ShortcutTarget & {
-  draft: KeyBinding | null
-  savedKey: KeyBinding
-  enableOnSave?: boolean
-  enableReason?: EnableRequest['reason']
-} | null
-
-function applyBindingRequest(
-  settings: ShortcutSettings, request: EnableRequest, enabled: boolean,
-  replaceConflicts: boolean, ignoredActions: readonly ShortcutAction[],
-): ShortcutSettings {
-  if (request.group === 'practice' && request.reason === 'enable' && enabled && !settings.subtitlePractice.bindings[request.action].enabled &&
-    (!settings.enabled || !settings.subtitlePractice.enabled)) return settings
-  const update = <Action extends string>(bindings: Record<Action, ShortcutBinding>, actions: readonly Action[], action: Action, ignored: readonly Action[] = []) => {
-    if (!keyBindingsEqual(bindings[action].key, request.savedKey)) return bindings
-    const conflicts = findEnabledBindingConflicts(bindings, actions, action, request.key, ignored)
-    if (enabled && conflicts.length && !replaceConflicts) return bindings
-    const next = { ...bindings }
-    if (enabled && replaceConflicts) {
-      for (const conflict of conflicts) next[conflict] = { ...bindings[conflict], enabled: false }
-    }
-    next[action] = { key: request.key, enabled }
-    return next
-  }
-  return request.group === 'practice'
-    ? { ...settings, subtitlePractice: { ...settings.subtitlePractice, bindings: update(settings.subtitlePractice.bindings, SUBTITLE_PRACTICE_ACTIONS, request.action) } }
-    : { ...settings, bindings: update(settings.bindings, SHORTCUT_ACTIONS, request.action, ignoredActions) }
-}
 
 type NetflixNativeKeyReplacementProps = ComponentProps<'p'> & {
   bindings: readonly KeyBinding[]
@@ -192,6 +161,7 @@ export function OptionsApp() {
     holdSpeed: holdSpeedForm,
   } = useShortcutSettingsForm()
   const subtitleSection = useRef<HTMLDivElement>(null)
+  const recordingArea = useRef<HTMLDivElement>(null)
   const globalEnableSwitch = useRef<HTMLButtonElement>(null)
   const subtitleActivationAnchor = useRef<HTMLDivElement>(null)
   const [subtitleGuideRequested, setSubtitleGuideRequested] = useState(() => window.location.hash === SUBTITLE_OPTIONS_HASH)
@@ -211,29 +181,15 @@ export function OptionsApp() {
     window.addEventListener('hashchange', navigate)
     return () => window.removeEventListener('hashchange', navigate)
   }, [loaded])
-  const [recorder, setRecorder] = useState<RecorderState>(null)
-  const recorderReturnFocus = useRef<HTMLButtonElement | null>(null)
-  const [enableRequest, setEnableRequest] = useState<EnableRequest | null>(null)
-  const [subtitlePermissionPending, setSubtitlePermissionPending] = useState(false)
-  const [subtitlePermissionError, setSubtitlePermissionError] = useState<'denied' | 'failed' | null>(null)
-  const permissionAttempt = useRef(0)
-  const permissionBusy = useRef(false)
-  const cancelSubtitlePermissionRequest = useCallback(() => {
-    permissionAttempt.current++
-    permissionBusy.current = false
-    setSubtitlePermissionPending(false)
-    setSubtitlePermissionError(null)
-  }, [])
+  const subtitleActivation = useSubtitleActivation({ settings, updateSettings })
+  const { pending: subtitlePermissionPending, error: subtitlePermissionError } = subtitleActivation
   useEffect(() => subscribeSettings(next => {
-    setEnableRequest(null)
-    // Observe every storage update, including off/on changes batched into
-    // one render, so another view cannot revive an older approval.
-    if (!next.enabled) cancelSubtitlePermissionRequest()
     if (next.subtitlePractice.enabled) setSubtitleGuideRequested(false)
-  }), [cancelSubtitlePermissionRequest])
-  useEffect(() => () => { permissionAttempt.current++ }, [])
+  }), [])
   const resolvedLocale = resolveLocalePreference(settings.locale)
   const practiceCopy = SUBTITLE_PRACTICE_COPY[resolvedLocale]
+  const subtitlePopupCopy = SUBTITLE_NAVIGATION_POPUP_COPY[resolvedLocale]
+  const subtitleNavigationEnabled = settings.enabled && settings.subtitlePractice.enabled
   const activationCopy = SUBTITLE_ACTIVATION_COPY[resolvedLocale]
   const showSubtitleGuide = subtitleGuideRequested && !settings.subtitlePractice.enabled
   const copy = getCopy(resolvedLocale)
@@ -241,118 +197,24 @@ export function OptionsApp() {
   const conflictCopy = SHORTCUT_CONFLICT_COPY[resolvedLocale]
   const ignoredGeneralActions: readonly ShortcutAction[] = browserCapabilities.supportsSubtitlePreservingPip ? [] : ['pictureInPicture']
   useTheme(settings.theme)
+  useUiStyle(settings.uiStyle)
 
-  const setSubtitleNavigationEnabled = (enabled: boolean) => {
-    if (!settings.enabled || permissionBusy.current) return
-    setSubtitlePermissionError(null)
-    if (!enabled) {
-      setSubtitleGuideRequested(false)
-      updateSettings(current => ({ ...current, subtitlePractice: { ...current.subtitlePractice, enabled: false } }))
-      return
-    }
-    const attempt = ++permissionAttempt.current
-    permissionBusy.current = true
-    setSubtitlePermissionPending(true)
-    const fail = (error: 'denied' | 'failed') => {
-      if (attempt === permissionAttempt.current) setSubtitlePermissionError(error)
-    }
-    const finish = () => {
-      if (attempt !== permissionAttempt.current) return
-      permissionBusy.current = false
-      setSubtitlePermissionPending(false)
-    }
-    try {
-      // Invoke synchronously in the switch's user gesture, without awaiting
-      // contains(). Both browsers grant silently when access is already held.
-      void chrome.permissions.request({ origins: [...NETFLIX_PAGE_HOST_PERMISSIONS, ...NETFLIX_CAPTION_HOST_PERMISSIONS] })
-        .then(granted => {
-          if (attempt !== permissionAttempt.current) return
-          if (!granted) { fail('denied'); return }
-          updateSettings(current => current.enabled
-            ? { ...current, subtitlePractice: { ...current.subtitlePractice, enabled: true } }
-            : current)
-        })
-        .catch(() => fail('failed'))
-        .finally(finish)
-    } catch { fail('failed'); finish() }
-  }
-
+  const editor = useShortcutEditor({ settings, updateSettings, ignoredGeneralActions })
+  const { recorder, conflict } = editor
   const actionLabels = { ...copy.actions, ...practiceCopy }
-  const bindingFor = (target: ShortcutTarget) => target.group === 'practice'
-    ? settings.subtitlePractice.bindings[target.action] : settings.bindings[target.action]
-  const conflictsFor = (target: ShortcutTarget, key: KeyBinding) => target.group === 'practice'
-    ? findEnabledBindingConflicts(settings.subtitlePractice.bindings, SUBTITLE_PRACTICE_ACTIONS, target.action, key)
-    : findEnabledBindingConflicts(settings.bindings, SHORTCUT_ACTIONS, target.action, key, ignoredGeneralActions)
-  const requestEnabled = (target: ShortcutTarget, enabled: boolean, key = bindingFor(target).key, reason: EnableRequest['reason'] = 'enable') => {
-    const request: EnableRequest = { ...target, savedKey: bindingFor(target).key, key, reason }
-    if (enabled && conflictsFor(target, key).length) { setEnableRequest(request); return }
-    setEnableRequest(null)
-    updateSettings(current => applyBindingRequest(current, request, enabled, false, ignoredGeneralActions))
-  }
-  const validEnableRequest = enableRequest && keyBindingsEqual(enableRequest.savedKey, bindingFor(enableRequest).key) &&
-    (enableRequest.group === 'general' || (settings.enabled && (enableRequest.reason === 'reset' || settings.subtitlePractice.enabled)))
-    ? enableRequest : null
-  const enableConflicts = validEnableRequest ? conflictsFor(validEnableRequest, validEnableRequest.key) : []
-  const conflictNames = new Intl.ListFormat(resolvedLocale, { style: 'short', type: 'conjunction' }).format(enableConflicts.map(action => actionLabels[action]))
+  const conflictNames = new Intl.ListFormat(resolvedLocale, { style: 'short', type: 'conjunction' }).format(conflict?.actions.map(action => actionLabels[action]) ?? [])
   const conflictSwitch = (target: ShortcutTarget, disabled: boolean) => {
-    const binding = bindingFor(target)
-    const open = Boolean(validEnableRequest?.group === target.group && validEnableRequest.action === target.action && enableConflicts.length)
+    const binding = target.group === 'practice' ? settings.subtitlePractice.bindings[target.action] : settings.bindings[target.action]
+    const open = Boolean(conflict?.group === target.group && conflict.action === target.action && conflict.actions.length)
     return <ShortcutConflictSwitch checked={binding.enabled && (target.group === 'practice' || !disabled)} disabled={disabled}
       label={`${actionLabels[target.action]} ${copy.status}`} open={open} copy={conflictCopy}
-      title={conflictCopy.title.replace('{key}', formatKeyBinding(validEnableRequest?.key ?? binding.key)).replace('{actions}', conflictNames)}
+      title={conflictCopy.title.replace('{key}', formatKeyBinding(conflict?.key ?? binding.key)).replace('{actions}', conflictNames)}
       consequence={conflictCopy.consequence.replace('{actions}', conflictNames)}
       transferLabel={conflictCopy.transfer.replace('{action}', actionLabels[target.action])}
-      onOpenChange={next => { if (!next) setEnableRequest(null) }}
-      onCheckedChange={enabled => requestEnabled(target, enabled)}
-      onChangeKey={returnFocus => {
-        if (!validEnableRequest) return
-        recorderReturnFocus.current = returnFocus
-        setRecorder({ ...target, savedKey: binding.key, draft: validEnableRequest.key, enableOnSave: true, enableReason: validEnableRequest.reason })
-        setEnableRequest(null)
-      }}
-      onTransfer={() => {
-        if (!validEnableRequest) return
-        const request = validEnableRequest
-        setEnableRequest(null)
-        updateSettings(current => applyBindingRequest(current, request, true, true, ignoredGeneralActions))
-      }} />
-  }
-  const activeConflict = recorder?.draft && (recorder.enableOnSave || bindingFor(recorder).enabled)
-    ? recorder.group === 'practice'
-      ? practiceConflict(settings, recorder.action, recorder.draft)
-      : findBindingConflict(settings, recorder.action, recorder.draft, {
-          ignoredActions: ignoredGeneralActions,
-        })
-    : null
-
-  const canSaveDraft = Boolean(recorder?.draft && !activeConflict && (recorder.group === 'general' ||
-    (settings.enabled && (!recorder.enableOnSave || recorder.enableReason === 'reset' || settings.subtitlePractice.enabled))))
-  const canRestoreDraft = Boolean(
-    recorder?.draft && !keyBindingsEqual(recorder.draft, recorder.savedKey)
-  )
-  const recorderReplacedNetflixKeys =
-    recorder?.draft && !activeConflict && recorder.group === 'general'
-      ? getReplacedNetflixNativeKeyBindings(recorder.action, {
-          ...settings.bindings[recorder.action],
-          key: recorder.draft,
-        })
-      : []
-
-  const saveDraft = () => {
-    if (!recorder?.draft || !canSaveDraft) return
-    const { draft } = recorder
-    const request: EnableRequest = { ...recorder, key: draft, reason: recorder.enableReason ?? 'enable' }
-    const enabled = recorder.enableOnSave || bindingFor(recorder).enabled
-    updateSettings(current => applyBindingRequest(current, request, enabled, false, ignoredGeneralActions))
-    setRecorder(null)
-  }
-
-  const restoreSavedDraft = () => {
-    if (!recorder) return
-    setRecorder({
-      ...recorder,
-      draft: recorder.savedKey,
-    })
+      onOpenChange={next => { if (!next) editor.dismissConflict() }}
+      onCheckedChange={enabled => editor.setBindingEnabled(target, enabled)}
+      onChangeKey={editor.changeConflictKey}
+      onTransfer={editor.confirmTransfer} />
   }
 
   if (!loaded) return null
@@ -360,7 +222,7 @@ export function OptionsApp() {
   const subtitleEnableGuidance = <>
     {practiceCopy.requiresEnabled}{' '}
     <a href="#enable-shortcut-override"
-      className="inline-block rounded-sm text-foreground underline underline-offset-4 hover:text-primary focus-visible:outline-2 focus-visible:outline-ring"
+      className="inline-block rounded-sm text-foreground underline underline-offset-4 hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
       onClick={event => {
         event.preventDefault()
         setSubtitleGuideRequested(false)
@@ -375,57 +237,74 @@ export function OptionsApp() {
     <TooltipProvider>
       <main className="min-h-svh bg-background text-foreground">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
-          <header>
-            <Card>
-              <CardHeader>
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <CardTitle className="flex min-w-0 items-center gap-4">
-                    <img src="/icons/icon48.png" alt="" className="size-12 shrink-0" />
-                    <h1 className="truncate text-2xl font-semibold leading-tight">
-                      {copy.appTitle}
-                    </h1>
-                  </CardTitle>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button variant="outline" size="sm" asChild>
-                      <a
-                        href={EXTERNAL_LINKS.githubRepository}
-                        target="_blank"
-                        rel="noreferrer"
-                        aria-label={copy.githubRepositoryAriaLabel}
-                      >
-                        <GitHubIcon data-icon="inline-start" />
-                        {copy.githubRepository}
-                      </a>
-                    </Button>
-                    <Button variant="outline" size="sm" asChild>
-                      <a
-                        href={getShortcutOverrideRatingUrl()}
-                        target="_blank"
-                        rel="noreferrer"
-                        aria-label={copy.rateExtensionAriaLabel}
-                      >
-                        <StarIcon data-icon="inline-start" aria-hidden="true" />
-                        {copy.rateExtension}
-                      </a>
-                    </Button>
-                    <OtherProjectsSelect
-                      label={copy.otherProjects}
-                      ariaLabel={copy.otherProjectsAriaLabel}
-                      streamDanmakuLabel={copy.streamDanmakuStore}
-                      streamDanmakuTitle={copy.streamDanmakuStoreAriaLabel}
-                    />
-                  </div>
-                </div>
-                <SettingsSaveStatus
-                  error={saveError}
-                  errorLabel={copy.settingsSaveError}
+          <header className="flex flex-col gap-2 py-2">
+            <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+              <div className="flex min-w-0 items-center gap-4 pl-2">
+                <img src="/icons/icon48.png" alt="" className="app-brand-icon size-10 shrink-0" />
+                <h1 className="font-heading text-2xl font-black leading-tight tracking-tight">
+                  {copy.appTitle}
+                </h1>
+              </div>
+              <nav className="flex flex-wrap items-center gap-2 self-end pr-2 sm:self-auto">
+                <Button variant="outline" asChild>
+                  <a
+                    href={EXTERNAL_LINKS.githubRepository}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={copy.githubRepositoryAriaLabel}
+                  >
+                    <GitHubIcon data-icon="inline-start" aria-hidden="true" />
+                    {copy.githubRepository}
+                  </a>
+                </Button>
+                <Button variant="outline" asChild>
+                  <a
+                    href={getShortcutOverrideRatingUrl()}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={copy.rateExtensionAriaLabel}
+                  >
+                    <StarIcon data-icon="inline-start" aria-hidden="true" />
+                    {copy.rateExtension}
+                  </a>
+                </Button>
+                <OtherProjectsSelect
+                  size="default"
+                  label={copy.otherProjects}
+                  ariaLabel={copy.otherProjectsAriaLabel}
+                  streamDanmakuLabel={copy.streamDanmakuStore}
+                  streamDanmakuTitle={copy.streamDanmakuStoreAriaLabel}
                 />
-              </CardHeader>
-            </Card>
+              </nav>
+            </div>
+            <SettingsSaveStatus
+              error={saveError}
+              errorLabel={copy.settingsSaveError}
+            />
           </header>
 
           <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
             <div className="flex min-w-0 flex-col gap-6">
+              <Card size="sm">
+                <CardContent className="px-4">
+                  <Field orientation="horizontal" className="min-h-6 gap-3">
+                    <SettingLabelWithTooltip
+                      htmlFor="enable-shortcut-override"
+                      label={copy.enabled}
+                      tooltip={copy.enabledDesc}
+                    />
+                    <Switch
+                      ref={globalEnableSwitch}
+                      id="enable-shortcut-override"
+                      className="focus:ring-3 focus:ring-ring/50 focus:ring-offset-2 focus:ring-offset-card"
+                      checked={settings.enabled}
+                      onCheckedChange={subtitleActivation.setGlobalEnabled}
+                      aria-label={copy.enabled}
+                    />
+                  </Field>
+                </CardContent>
+              </Card>
+
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -443,48 +322,35 @@ export function OptionsApp() {
                         label={copy.locale}
                         size="default"
                         value={settings.locale}
-                        onChange={locale =>
-                          updateSettings(current => ({ ...current, locale }))
-                        }
+                        onChange={locale => updateSettings(current => ({ ...current, locale }))}
                       />
                     </Field>
-
+                    <Field orientation="horizontal" className="items-center justify-between">
+                      <FieldLabel>{copy.uiStyle}</FieldLabel>
+                      <ChoiceCombobox
+                        className="w-36"
+                        size="default"
+                        label={copy.uiStyle}
+                        value={settings.uiStyle}
+                        options={getUiStyleOptions(resolvedLocale)}
+                        onChange={uiStyle => updateSettings(current => ({ ...current, uiStyle }))}
+                      />
+                    </Field>
                     <Field orientation="horizontal" className="items-center justify-between">
                       <FieldLabel>{copy.theme}</FieldLabel>
-                      <ThemeCombobox
+                      <ChoiceCombobox
                         className="w-36"
                         label={copy.theme}
-                        labels={{
-                          auto: copy.themeAuto,
-                          light: copy.themeLight,
-                          dark: copy.themeDark,
-                        }}
                         size="default"
                         value={settings.theme}
-                        onChange={theme =>
-                          updateSettings(current => ({ ...current, theme }))
-                        }
+                        options={[
+                          { value: 'auto', label: copy.themeAuto },
+                          { value: 'light', label: copy.themeLight },
+                          { value: 'dark', label: copy.themeDark },
+                        ]}
+                        onChange={theme => updateSettings(current => ({ ...current, theme }))}
                       />
                     </Field>
-
-                    <Field orientation="horizontal" className="items-center justify-between">
-                      <SettingLabelWithTooltip
-                        htmlFor="enable-shortcut-override"
-                        label={copy.enabled}
-                        tooltip={copy.enabledDesc}
-                      />
-                      <Switch
-                        ref={globalEnableSwitch}
-                        id="enable-shortcut-override"
-                        checked={settings.enabled}
-                        onCheckedChange={enabled => {
-                          if (!enabled) cancelSubtitlePermissionRequest()
-                          updateSettings(current => ({ ...current, enabled }))
-                        }}
-                        aria-label={copy.enabled}
-                      />
-                    </Field>
-
                   </FieldGroup>
                 </CardContent>
               </Card>
@@ -515,6 +381,15 @@ export function OptionsApp() {
                         const actionSupported =
                           action !== 'pictureInPicture' ||
                           browserCapabilities.supportsSubtitlePreservingPip
+                        const overridingSubtitleAction = subtitleNavigationEnabled && binding.enabled && actionSupported
+                          ? SUBTITLE_PRACTICE_ACTIONS.find(subtitleAction => {
+                              const subtitleBinding = settings.subtitlePractice.bindings[subtitleAction]
+                              return subtitleBinding.enabled && keyBindingsEqual(subtitleBinding.key, binding.key)
+                            })
+                          : undefined
+                        const overrideDescription = overridingSubtitleAction
+                          ? subtitlePopupCopy.overriddenBy.replace('{action}', practiceCopy[overridingSubtitleAction])
+                          : undefined
                         return (
                           <TableRow key={action}>
                             <TableCell className="font-medium whitespace-normal">
@@ -525,7 +400,7 @@ export function OptionsApp() {
                                     <TooltipTrigger asChild>
                                       <button
                                         type="button"
-                                        className="inline-flex size-4 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                        className="inline-flex size-4 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                                         aria-label={`${copy.actions[action]} info`}
                                       >
                                         <CircleHelpIcon className="size-3.5" />
@@ -533,7 +408,7 @@ export function OptionsApp() {
                                     </TooltipTrigger>
                                     <TooltipContent
                                       side="top"
-                                      sideOffset={6}
+                                      sideOffset={8}
                                       className="max-w-80 whitespace-pre-line"
                                     >
                                       {actionSupported
@@ -546,7 +421,19 @@ export function OptionsApp() {
                             </TableCell>
                             <TableCell>
                               <div className="flex flex-col items-start gap-1">
-                                <KeyBindingKbd binding={binding.key} className="flex-wrap" />
+                                <div className="flex min-w-0 max-w-full flex-wrap items-center gap-1.5">
+                                  <KeyBindingKbd binding={binding.key} className={cn('flex-wrap', overridingSubtitleAction && 'opacity-60')} />
+                                  {overridingSubtitleAction && (
+                                    <Badge
+                                      variant="secondary"
+                                      className="h-auto min-h-5 max-w-full rounded px-1.5 text-xs whitespace-normal shadow-xs"
+                                      title={overrideDescription}
+                                      aria-label={overrideDescription}
+                                    >
+                                      {subtitlePopupCopy.overridden}
+                                    </Badge>
+                                  )}
+                                </div>
                                 <NetflixNativeKeyReplacement
                                   bindings={replacedNetflixKeys}
                                   template={copy.replacedNetflixKeys}
@@ -561,16 +448,9 @@ export function OptionsApp() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="text-muted-foreground hover:text-foreground focus-visible:text-foreground"
+                                  className="text-muted-foreground focus-visible:text-foreground"
                                   disabled={!actionSupported}
-                                  onClick={() =>
-                                    setRecorder({
-                                      group: 'general',
-                                      action,
-                                      draft: settings.bindings[action].key,
-                                      savedKey: settings.bindings[action].key,
-                                    })
-                                  }
+                                  onClick={() => editor.edit({ group: 'general', action })}
                                   aria-label={`${copy.edit} ${copy.actions[action]}`}
                                 >
                                   <PencilIcon />
@@ -578,9 +458,9 @@ export function OptionsApp() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="text-muted-foreground hover:text-foreground focus-visible:text-foreground"
+                                  className="text-muted-foreground focus-visible:text-foreground"
                                   disabled={!actionSupported}
-                                  onClick={() => requestEnabled({ group: 'general', action }, true, DEFAULT_KEY_BINDINGS[action], 'reset')}
+                                  onClick={() => editor.resetBinding({ group: 'general', action })}
                                   aria-label={`${copy.reset} ${copy.actions[action]}`}
                                 >
                                   <RotateCcwIcon />
@@ -599,16 +479,17 @@ export function OptionsApp() {
                 className="scroll-mt-6 focus-visible:outline-2 focus-visible:outline-ring">
                 <CardHeader className="flex flex-wrap items-center justify-between gap-3">
                   <CardTitle className={cn("flex items-center gap-1.5", !settings.enabled && "text-muted-foreground")}>
+                    <CaptionsIcon data-icon="inline-start" aria-hidden="true" />
                     <span>{practiceCopy.title}</span>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button type="button"
-                          className="inline-flex size-4 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                          className="inline-flex size-4 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                           aria-label={`${practiceCopy.title} info`}>
                           <CircleHelpIcon className="size-3.5" />
                         </button>
                       </TooltipTrigger>
-                      <TooltipContent side="top" sideOffset={6} className="max-w-80">
+                      <TooltipContent side="top" sideOffset={8} className="max-w-80">
                         <div className="space-y-2 whitespace-normal">
                           {practiceCopy.description.split('\n\n').map(paragraph => <p key={paragraph}>{paragraph}</p>)}
                         </div>
@@ -622,7 +503,10 @@ export function OptionsApp() {
                           <Label htmlFor="subtitle-navigation-enabled" className="text-muted-foreground">{activationCopy.enableLabel}</Label>
                           <Switch id="subtitle-navigation-enabled" disabled={!settings.enabled || subtitlePermissionPending} checked={settings.subtitlePractice.enabled} aria-label={practiceCopy.enabled}
                             aria-busy={subtitlePermissionPending} aria-describedby={[showSubtitleGuide && 'subtitle-activation-guide', subtitlePermissionError && 'subtitle-permission-error'].filter(Boolean).join(' ') || undefined}
-                            onCheckedChange={setSubtitleNavigationEnabled} />
+                            onCheckedChange={enabled => {
+                              if (!enabled) setSubtitleGuideRequested(false)
+                              subtitleActivation.setEnabled(enabled)
+                            }} />
                         </div>
                       </PopoverAnchor>
                       <PopoverContent side="bottom" align="end" sideOffset={10} collisionPadding={16} className="w-80 max-w-[calc(100vw-2rem)] gap-2 p-3"
@@ -664,12 +548,12 @@ export function OptionsApp() {
                         <TableCell><KeyBindingKbd binding={binding.key} className="flex-wrap" /></TableCell>
                         <TableCell>{conflictSwitch({ group: 'practice', action }, !settings.enabled || !settings.subtitlePractice.enabled)}</TableCell>
                         <TableCell><div className="flex items-center justify-end gap-2">
-                          <Button disabled={!settings.enabled} variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground focus-visible:text-foreground"
+                          <Button disabled={!settings.enabled} variant="ghost" size="icon" className="text-muted-foreground focus-visible:text-foreground"
                             aria-label={`${copy.edit} ${practiceCopy[action]}`}
-                            onClick={() => setRecorder({ group: 'practice', action, draft: binding.key, savedKey: binding.key })}><PencilIcon /></Button>
-                          <Button disabled={!settings.enabled} variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground focus-visible:text-foreground"
+                            onClick={() => editor.edit({ group: 'practice', action })}><PencilIcon /></Button>
+                          <Button disabled={!settings.enabled} variant="ghost" size="icon" className="text-muted-foreground focus-visible:text-foreground"
                             aria-label={`${copy.reset} ${practiceCopy[action]}`}
-                            onClick={() => requestEnabled({ group: 'practice', action }, true, DEFAULT_PRACTICE_BINDINGS[action].key, 'reset')}><RotateCcwIcon /></Button>
+                            onClick={() => editor.resetBinding({ group: 'practice', action })}><RotateCcwIcon /></Button>
                         </div></TableCell>
                       </TableRow>
                     })}</TableBody>
@@ -874,21 +758,19 @@ export function OptionsApp() {
         </div>
       </main>
 
-      <Dialog open={Boolean(recorder)} onOpenChange={open => !open && setRecorder(null)}>
+      <Dialog open={Boolean(recorder)} onOpenChange={open => !open && editor.closeRecorder()}>
         <DialogContent
-          onCloseAutoFocus={event => {
-            const target = recorderReturnFocus.current
-            recorderReturnFocus.current = null
-            if (!target) return
+          onOpenAutoFocus={event => {
             event.preventDefault()
-            if (target.isConnected && !target.disabled) target.focus()
+            recordingArea.current?.focus({ preventScroll: true })
           }}
+          onCloseAutoFocus={editor.restoreRecorderFocus}
           onKeyDown={event => {
             if (!recorder) return
             if (ignoredRecordKeys.has(event.code)) return
             event.preventDefault()
             event.stopPropagation()
-            setRecorder({ ...recorder, draft: keyBindingFromEvent(event) })
+            editor.capture(keyBindingFromEvent(event))
           }}
         >
           <DialogHeader>
@@ -897,7 +779,13 @@ export function OptionsApp() {
           </DialogHeader>
 
           <div className="flex flex-col gap-4">
-            <div className="flex min-h-20 items-center justify-center rounded-lg border border-dashed bg-muted/35 px-4 text-center">
+            <div
+              ref={recordingArea}
+              role="group"
+              aria-label={copy.recordTitle}
+              tabIndex={-1}
+              className="flex min-h-20 items-center justify-center rounded-lg border-2 border-dashed bg-[var(--ui-recording-bg)] px-4 text-center outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+            >
               {recorder?.draft ? (
                 <KeyBindingKbd binding={recorder.draft} className="justify-center" />
               ) : (
@@ -905,17 +793,17 @@ export function OptionsApp() {
               )}
             </div>
             {recorder?.draft && (
-              <Alert variant={activeConflict ? 'destructive' : 'default'}>
+              <Alert variant={recorder.activeConflict ? 'destructive' : 'default'}>
                 <PlayIcon />
                 <AlertTitle>
-                  {activeConflict
-                    ? copy.conflict.replace('{action}', actionLabels[activeConflict])
+                  {recorder.activeConflict
+                    ? copy.conflict.replace('{action}', actionLabels[recorder.activeConflict])
                     : copy.noConflict}
                 </AlertTitle>
               </Alert>
             )}
             <NetflixNativeKeyReplacement
-              bindings={recorderReplacedNetflixKeys}
+              bindings={recorder?.replacedNetflixKeys ?? []}
               template={copy.willReplaceNetflixKeys}
               className="text-center"
               aria-live="polite"
@@ -927,17 +815,17 @@ export function OptionsApp() {
           <DialogFooter className="sm:justify-between">
             <Button
               variant="ghost"
-              onClick={restoreSavedDraft}
-              disabled={!canRestoreDraft}
+              onClick={editor.restoreSavedDraft}
+              disabled={!recorder?.canRestoreDraft}
               aria-label={`${copy.restore} ${actionLabels[recorder?.action ?? 'playPause']}`}
             >
               {copy.restore}
             </Button>
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button variant="outline" onClick={() => setRecorder(null)}>
+              <Button variant="outline" onClick={editor.closeRecorder}>
                 {copy.cancel}
               </Button>
-              <Button onClick={saveDraft} disabled={!canSaveDraft}>
+              <Button onClick={editor.saveDraft} disabled={!recorder?.canSaveDraft}>
                 {copy.save}
               </Button>
             </div>

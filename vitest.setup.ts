@@ -14,11 +14,11 @@ const storageListeners = new Set<(changes: Record<string, chrome.storage.Storage
 const syncArea: ChromeStorageArea = {
   get: vi.fn((keys: string | string[] | null, callback: (items: Record<string, unknown>) => void) => {
     if (typeof keys === 'string') {
-      callback({ [keys]: storageState[keys] })
+      callback(keys in storageState ? { [keys]: storageState[keys] } : {})
       return
     }
     if (Array.isArray(keys)) {
-      callback(Object.fromEntries(keys.map(key => [key, storageState[key]])))
+      callback(Object.fromEntries(keys.filter(key => key in storageState).map(key => [key, storageState[key]])))
       return
     }
     callback({ ...storageState })
@@ -72,7 +72,7 @@ const sessionArea = {
 
 const localArea: ChromeStorageArea & { clear: ReturnType<typeof vi.fn> } = {
   get: vi.fn((key: string, callback: (items: Record<string, unknown>) => void) => {
-    callback({ [key]: localStorageState[key] })
+    callback(key in localStorageState ? { [key]: localStorageState[key] } : {})
   }),
   set: vi.fn((items: Record<string, unknown>, callback?: () => void) => {
     const changes = Object.fromEntries(Object.entries(items).map(([key, value]) => [

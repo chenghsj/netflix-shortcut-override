@@ -1,14 +1,15 @@
 import { ChevronsUpDownIcon, StoreIcon } from 'lucide-react'
 import { useState } from 'react'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@/components/app-ui/button'
 import {
   Command,
   CommandGroup,
   CommandItem,
   CommandList,
-} from '@/components/ui/command'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+} from '@/components/app-ui/command'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/app-ui/popover'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/app-ui/tooltip'
 import { cn } from '@/lib/utils'
 import { getStreamDanmakuStoreUrl } from '@/shared/external-links'
 
@@ -31,6 +32,7 @@ type OtherProjectsSelectProps = {
   size?: 'sm' | 'default'
   className?: string
   labelClassName?: string
+  iconOnly?: boolean
   onNavigate?: () => void
 }
 
@@ -42,29 +44,44 @@ export function OtherProjectsSelect({
   size = 'sm',
   className,
   labelClassName,
+  iconOnly = false,
   onNavigate,
 }: OtherProjectsSelectProps) {
   const [open, setOpen] = useState(false)
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          size={size}
-          role="combobox"
-          aria-label={ariaLabel}
-          aria-expanded={open}
-          className={cn(
-            'min-w-28 justify-between rounded-lg has-data-[icon=inline-start]:pl-3',
-            className,
-          )}
-        >
-          <StoreIcon data-icon="inline-start" />
+  const [tooltipOpen, setTooltipOpen] = useState(false)
+  const trigger = (
+    <PopoverTrigger asChild>
+      <Button
+        variant="outline"
+        size={iconOnly ? 'icon' : size}
+        role="combobox"
+        aria-label={ariaLabel}
+        aria-expanded={open}
+        className={cn(
+          iconOnly ? 'rounded-full' : 'min-w-28 justify-between has-data-[icon=inline-start]:pl-3',
+          className,
+        )}
+      >
+        <StoreIcon data-icon="inline-start" aria-hidden="true" />
+        {!iconOnly && <>
           <span className={cn('min-w-0 flex-1 truncate text-left', labelClassName)}>{label}</span>
           <ChevronsUpDownIcon data-icon="inline-end" className="opacity-50" />
-        </Button>
-      </PopoverTrigger>
+        </>}
+      </Button>
+    </PopoverTrigger>
+  )
+
+  return (
+    <Popover open={open} onOpenChange={nextOpen => {
+      setOpen(nextOpen)
+      setTooltipOpen(false)
+    }}>
+      {iconOnly ? (
+        <Tooltip open={tooltipOpen && !open} onOpenChange={nextOpen => setTooltipOpen(nextOpen && !open)}>
+          <TooltipTrigger asChild>{trigger}</TooltipTrigger>
+          <TooltipContent side="bottom" sideOffset={8}>{label}</TooltipContent>
+        </Tooltip>
+      ) : trigger}
       <PopoverContent align="end" className="w-(--radix-popover-trigger-width) min-w-44 p-0">
         <Command
           filter={(itemValue, search, keywords) => {

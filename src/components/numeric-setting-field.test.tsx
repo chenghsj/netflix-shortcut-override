@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { NumericSettingField } from '@/components/numeric-setting-field'
-import { TooltipProvider } from '@/components/ui/tooltip'
+import { TooltipProvider } from '@/components/app-ui/tooltip'
 
 describe('NumericSettingField', () => {
   it('releases focus on wheel so scrolling cannot change the value', () => {

@@ -25,4 +25,16 @@ export default defineConfig([
       'react-refresh/only-export-components': 'off',
     },
   },
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/components/ui/**', 'src/components/app-ui/**'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [{
+          regex: '^(?:@/components/ui(?:/|$)|\\.{1,2}/(?:.*/)?ui(?:/|$))',
+          message: 'Import application UI components from @/components/app-ui instead.',
+        }],
+      }],
+    },
+  },
 ])
