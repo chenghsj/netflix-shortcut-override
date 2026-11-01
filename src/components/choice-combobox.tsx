@@ -1,14 +1,14 @@
 import { ChevronsUpDownIcon } from 'lucide-react'
-import { useState } from 'react'
+import { useId, useState, type ReactNode } from 'react'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@/components/app-ui/button'
 import {
   Command,
   CommandGroup,
   CommandItem,
   CommandList,
-} from '@/components/ui/command'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+} from '@/components/app-ui/command'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/app-ui/popover'
 import { cn } from '@/lib/utils'
 
 export type ChoiceComboboxOption<Value extends string> = {
@@ -25,6 +25,7 @@ type ChoiceComboboxProps<Value extends string> = {
   options: readonly ChoiceComboboxOption<Value>[]
   size?: 'sm' | 'default'
   className?: string
+  triggerIcon?: ReactNode
 }
 
 export function ChoiceCombobox<Value extends string>({
@@ -34,28 +35,45 @@ export function ChoiceCombobox<Value extends string>({
   options,
   size = 'sm',
   className,
+  triggerIcon,
 }: ChoiceComboboxProps<Value>) {
   const [open, setOpen] = useState(false)
+  const selectedDescriptionId = useId()
   const selected = options.find(option => option.value === value) ?? options[0]
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          size={size}
-          role="combobox"
-          aria-label={label}
-          aria-expanded={open}
-          className={cn('min-w-28 justify-between rounded-lg pl-3', className)}
-        >
-          <span className="min-w-0 flex-1 truncate text-left" title={selected?.title ?? selected?.label}>
+  const selectedTitle = selected?.title ?? selected?.label
+  const iconOnly = triggerIcon !== undefined
+  const trigger = (
+    <PopoverTrigger asChild>
+      <Button
+        variant="outline"
+        size={iconOnly ? 'icon' : size}
+        role="combobox"
+        aria-label={label}
+        aria-describedby={iconOnly ? selectedDescriptionId : undefined}
+        aria-expanded={open}
+        className={cn(iconOnly ? 'rounded-full' : 'min-w-28 justify-between pl-3', className)}
+      >
+        {iconOnly ? <>
+          {triggerIcon}
+          <span id={selectedDescriptionId} className="sr-only">{selected?.label}</span>
+        </> : <>
+          <span className="min-w-0 flex-1 truncate text-left" title={selectedTitle}>
             {selected?.label}
           </span>
           <ChevronsUpDownIcon data-icon="inline-end" className="opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-(--radix-popover-trigger-width) min-w-36 p-0">
+        </>}
+      </Button>
+    </PopoverTrigger>
+  )
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      {trigger}
+      <PopoverContent
+        align="end"
+        collisionPadding={8}
+        className="w-max min-w-[max(10rem,var(--radix-popover-trigger-width))] max-w-(--radix-popover-content-available-width) p-0"
+      >
         <Command
           filter={(itemValue, search, keywords) => {
             const haystack = `${itemValue} ${(keywords ?? []).join(' ')}`.toLowerCase()
@@ -75,7 +93,7 @@ export function ChoiceCombobox<Value extends string>({
                     setOpen(false)
                   }}
                 >
-                  <span className="min-w-0 flex-1 truncate" title={option.title ?? option.label}>
+                  <span className="min-w-0 flex-1 whitespace-normal break-words" title={option.title ?? option.label}>
                     {option.label}
                   </span>
                 </CommandItem>

@@ -103,7 +103,7 @@ Read the full [privacy policy](PRIVACY.md).
 
 ## Development and Documentation
 
-Requires Node.js 22 or newer and npm. From the repository root:
+Requires Node.js 22.18.0 or newer and npm. From the repository root:
 
 ```sh
 npm ci

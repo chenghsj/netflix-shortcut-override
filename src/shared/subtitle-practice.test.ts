@@ -26,7 +26,7 @@ describe('subtitle practice', () => {
     for (const modifier of ['ctrlKey', 'altKey', 'shiftKey', 'metaKey']) {
       expect(practiceAction(new KeyboardEvent('keydown', { code: 'KeyA', [modifier]: true }))).toBeNull()
     }
-    expect(practiceAction(new KeyboardEvent('keydown', { code: 'KeyS' }))).toBe('replay')
+    expect(practiceAction(new KeyboardEvent('keydown', { code: 'KeyS' }))).toBeNull()
   })
   it('routes edited keys only while the master and row are enabled', () => {
     const settings = normalizeSettings({ ...DEFAULT_SETTINGS, subtitlePractice: { enabled: true, bindings: { next: { enabled: true, key: { code: 'KeyN', key: 'n', ctrl: false, alt: false, shift: true, meta: false } } } } })

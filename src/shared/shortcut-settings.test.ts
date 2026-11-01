@@ -14,6 +14,18 @@ import {
 } from '@/shared/shortcut-settings'
 
 describe('shortcut settings', () => {
+  it.each([undefined, null, '', 'unknown'])('keeps the Classic appearance of legacy settings with absent or invalid style %s', uiStyle => {
+    const settings = normalizeSettings({ ...DEFAULT_SETTINGS, version: 12, uiStyle })
+    expect(settings.uiStyle).toBe('classic')
+    expect(settings.version).toBe(SHORTCUT_SETTINGS_VERSION)
+  })
+
+  it('preserves a chosen style and the independent brightness preference', () => {
+    const settings = normalizeSettings({ ...DEFAULT_SETTINGS, uiStyle: 'classic', theme: 'dark' })
+    expect(settings.uiStyle).toBe('classic')
+    expect(settings.theme).toBe('dark')
+  })
+
   it('uses the planned speed defaults', () => {
     expect(DEFAULT_SETTINGS.locale).toBe('auto')
     expect(DEFAULT_SETTINGS.theme).toBe('auto')

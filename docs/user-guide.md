@@ -30,7 +30,7 @@ The configured Play / Pause shortcut has two behaviors when hold speed is enable
 
 ## Subtitle Navigation
 
-Subtitle navigation is **off by default**. In Options, turn on **Enable shortcut override** and the **Subtitle navigation** master switch, allow Netflix subtitle website access if the browser asks, then select a Netflix subtitle track. If access is already granted, the switch enables without another permission prompt. Denying access leaves it off; turn the switch on again to retry.
+Subtitle navigation is **off by default**. In Options or the popup, turn on **Enable extension** and the **Subtitle navigation** master switch. Allow Netflix subtitle website access if the browser asks, then select a Netflix subtitle track. If access is already granted, the switch enables without another permission prompt. Denying access leaves it off; turn the switch on again to retry.
 
 | Action | Default key | Behavior |
 | --- | --- | --- |
@@ -47,7 +47,11 @@ Turning off the global shortcut override disables the subtitle navigation contro
 
 Within either shortcut table, individually disabled rows keep their saved keys but allow other rows to reuse them. Enabled rows reserve their keys within that table even while a master switch is off. Enabling or resetting a row whose key is already reserved opens a popover without changing settings: choose **Change key** to record a different key and enable the row, or **Use for [action]** to disable the current owner and transfer the key. Clicking outside or pressing Escape cancels; cancelling the key editor also leaves settings unchanged. Ordinary and subtitle shortcuts remain separate groups, with subtitle navigation taking priority during playback.
 
-The popup has a separate, read-only Subtitle navigation summary. It shows the four configured keys and individual disabled states while both master switches are on; otherwise it shows only the title and **Not enabled**. Ordinary shortcuts whose configured keys are claimed by enabled subtitle navigation rows display **Subtitle priority**, with the overriding action in their tooltip. Key editing, resets, and website authorization remain in Options.
+The popup opens on the **Shortcuts** tab. Its **Subtitle navigation** header has a master switch that uses the same website permission flow as Options. The switch is disabled while the extension is off or permission approval is pending. The four configured keys and individual disabled states appear while both master switches are on. Ordinary shortcuts whose configured keys are claimed by enabled subtitle navigation rows display **Subtitle priority**, with the overriding action in their tooltip. Key editing and resets remain in Options.
+
+The **Settings** tab contains language, interface style, brightness, and playback preferences. **General settings** starts collapsed. Switching tabs preserves numeric drafts and saves the focused numeric field before leaving its panel.
+
+Choose **Classic**, **Neobrutalism**, or **Markdown** as the interface style independently of light or dark brightness. Existing installations without an appearance choice and backups from older versions use Classic. Explicit appearance choices are preserved. Fresh installations start with Neobrutalism.
 
 Subtitle timings are loaded on demand and cached in memory for the selected video/player session/track. During a download, a compact text hint and spinner remain visible until loading completes, fails, or the operation is cancelled. The spinner takes 1.6 seconds per revolution and respects reduced-motion preferences. Cache hits, successful jumps, and subtitle boundaries show no navigation hint. Failures use the volume-value text hint style for five seconds; `W` keeps the play/pause icon hint.
 

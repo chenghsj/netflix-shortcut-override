@@ -1,7 +1,5 @@
 import type { NetflixPlaybackSession } from '@/content/netflix-playback-session'
-import { resolveLocalePreference } from '@/shared/browser-locale'
 import { formatPlaybackRate } from '@/shared/playback-speed'
-import type { Locale } from '@/shared/shortcut-types'
 import type { CommandContext } from './shortcut-command-types'
 
 type HoldSpeedInteractionState = {
@@ -39,14 +37,6 @@ const HOLD_SPEED_DELAY_MS = 250
 
 const getRestorablePlaybackRate = (video: HTMLVideoElement): number =>
   Number.isFinite(video.playbackRate) && video.playbackRate > 0 ? video.playbackRate : 1
-
-const formatHoldSpeedRate = (rate: number, locale: Locale): string => {
-  const value = formatPlaybackRate(rate).replace(/x$/, '')
-  if (locale === 'zh-TW' || locale === 'zh-CN') return `${value} 倍`
-  if (locale === 'ja') return `${value}倍`
-  if (locale === 'ko') return `${value}배`
-  return `${value}x`
-}
 
 export const createHoldSpeedInteractionController = (
   dependencies: HoldSpeedInteractionDependencies
@@ -126,10 +116,7 @@ export const createHoldSpeedInteractionController = (
       if (context.settings.holdSpeed.showHint) {
         dependencies.showHoldSpeedHint(
           context,
-          formatHoldSpeedRate(
-            context.settings.holdSpeed.speed,
-            resolveLocalePreference(context.settings.locale)
-          )
+          formatPlaybackRate(context.settings.holdSpeed.speed)
         )
       }
 

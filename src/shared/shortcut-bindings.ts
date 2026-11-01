@@ -45,7 +45,6 @@ const NETFLIX_NATIVE_SHORTCUT_ACTIONS = [
   'volumeUp',
   'volumeDown',
   'mute',
-  'toggleSubtitles',
   'fullscreen',
   'skipIntro',
 ] as const satisfies readonly ShortcutAction[]
@@ -60,7 +59,6 @@ const NETFLIX_NATIVE_KEY_BINDINGS: Record<
   volumeUp: [DEFAULT_KEY_BINDINGS.volumeUp],
   volumeDown: [DEFAULT_KEY_BINDINGS.volumeDown],
   mute: [DEFAULT_KEY_BINDINGS.mute],
-  toggleSubtitles: [DEFAULT_KEY_BINDINGS.toggleSubtitles],
   fullscreen: [DEFAULT_KEY_BINDINGS.fullscreen],
   skipIntro: [DEFAULT_KEY_BINDINGS.skipIntro],
 }

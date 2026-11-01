@@ -6,9 +6,9 @@ import {
 import { useRef, useState } from 'react'
 
 import { KeyBindingKbd } from '@/components/key-binding-kbd'
-import { Alert, AlertTitle } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Alert, AlertTitle } from '@/components/app-ui/alert'
+import { Button } from '@/components/app-ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/app-ui/card'
 import {
   Dialog,
   DialogContent,
@@ -16,7 +16,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
+} from '@/components/app-ui/dialog'
 import { LOCALE_LABELS, getCopy } from '@/shared/i18n'
 import {
   createSettingsBackup,

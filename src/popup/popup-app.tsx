@@ -1,63 +1,31 @@
-import {
-  ChevronsLeftRightIcon,
-  AlertCircleIcon,
-  GaugeIcon,
-  KeyboardIcon,
-  Settings2Icon,
-  SettingsIcon,
-  StarIcon,
-} from 'lucide-react'
+import { useState } from 'react'
+import { AlertCircleIcon, KeyboardIcon, SettingsIcon, Settings2Icon, StarIcon } from 'lucide-react'
 import { GitHubIcon } from '@/components/github-icon'
-import { HoldSpeedIcon } from '@/components/hold-speed-icon'
-import { KeyBindingKbd } from '@/components/key-binding-kbd'
 import { CompatibilityConnectionAlert } from '@/components/compatibility-connection-alert'
 import { CompatibilityDiagnosticsDialog } from '@/components/compatibility-diagnostics-dialog'
-import { LanguageCombobox } from '@/components/language-combobox'
-import { NumericSettingField } from '@/components/numeric-setting-field'
 import { OtherProjectsSelect } from '@/components/other-projects-select'
 import { SettingLabelWithTooltip } from '@/components/setting-label-with-tooltip'
 import { SettingsSaveStatus } from '@/components/settings-save-status'
-import { ThemeCombobox } from '@/components/theme-combobox'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Switch } from '@/components/ui/switch'
-import { TooltipProvider } from '@/components/ui/tooltip'
-import { cn } from '@/lib/utils'
+import { Button } from '@/components/app-ui/button'
+import { Card, CardContent } from '@/components/app-ui/card'
+import { Switch } from '@/components/app-ui/switch'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/app-ui/tabs'
+import { TooltipProvider } from '@/components/app-ui/tooltip'
 import { useCompatibilitySession } from '@/popup/use-compatibility-session'
 import { usePopupFocusRestoration } from '@/popup/use-popup-focus-restoration'
-import { SUBTITLE_NAVIGATION_POPUP_COPY } from '@/popup/subtitle-navigation-copy'
 import { FEATURE_ANNOUNCEMENT_COPY } from '@/popup/feature-announcement-copy'
 import { FeatureAnnouncementCard } from '@/popup/feature-announcement-card'
+import { PopupSettingsPanel } from '@/popup/popup-settings-panel'
+import { PopupShortcutsPanel } from '@/popup/popup-shortcuts-panel'
 import { SUBTITLE_OPTIONS_HASH, subtitleNavigationAnnouncement } from '@/shared/feature-announcements'
 import { EXTERNAL_LINKS, getShortcutOverrideRatingUrl } from '@/shared/external-links'
 import { resolveLocalePreference } from '@/shared/browser-locale'
 import { getBrowserCapabilities } from '@/shared/browser-capabilities'
 import { getCopy } from '@/shared/i18n'
-import { HOLD_SPEED_LIMITS, SEEK_LIMITS, SPEED_LIMITS } from '@/shared/shortcut-settings'
-import { keyBindingsEqual } from '@/shared/shortcut-bindings'
-import { SUBTITLE_PRACTICE_ACTIONS, type ShortcutAction } from '@/shared/shortcut-types'
-import { SUBTITLE_PRACTICE_COPY } from '@/shared/subtitle-practice'
+import { useSubtitleActivation } from '@/shared/use-subtitle-activation'
 import { useShortcutSettingsForm } from '@/shared/use-shortcut-settings-form'
 import { useTheme } from '@/shared/use-theme'
-
-const POPUP_SHORTCUT_ACTIONS: ShortcutAction[] = [
-  'playPause',
-  'seekBackward',
-  'seekForward',
-  'volumeUp',
-  'volumeDown',
-  'mute',
-  'toggleSubtitles',
-  'fullscreen',
-  'pictureInPicture',
-  'skipIntro',
-  'speedUp',
-  'speedDown',
-  'setPreferredSpeed',
-  'speedReset',
-]
-
-const popupSpeedInputClassName = 'h-6 w-20 px-2 py-0 text-xs'
+import { useUiStyle } from '@/shared/use-ui-style'
 
 const openOptionsPage = (beforeNavigate: () => void) => {
   beforeNavigate()
@@ -71,15 +39,9 @@ const openOptionsPage = (beforeNavigate: () => void) => {
 }
 
 export function PopupApp() {
-  const {
-    settings,
-    loaded,
-    saveError,
-    updateSettings,
-    speed: speedForm,
-    seek: seekForm,
-    holdSpeed: holdSpeedForm,
-  } = useShortcutSettingsForm()
+  const [generalSettingsOpen, setGeneralSettingsOpen] = useState(false)
+  const form = useShortcutSettingsForm()
+  const { settings, loaded, saveError, updateSettings } = form
   const {
     pageStatus,
     isPageLoadingLong,
@@ -94,8 +56,6 @@ export function PopupApp() {
     usePopupFocusRestoration(resolvePlaybackFocusTarget)
   const locale = resolveLocalePreference(settings.locale)
   const copy = getCopy(locale)
-  const subtitleCopy = SUBTITLE_PRACTICE_COPY[locale]
-  const subtitlePopupCopy = SUBTITLE_NAVIGATION_POPUP_COPY[locale]
   const announcementCopy = FEATURE_ANNOUNCEMENT_COPY[locale]
   const openSubtitleOptions = () => {
     suppressFocusRestoration()
@@ -106,9 +66,10 @@ export function PopupApp() {
     }
     window.location.href = `/options.html${SUBTITLE_OPTIONS_HASH}`
   }
-  const subtitleNavigationEnabled = settings.enabled && settings.subtitlePractice.enabled
+  const subtitleActivation = useSubtitleActivation({ settings, updateSettings })
   const browserCapabilities = getBrowserCapabilities()
   useTheme(settings.theme)
+  useUiStyle(settings.uiStyle)
 
   const statusText =
     pageStatus === 'netflix'
@@ -116,20 +77,19 @@ export function PopupApp() {
       : pageStatus === 'external'
         ? copy.popupNetflixOnly
         : null
-  const shouldShowPageStatus = Boolean(statusText)
 
   if (!loaded) {
-    return <main className="h-40 w-[22rem] bg-background" aria-label="Loading" />
+    return <main className="h-40 w-full bg-background" aria-label="Loading" />
   }
 
   return (
     <TooltipProvider>
-      <main className="w-[22rem] bg-background text-foreground">
+      <main className="w-full bg-background text-sm text-foreground">
         <div className="flex flex-col gap-3 p-3">
-          <header className="flex items-center gap-2 px-0.5 py-0.5">
-            <img src="/icons/icon48.png" alt="" className="size-6 shrink-0" />
+          <header className="flex items-center gap-2 border-b-2 border-border pb-2">
+            <img src="/icons/icon48.png" alt="" className="app-brand-icon ml-1 size-6 shrink-0" />
             <div className="min-w-0 flex-1">
-              <h1 className="truncate text-sm font-semibold leading-tight">Shortcut Override</h1>
+              <h1 className="truncate font-heading text-base font-black leading-tight">Shortcut Override</h1>
             </div>
             {pageStatus === 'watch' &&
               diagnosticsTriggerState !== 'reload-required' && (
@@ -145,8 +105,8 @@ export function PopupApp() {
             <Button
               type="button"
               variant="ghost"
-              size="icon-sm"
-              className="shrink-0"
+              size="icon"
+              className="shrink-0 bg-clip-border"
               aria-label={copy.openOptions}
               title={copy.openOptions}
               onClick={() => openOptionsPage(suppressFocusRestoration)}
@@ -154,6 +114,25 @@ export function PopupApp() {
               <Settings2Icon aria-hidden="true" />
             </Button>
           </header>
+
+          <Card size="sm" className="relative">
+            <CardContent className="flex min-h-6 items-center justify-between gap-3">
+              <SettingLabelWithTooltip
+                htmlFor="popup-enable-shortcut-override"
+                label={copy.enabled}
+                tooltip={copy.enabledDesc}
+                className="[&_button]:relative [&_button]:z-10"
+                labelClassName="text-sm after:absolute after:inset-0 after:cursor-pointer"
+              />
+              <Switch
+                id="popup-enable-shortcut-override"
+                className="z-10"
+                checked={settings.enabled}
+                onCheckedChange={subtitleActivation.setGlobalEnabled}
+                aria-label={copy.enabled}
+              />
+            </CardContent>
+          </Card>
 
           <FeatureAnnouncementCard announcement={subtitleNavigationAnnouncement} copy={announcementCopy} onEnable={openSubtitleOptions} />
 
@@ -163,363 +142,50 @@ export function PopupApp() {
 
           {isPageLoadingLong && (
             <section
-              className="rounded-lg border bg-card p-3 shadow-xs"
+              className="rounded-[var(--ui-card-radius)] border-2 border-border bg-card p-3 shadow-md"
               role="status"
             >
               <div className="flex items-start gap-2.5">
-                <AlertCircleIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                <p className="text-xs leading-relaxed text-muted-foreground">
+                <AlertCircleIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground dark:text-card-foreground" />
+                <p className="text-sm leading-relaxed text-muted-foreground dark:text-card-foreground">
                   {copy.diagnosticsPageLoadingLong}
                 </p>
               </div>
             </section>
           )}
 
-          {shouldShowPageStatus && (
-            <section className="rounded-lg border bg-card p-3 shadow-xs">
-              <div className="flex items-start gap-2.5">
-                <AlertCircleIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                <p className="text-xs leading-relaxed text-muted-foreground">{statusText}</p>
-              </div>
-            </section>
-          )}
-
-          <section className="rounded-lg border bg-card p-3 shadow-xs">
-            <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-              <SettingsIcon className="size-3.5" />
-              {copy.quickSettings}
-            </h2>
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center justify-between gap-3">
-                <span className="min-w-0 text-sm font-medium">{copy.locale}</span>
-                <LanguageCombobox
-                  autoLabel={copy.localeAuto}
-                  className="w-28"
-                  label={copy.locale}
-                  value={settings.locale}
-                  onChange={locale =>
-                    updateSettings(current => ({
-                      ...current,
-                      locale,
-                    }))
-                  }
-                />
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span className="min-w-0 text-sm font-medium">{copy.theme}</span>
-                <ThemeCombobox
-                  className="w-28"
-                  label={copy.theme}
-                  labels={{
-                    auto: copy.themeAuto,
-                    light: copy.themeLight,
-                    dark: copy.themeDark,
-                  }}
-                  value={settings.theme}
-                  onChange={theme => updateSettings(current => ({ ...current, theme }))}
-                />
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <SettingLabelWithTooltip
-                  htmlFor="popup-enable-shortcut-override"
-                  label={copy.enabled}
-                  tooltip={copy.enabledDesc}
-                  labelClassName="text-sm"
-                />
-                <Switch
-                  id="popup-enable-shortcut-override"
-                  checked={settings.enabled}
-                  onCheckedChange={enabled =>
-                    updateSettings(current => ({ ...current, enabled }))
-                  }
-                  aria-label={copy.enabled}
-                />
-              </div>
-            </div>
-          </section>
-
-          <section className="rounded-lg border bg-card p-2.5 shadow-xs">
-          <h2 className="mb-2.5 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-            <KeyboardIcon className="size-3.5" />
-            {copy.shortcuts}
-          </h2>
-          <div className="flex flex-col gap-1">
-            {POPUP_SHORTCUT_ACTIONS.map(action => {
-              const binding = settings.bindings[action]
-              const actionSupported =
-                action !== 'pictureInPicture' ||
-                browserCapabilities.supportsSubtitlePreservingPip
-              const overridingSubtitleAction = subtitleNavigationEnabled && binding.enabled && actionSupported
-                ? SUBTITLE_PRACTICE_ACTIONS.find(subtitleAction => {
-                    const subtitleBinding = settings.subtitlePractice.bindings[subtitleAction]
-                    return subtitleBinding.enabled && keyBindingsEqual(subtitleBinding.key, binding.key)
-                  })
-                : undefined
-              const overrideDescription = overridingSubtitleAction
-                ? subtitlePopupCopy.overriddenBy.replace('{action}', subtitleCopy[overridingSubtitleAction])
-                : undefined
-              return (
-                <div
-                  key={action}
-                  className="flex min-h-7 items-center justify-between gap-3 rounded-md px-1.5"
-                >
-                  <span
-                    className={cn(
-                      'min-w-0 truncate text-xs leading-tight',
-                      (!binding.enabled || !actionSupported || overridingSubtitleAction) && 'text-muted-foreground'
-                    )}
-                    title={actionSupported ? copy.actions[action] : copy.pictureInPictureUnsupported}
-                  >
-                    {copy.actions[action]}
-                  </span>
-                  {!actionSupported ? (
-                    <Badge
-                      variant="secondary"
-                      className="max-w-24 justify-start truncate px-1.5 text-xs"
-                      title={copy.pictureInPictureUnsupported}
-                    >
-                      {copy.diagnosticsUnsupportedValue}
-                    </Badge>
-                  ) : overridingSubtitleAction ? (
-                    <Badge
-                      variant="secondary"
-                      className="max-w-32 justify-start truncate px-1.5 text-xs"
-                      title={overrideDescription}
-                      aria-label={overrideDescription}
-                    >
-                      {subtitlePopupCopy.overridden}
-                    </Badge>
-                  ) : binding.enabled ? (
-                    <KeyBindingKbd
-                      binding={binding.key}
-                      className="max-w-32 shrink-0 justify-end overflow-hidden"
-                    />
-                  ) : (
-                    <Badge
-                      variant="secondary"
-                      className="max-w-24 justify-start truncate px-1.5 text-xs"
-                      title={copy.disabledStatus}
-                    >
-                      {copy.disabledStatus}
-                    </Badge>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-          </section>
-
-          <section
-            className="rounded-lg border bg-card p-2.5 shadow-xs"
-            aria-labelledby="popup-subtitle-navigation-title"
-          >
-            <div className={cn('flex items-center justify-between gap-3', subtitleNavigationEnabled && 'mb-2.5')}>
-              <h2 id="popup-subtitle-navigation-title" className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-                <KeyboardIcon className="size-3.5" />
-                {subtitleCopy.title}
-              </h2>
-              {!subtitleNavigationEnabled && (
-                <div className="flex shrink-0 items-center gap-2">
-                  <Badge variant="secondary" className="px-1.5 text-xs" title={!settings.enabled ? subtitleCopy.requiresEnabled : undefined}>
-                    {subtitlePopupCopy.inactive}
-                  </Badge>
-                  <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={openSubtitleOptions}>
-                    {announcementCopy.enable}
-                  </Button>
-                </div>
-              )}
-            </div>
-            {subtitleNavigationEnabled && (
-              <div className="flex flex-col gap-1">
-                {SUBTITLE_PRACTICE_ACTIONS.map(action => {
-                  const binding = settings.subtitlePractice.bindings[action]
-                  return (
-                    <div key={action} className="flex min-h-7 items-center justify-between gap-3 rounded-md px-1.5">
-                      <span className={cn('min-w-0 truncate text-xs leading-tight', !binding.enabled && 'text-muted-foreground')} title={subtitleCopy[action]}>
-                        {subtitleCopy[action]}
-                      </span>
-                      {binding.enabled ? (
-                        <KeyBindingKbd binding={binding.key} className="max-w-32 shrink-0 justify-end overflow-hidden" />
-                      ) : (
-                        <Badge variant="secondary" className="max-w-24 justify-start truncate px-1.5 text-xs" title={copy.disabledStatus}>
-                          {copy.disabledStatus}
-                        </Badge>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </section>
-
-          <section className="rounded-lg border bg-card p-3 shadow-xs">
-            <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-              <GaugeIcon className="size-3.5" />
-              {copy.speed}
-            </h2>
-            <div className="flex flex-col gap-2">
-              <NumericSettingField
-                  id="popup-preferred-speed"
-                  label={copy.preferredSpeed}
-                  tooltip={copy.preferredSpeedTooltip}
-                  orientation="horizontal"
-                  fieldClassName="items-center justify-between gap-3"
-                  labelClassName="min-w-0 truncate text-xs"
-                  min={SPEED_LIMITS.preferred.min}
-                  max={SPEED_LIMITS.preferred.max}
-                  step={SPEED_LIMITS.preferred.inputStep}
-                  value={speedForm.draft.preferred}
-                  data-speed-field="preferred"
-                  inputClassName={popupSpeedInputClassName}
-                  onValueChange={value => speedForm.setField('preferred', value)}
-                  onBlur={() => speedForm.commitField('preferred')}
-                  onDragCommit={() => speedForm.commitField('preferred')}
-                  onKeyDown={speedForm.handleKeyDown}
+          <Tabs defaultValue="shortcuts" className="gap-3">
+            <TabsList aria-label={copy.appTitle}>
+              <TabsTrigger value="shortcuts">
+                <KeyboardIcon aria-hidden="true" />
+                {copy.shortcuts}
+              </TabsTrigger>
+              <TabsTrigger value="settings">
+                <SettingsIcon aria-hidden="true" />
+                {copy.popupSettings}
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="shortcuts" className="gap-3">
+              <PopupShortcutsPanel
+                settings={settings}
+                locale={locale}
+                supportsSubtitlePreservingPip={browserCapabilities.supportsSubtitlePreservingPip}
+                activation={subtitleActivation}
+                statusText={statusText}
               />
-              <NumericSettingField
-                  id="popup-min-speed"
-                  label={copy.minSpeed}
-                  tooltip={copy.minSpeedTooltip}
-                  orientation="horizontal"
-                  fieldClassName="items-center justify-between gap-3"
-                  labelClassName="min-w-0 truncate text-xs"
-                  min={SPEED_LIMITS.min.min}
-                  max={SPEED_LIMITS.min.max}
-                  step={SPEED_LIMITS.step.inputStep}
-                  value={speedForm.draft.min}
-                  data-speed-field="min"
-                  inputClassName={popupSpeedInputClassName}
-                  onValueChange={value => speedForm.setField('min', value)}
-                  onBlur={() => speedForm.commitField('min')}
-                  onDragCommit={() => speedForm.commitField('min')}
-                  onKeyDown={speedForm.handleKeyDown}
+            </TabsContent>
+            <TabsContent value="settings" className="gap-3">
+              <PopupSettingsPanel
+                form={form}
+                locale={locale}
+                generalSettingsOpen={generalSettingsOpen}
+                onGeneralSettingsOpenChange={setGeneralSettingsOpen}
               />
-              <NumericSettingField
-                  id="popup-max-speed"
-                  label={copy.maxSpeed}
-                  tooltip={copy.maxSpeedTooltip}
-                  orientation="horizontal"
-                  fieldClassName="items-center justify-between gap-3"
-                  labelClassName="min-w-0 truncate text-xs"
-                  min={SPEED_LIMITS.max.min}
-                  max={SPEED_LIMITS.max.max}
-                  step={SPEED_LIMITS.step.inputStep}
-                  value={speedForm.draft.max}
-                  data-speed-field="max"
-                  inputClassName={popupSpeedInputClassName}
-                  onValueChange={value => speedForm.setField('max', value)}
-                  onBlur={() => speedForm.commitField('max')}
-                  onDragCommit={() => speedForm.commitField('max')}
-                  onKeyDown={speedForm.handleKeyDown}
-              />
-              <NumericSettingField
-                  id="popup-speed-step"
-                  label={copy.step}
-                  tooltip={copy.stepTooltip}
-                  orientation="horizontal"
-                  fieldClassName="items-center justify-between gap-3"
-                  labelClassName="min-w-0 truncate text-xs"
-                  min={SPEED_LIMITS.step.min}
-                  max={SPEED_LIMITS.step.max}
-                  step={SPEED_LIMITS.step.inputStep}
-                  value={speedForm.draft.step}
-                  data-speed-field="step"
-                  inputClassName={popupSpeedInputClassName}
-                  onValueChange={value => speedForm.setField('step', value)}
-                  onBlur={() => speedForm.commitField('step')}
-                  onDragCommit={() => speedForm.commitField('step')}
-                  onKeyDown={speedForm.handleKeyDown}
-              />
-            </div>
-          </section>
+            </TabsContent>
+          </Tabs>
 
-          <section className="rounded-lg border bg-card p-3 shadow-xs">
-            <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-              <ChevronsLeftRightIcon className="size-3.5" />
-              {copy.seek}
-            </h2>
-            <div className="flex flex-col gap-2">
-              <NumericSettingField
-                id="popup-seek-seconds"
-                label={copy.seekSeconds}
-                tooltip={copy.seekSecondsTooltip}
-                orientation="horizontal"
-                fieldClassName="items-center justify-between gap-3"
-                labelClassName="min-w-0 truncate text-xs"
-                min={SEEK_LIMITS.seconds.min}
-                max={SEEK_LIMITS.seconds.max}
-                step={SEEK_LIMITS.seconds.inputStep}
-                value={seekForm.draft.seconds}
-                inputClassName={popupSpeedInputClassName}
-                onValueChange={seekForm.setSeconds}
-                onBlur={seekForm.commit}
-                onDragCommit={seekForm.commit}
-                onKeyDown={seekForm.handleKeyDown}
-              />
-            </div>
-          </section>
-
-          <section className="rounded-lg border bg-card p-3 shadow-xs">
-            <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-              <HoldSpeedIcon className="size-3.5" />
-              {copy.holdSpeed}
-            </h2>
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center justify-between gap-3">
-                <label
-                  htmlFor="popup-enable-hold-speed"
-                  aria-disabled={holdSpeedForm.enableControlDisabled}
-                  className="min-w-0 text-xs font-medium"
-                >
-                  {copy.holdSpeedEnabled}
-                </label>
-                <Switch
-                  id="popup-enable-hold-speed"
-                  checked={holdSpeedForm.enabled}
-                  disabled={holdSpeedForm.enableControlDisabled}
-                  onCheckedChange={holdSpeedForm.setEnabled}
-                  aria-label={`${copy.holdSpeed}: ${copy.holdSpeedEnabled}`}
-                />
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <label
-                  htmlFor="popup-show-hold-speed-hint"
-                  aria-disabled={holdSpeedForm.detailsDisabled}
-                  className="min-w-0 text-xs font-medium"
-                >
-                  {copy.holdSpeedHint}
-                </label>
-                <Switch
-                  id="popup-show-hold-speed-hint"
-                  checked={holdSpeedForm.showHint}
-                  disabled={holdSpeedForm.detailsDisabled}
-                  onCheckedChange={holdSpeedForm.setShowHint}
-                  aria-label={`${copy.holdSpeed}: ${copy.holdSpeedHint}`}
-                />
-              </div>
-              <NumericSettingField
-                  id="popup-hold-speed"
-                  label={copy.holdSpeedRate}
-                  tooltip={copy.holdSpeedTooltip}
-                  orientation="horizontal"
-                  fieldClassName="items-center justify-between gap-3"
-                  labelClassName="min-w-0 truncate text-xs"
-                  min={HOLD_SPEED_LIMITS.speed.min}
-                  max={HOLD_SPEED_LIMITS.speed.max}
-                  step={HOLD_SPEED_LIMITS.speed.inputStep}
-                  value={holdSpeedForm.draft.speed}
-                  disabled={holdSpeedForm.detailsDisabled}
-                  inputClassName={popupSpeedInputClassName}
-                  onValueChange={holdSpeedForm.setSpeed}
-                  onBlur={holdSpeedForm.commit}
-                  onDragCommit={holdSpeedForm.commit}
-                  onKeyDown={holdSpeedForm.handleKeyDown}
-              />
-            </div>
-          </section>
-
-          <footer className="grid grid-cols-2 gap-2 border-t pt-3">
-            <Button variant="outline" size="xs" asChild className="min-w-0">
+          <footer className="grid grid-cols-2 gap-2 border-t-2 border-border pt-2">
+            <Button variant="outline" asChild className="min-w-0">
               <a
                 href={EXTERNAL_LINKS.githubRepository}
                 target="_blank"
@@ -537,11 +203,12 @@ export function PopupApp() {
               ariaLabel={copy.otherProjectsAriaLabel}
               streamDanmakuLabel={copy.streamDanmakuStore}
               streamDanmakuTitle={copy.streamDanmakuStoreAriaLabel}
-              className="h-6 min-w-0 text-xs has-data-[icon=inline-start]:pl-2"
+              size="default"
+              className="min-w-0 has-data-[icon=inline-start]:pl-2"
               labelClassName="text-center"
               onNavigate={suppressFocusRestoration}
             />
-            <Button variant="outline" size="xs" asChild className="col-span-2 min-w-0">
+            <Button variant="outline" asChild className="col-span-2 min-w-0">
               <a
                 href={getShortcutOverrideRatingUrl()}
                 target="_blank"

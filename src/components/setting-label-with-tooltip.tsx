@@ -2,12 +2,12 @@ import type { ComponentProps } from 'react'
 import { CircleHelpIcon } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
-import { FieldLabel } from '@/components/ui/field'
+import { FieldLabel } from '@/components/app-ui/field'
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from '@/components/ui/tooltip'
+} from '@/components/app-ui/tooltip'
 
 type SettingLabelWithTooltipProps = {
   htmlFor: string
@@ -35,7 +35,7 @@ export function SettingLabelWithTooltip({
         <TooltipTrigger asChild>
           <button
             type="button"
-            className="inline-flex size-4 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            className="inline-flex size-4 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             aria-label={`${label} info`}
           >
             <CircleHelpIcon className="size-3.5" />
@@ -43,7 +43,7 @@ export function SettingLabelWithTooltip({
         </TooltipTrigger>
         <TooltipContent
           side="top"
-          sideOffset={6}
+          sideOffset={8}
           className="max-w-80 whitespace-pre-line"
         >
           {tooltip}

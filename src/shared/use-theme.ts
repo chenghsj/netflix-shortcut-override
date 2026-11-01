@@ -29,6 +29,7 @@ export const applyTheme = (theme: ResolvedTheme) => {
 
 export const useTheme = (theme: ThemeMode) => {
   const [systemTheme, setSystemTheme] = useState<ResolvedTheme>(getSystemTheme)
+  const resolvedTheme = resolveTheme(theme, systemTheme)
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
@@ -46,6 +47,8 @@ export const useTheme = (theme: ThemeMode) => {
   }, [theme])
 
   useEffect(() => {
-    applyTheme(resolveTheme(theme, systemTheme))
-  }, [systemTheme, theme])
+    applyTheme(resolvedTheme)
+  }, [resolvedTheme])
+
+  return resolvedTheme
 }

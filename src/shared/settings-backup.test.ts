@@ -12,6 +12,7 @@ import {
   DEFAULT_SETTINGS,
   SHORTCUT_SETTINGS_VERSION,
 } from '@/shared/shortcut-settings'
+import { UI_STYLES } from '@/shared/ui-styles'
 
 const exportedAt = new Date('2026-08-12T03:04:05.000Z')
 
@@ -36,6 +37,32 @@ const createVersion9Settings = () => {
 }
 
 describe('settings backup', () => {
+  it('restores a version 12 backup without a style using Classic', () => {
+    const backup = createSettingsBackup(DEFAULT_SETTINGS, { extensionVersion: '0.6.4', exportedAt })
+    const result = parseSettingsBackup(JSON.stringify({
+      ...backup, settings: { ...backup.settings, version: 12, uiStyle: undefined },
+    }))
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.value.settings.uiStyle).toBe('classic')
+      expect(result.value.settings.version).toBe(SHORTCUT_SETTINGS_VERSION)
+    }
+  })
+
+  it.each(UI_STYLES)('round-trips the %s style and brightness', uiStyle => {
+    const settings = { ...DEFAULT_SETTINGS, uiStyle, theme: 'dark' as const }
+    const backup = createSettingsBackup(settings, { extensionVersion: '0.6.4', exportedAt })
+    const result = parseSettingsBackup(serializeSettingsBackup(backup))
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.value.settings).toEqual(settings)
+  })
+
+  it.each([undefined, null, 'unknown'])('rejects a current backup with invalid style %s', uiStyle => {
+    const backup = createSettingsBackup(DEFAULT_SETTINGS, { extensionVersion: '0.6.4', exportedAt })
+    expect(parseSettingsBackup(JSON.stringify({ ...backup, settings: { ...backup.settings, uiStyle } })))
+      .toEqual({ ok: false, error: 'invalidSettings' })
+  })
+
   it('creates and serializes a stable complete backup envelope', () => {
     const settings = {
       ...DEFAULT_SETTINGS,

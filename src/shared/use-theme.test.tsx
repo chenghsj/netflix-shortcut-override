@@ -1,4 +1,4 @@
-import { act, render } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { useTheme } from '@/shared/use-theme'
@@ -8,8 +8,8 @@ type ThemeHarnessProps = {
 }
 
 function ThemeHarness({ theme }: ThemeHarnessProps) {
-  useTheme(theme)
-  return null
+  const resolvedTheme = useTheme(theme)
+  return <output>{resolvedTheme}</output>
 }
 
 const originalMatchMedia = window.matchMedia
@@ -29,6 +29,7 @@ describe('useTheme', () => {
 
     expect(document.documentElement).toHaveClass('dark')
     expect(document.documentElement.style.colorScheme).toBe('dark')
+    expect(screen.getByText('dark')).toBeInTheDocument()
   })
 
   it('updates an automatic theme when the system preference changes', () => {
@@ -56,6 +57,7 @@ describe('useTheme', () => {
 
     render(<ThemeHarness theme="auto" />)
     expect(document.documentElement).not.toHaveClass('dark')
+    expect(screen.getByText('light')).toBeInTheDocument()
 
     act(() => {
       matches = true
@@ -64,5 +66,42 @@ describe('useTheme', () => {
 
     expect(document.documentElement).toHaveClass('dark')
     expect(document.documentElement.style.colorScheme).toBe('dark')
+    expect(screen.getByText('dark')).toBeInTheDocument()
+  })
+
+  it('keeps an explicit choice when system preference changes', () => {
+    const listeners = new Set<(event: MediaQueryListEvent) => void>()
+    const mediaQuery = {
+      matches: true,
+      addEventListener: vi.fn((_event: string, callback: (event: MediaQueryListEvent) => void) => { listeners.add(callback) }),
+      removeEventListener: vi.fn((_event: string, callback: (event: MediaQueryListEvent) => void) => { listeners.delete(callback) }),
+    }
+    Object.defineProperty(window, 'matchMedia', { configurable: true, value: vi.fn(() => mediaQuery) })
+    render(<ThemeHarness theme="light" />)
+    expect(screen.getByText('light')).toBeInTheDocument()
+    expect(mediaQuery.addEventListener).not.toHaveBeenCalled()
+    act(() => { mediaQuery.matches = false; for (const listener of listeners) listener({ matches: false } as MediaQueryListEvent) })
+    act(() => { mediaQuery.matches = true; for (const listener of listeners) listener({ matches: true } as MediaQueryListEvent) })
+    expect(screen.getByText('light')).toBeInTheDocument()
+    expect(document.documentElement).not.toHaveClass('dark')
+  })
+
+  it('removes the system listener when automatic mode becomes manual', () => {
+    const listeners = new Set<(event: MediaQueryListEvent) => void>()
+    const mediaQuery = {
+      matches: false,
+      addEventListener: vi.fn((_event: string, callback: (event: MediaQueryListEvent) => void) => { listeners.add(callback) }),
+      removeEventListener: vi.fn((_event: string, callback: (event: MediaQueryListEvent) => void) => { listeners.delete(callback) }),
+    }
+    Object.defineProperty(window, 'matchMedia', { configurable: true, value: vi.fn(() => mediaQuery) })
+    const view = render(<ThemeHarness theme="auto" />)
+    expect(listeners.size).toBe(1)
+
+    view.rerender(<ThemeHarness theme="light" />)
+    expect(listeners.size).toBe(0)
+    expect(mediaQuery.removeEventListener).toHaveBeenCalledOnce()
+    act(() => { mediaQuery.matches = true; for (const listener of listeners) listener({ matches: true } as MediaQueryListEvent) })
+    expect(screen.getByText('light')).toBeInTheDocument()
+    expect(document.documentElement).not.toHaveClass('dark')
   })
 })

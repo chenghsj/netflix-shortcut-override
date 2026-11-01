@@ -6,7 +6,7 @@ import { dirname, resolve } from 'node:path'
 
 const args = process.argv.slice(2)
 
-function getArg(name) {
+function getArg(name: string) {
   const index = args.indexOf(`--${name}`)
   if (index >= 0) {
     return args[index + 1]
@@ -16,7 +16,7 @@ function getArg(name) {
   return prefixed?.slice(name.length + 3)
 }
 
-function git(args, fallback = '') {
+function git(args: string[], fallback = '') {
   try {
     return execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
   } catch {
@@ -24,7 +24,7 @@ function git(args, fallback = '') {
   }
 }
 
-function gitLines(args) {
+function gitLines(args: string[]) {
   const output = git(args)
   return output ? output.split('\n').filter(Boolean) : []
 }
@@ -38,11 +38,11 @@ function getTag() {
   )
 }
 
-function getPreviousTag(tag) {
+function getPreviousTag(tag: string) {
   return git(['describe', '--tags', '--abbrev=0', '--match', 'v[0-9]*', `${tag}^`], '')
 }
 
-function parseCommit(line) {
+function parseCommit(line: string) {
   const [hash, subject] = line.split('\x1f')
   const match = /^(?<type>[a-z]+)(?:\((?<scope>[^)]+)\))?(?<breaking>!)?: (?<title>.+)$/i.exec(subject)
 
@@ -63,7 +63,7 @@ function parseCommit(line) {
   }
 }
 
-function categoryFor(type) {
+function categoryFor(type: string) {
   switch (type) {
     case 'feat':
       return 'Features'
@@ -87,7 +87,7 @@ function categoryFor(type) {
   }
 }
 
-function formatCommit(commit) {
+function formatCommit(commit: ReturnType<typeof parseCommit>) {
   const shortHash = commit.hash.slice(0, 7)
   return `- ${commit.title} (${shortHash})`
 }
@@ -103,7 +103,7 @@ const previousTag = getPreviousTag(tag)
 const range = previousTag ? `${previousTag}..${tag}` : tag
 const lines = gitLines(['log', '--pretty=format:%H%x1f%s', range])
 const commits = lines.map(parseCommit).filter(commit => !commit.title.startsWith('Merge '))
-const grouped = new Map()
+const grouped = new Map<string, ReturnType<typeof parseCommit>[]>()
 
 for (const commit of commits) {
   const category = commit.breaking ? 'Breaking Changes' : categoryFor(commit.type)

@@ -77,6 +77,7 @@ const isCurrentSettingsNormalized = (
     }) &&
     settings.locale === normalized.locale &&
     settings.theme === normalized.theme &&
+    settings.uiStyle === normalized.uiStyle &&
     settings.speed.min === normalized.speed.min &&
     settings.speed.max === normalized.speed.max &&
     settings.speed.step === normalized.speed.step &&

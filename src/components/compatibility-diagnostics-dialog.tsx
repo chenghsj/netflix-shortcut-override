@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import {
   CompatibilityDiagnosticsCard,
 } from '@/components/compatibility-diagnostics-card'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/components/app-ui/button'
 import {
   Dialog,
   DialogContent,
@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog'
+} from '@/components/app-ui/dialog'
 import { getCopy } from '@/shared/i18n'
 import type { CompatibilityDiagnosticsState } from '@/shared/compatibility-readiness'
 import type {
@@ -75,7 +75,7 @@ export function CompatibilityDiagnosticsDialog({
         <Button
           variant="outline"
           size="icon-sm"
-          className="shrink-0"
+          className="shrink-0 rounded-full"
           aria-label={triggerLabel}
           title={triggerLabel}
           disabled={triggerState === 'checking'}

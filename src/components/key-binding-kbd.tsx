@@ -1,6 +1,6 @@
 import type { ComponentProps } from 'react'
 
-import { Kbd, KbdGroup } from '@/components/ui/kbd'
+import { Kbd, KbdGroup } from '@/components/app-ui/kbd'
 import { cn } from '@/lib/utils'
 import {
   formatKeyBinding,
