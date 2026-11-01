@@ -22,6 +22,7 @@ it('explains missing subtitle host access and allows retry after granting it', a
   const settings = structuredClone(DEFAULT_SETTINGS)
   settings.locale = 'zh-TW'
   settings.subtitlePractice.enabled = true
+  settings.subtitlePractice.bindings.replay.enabled = true
   const practice = createSubtitlePractice(() => settings, session, vi.fn())
   await practice.execute('next', document)
   expect(document.getElementById('shortcut-override-text-hint-label')).toHaveTextContent('字幕來源未授權')
@@ -55,7 +56,7 @@ it('gets subtitle metadata in Firefox without a page bridge', async () => {
       const success = { response: { success: true }, failureLabel: null }
       const seek = vi.spyOn(session, 'seekTo').mockResolvedValue(success)
       const play = vi.spyOn(session, 'play').mockResolvedValue(success)
-      const practice = createSubtitlePractice(() => ({ ...DEFAULT_SETTINGS, subtitlePractice: { ...DEFAULT_SETTINGS.subtitlePractice, enabled: true } }), session, vi.fn())
+      const practice = createSubtitlePractice(() => ({ ...DEFAULT_SETTINGS, subtitlePractice: { ...DEFAULT_SETTINGS.subtitlePractice, enabled: true, bindings: { ...DEFAULT_SETTINGS.subtitlePractice.bindings, replay: { ...DEFAULT_SETTINGS.subtitlePractice.bindings.replay, enabled: true } } } }), session, vi.fn())
       await practice.execute('next', document)
       expect(seek).toHaveBeenLastCalledWith(6000)
       await practice.execute('previous', document)
@@ -101,7 +102,7 @@ it('fetches once per track, preserves navigation state, and explicitly plays onl
   }
   window.addEventListener('shortcut-override:caption-request', respond)
   try {
-    const practice = createSubtitlePractice(() => ({ ...DEFAULT_SETTINGS, subtitlePractice: { ...DEFAULT_SETTINGS.subtitlePractice, enabled: true } }), session, onSeek)
+    const practice = createSubtitlePractice(() => ({ ...DEFAULT_SETTINGS, subtitlePractice: { ...DEFAULT_SETTINGS.subtitlePractice, enabled: true, bindings: { ...DEFAULT_SETTINGS.subtitlePractice.bindings, replay: { ...DEFAULT_SETTINGS.subtitlePractice.bindings.replay, enabled: true } } } }), session, onSeek)
     await practice.execute('next', document)
     expect(seek).toHaveBeenLastCalledWith(6000)
     expect(play).not.toHaveBeenCalled()
@@ -123,7 +124,7 @@ it('does not seek when disabled while a subtitle download is pending', async () 
   const respond = (event: Event) => window.dispatchEvent(new CustomEvent('shortcut-override:caption-response', { detail: JSON.stringify({ source: 'shortcut-override', id: JSON.parse((event as CustomEvent<string>).detail).id, metadata }) }))
   window.addEventListener('shortcut-override:caption-request', respond)
   try {
-    const practice = createSubtitlePractice(() => ({ ...DEFAULT_SETTINGS, subtitlePractice: { ...DEFAULT_SETTINGS.subtitlePractice, enabled: true } }), session, vi.fn())
+    const practice = createSubtitlePractice(() => ({ ...DEFAULT_SETTINGS, subtitlePractice: { ...DEFAULT_SETTINGS.subtitlePractice, enabled: true, bindings: { ...DEFAULT_SETTINGS.subtitlePractice.bindings, replay: { ...DEFAULT_SETTINGS.subtitlePractice.bindings.replay, enabled: true } } } }), session, vi.fn())
     const request = practice.execute('next', document)
     await Promise.resolve()
     practice.cancel()
@@ -141,7 +142,7 @@ it('ends a stalled subtitle delivery with an actionable timeout and allows retry
   const respond = (event: Event) => window.dispatchEvent(new CustomEvent('shortcut-override:caption-response', { detail: JSON.stringify({ source: 'shortcut-override', id: JSON.parse((event as CustomEvent<string>).detail).id, metadata }) }))
   window.addEventListener('shortcut-override:caption-request', respond)
   try {
-    const practice = createSubtitlePractice(() => ({ ...DEFAULT_SETTINGS, subtitlePractice: { ...DEFAULT_SETTINGS.subtitlePractice, enabled: true } }), session, vi.fn())
+    const practice = createSubtitlePractice(() => ({ ...DEFAULT_SETTINGS, subtitlePractice: { ...DEFAULT_SETTINGS.subtitlePractice, enabled: true, bindings: { ...DEFAULT_SETTINGS.subtitlePractice.bindings, replay: { ...DEFAULT_SETTINGS.subtitlePractice.bindings.replay, enabled: true } } } }), session, vi.fn())
     void practice.execute('next', document)
     await vi.advanceTimersByTimeAsync(12500)
     expect(document.getElementById('shortcut-override-text-hint-label')).toHaveTextContent('Subtitle download timed out')
@@ -161,6 +162,7 @@ const captionText = 'WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nOne\n\n00:00:03.00
 function pendingPractice(currentMs = metadata.currentMs) {
   const settings = structuredClone(DEFAULT_SETTINGS)
   settings.subtitlePractice.enabled = true
+  settings.subtitlePractice.bindings.replay.enabled = true
   const video = document.createElement('video')
   document.body.append(video)
   const session = createNetflixPlaybackSession()

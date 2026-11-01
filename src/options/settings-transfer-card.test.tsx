@@ -117,7 +117,7 @@ describe('SettingsTransferCard', () => {
     const subtitleSummary = within(dialog).getByText(subtitleCopy.title).nextElementSibling as HTMLElement
     expect(generalSummary).toHaveTextContent('13 / 14')
     expect(subtitleSummary).toHaveTextContent(localizedCopy.backupEnabled)
-    expect(subtitleSummary).toHaveTextContent('3 / 4')
+    expect(subtitleSummary).toHaveTextContent('2 / 4')
     expect(within(subtitleSummary).getAllByRole('listitem')).toHaveLength(4)
     const nextRow = within(subtitleSummary).getByText(subtitleCopy.next).closest('li') as HTMLElement
     expect(nextRow).toHaveTextContent(/Ctrl.*Shift.*N/)
@@ -137,7 +137,7 @@ describe('SettingsTransferCard', () => {
     selectFile(serializeSettingsBackup(createSettingsBackup(settings, { extensionVersion: 'test' })))
     const dialog = await screen.findByRole('dialog')
     const summary = within(dialog).getByText('Subtitle navigation').nextElementSibling as HTMLElement
-    expect(summary).toHaveTextContent('Disabled · enabled keys: 3 / 4')
+    expect(summary).toHaveTextContent('Disabled · enabled keys: 2 / 4')
     expect(within(summary).getAllByRole('listitem')).toHaveLength(4)
     expect(summary).toHaveTextContent(/Ctrl.*Shift.*N/)
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))

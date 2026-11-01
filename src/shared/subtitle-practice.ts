@@ -28,7 +28,7 @@ export const SUBTITLE_PERMISSION_COPY: Record<Locale, { denied: string; failed: 
 
 import type { SubtitlePracticeAction } from './shortcut-types'
 export type { SubtitlePracticeAction } from './shortcut-types'
-export const DEFAULT_PRACTICE_BINDINGS = Object.fromEntries(SUBTITLE_PRACTICE_ACTIONS.map((action, index) => [action, { enabled: true, key: { code: ['KeyA', 'KeyD', 'KeyS', 'KeyW'][index], key: ['a', 'd', 's', 'w'][index], ctrl: false, alt: false, shift: false, meta: false } }])) as ShortcutSettings['subtitlePractice']['bindings']
+export const DEFAULT_PRACTICE_BINDINGS = Object.fromEntries(SUBTITLE_PRACTICE_ACTIONS.map((action, index) => [action, { enabled: action !== 'replay', key: { code: ['KeyA', 'KeyD', 'KeyS', 'KeyW'][index], key: ['a', 'd', 's', 'w'][index], ctrl: false, alt: false, shift: false, meta: false } }])) as ShortcutSettings['subtitlePractice']['bindings']
 export function practiceAction(event: KeyboardEvent, settings?: ShortcutSettings): SubtitlePracticeAction | null {
   if (settings && !settings.subtitlePractice.enabled) return null
   const pressed = keyBindingFromEvent(event)

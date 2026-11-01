@@ -309,7 +309,7 @@ export const normalizeSettings = (raw: unknown): ShortcutSettings => {
       enabled: source.subtitlePractice?.enabled === true,
       bindings: Object.fromEntries(SUBTITLE_PRACTICE_ACTIONS.map(action => {
         const raw = source.subtitlePractice?.bindings?.[action]
-        return [action, { enabled: typeof raw?.enabled === 'boolean' ? raw.enabled : true, key: isKeyBinding(raw?.key) ? raw.key : DEFAULT_PRACTICE_BINDINGS[action].key }]
+        return [action, { enabled: typeof raw?.enabled === 'boolean' ? raw.enabled : DEFAULT_PRACTICE_BINDINGS[action].enabled, key: isKeyBinding(raw?.key) ? raw.key : DEFAULT_PRACTICE_BINDINGS[action].key }]
       })) as ShortcutSettings['subtitlePractice']['bindings'],
     },
     speed: normalizeSpeedSettings(source.speed),

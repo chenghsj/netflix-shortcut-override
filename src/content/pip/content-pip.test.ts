@@ -380,7 +380,7 @@ describe('content PiP shortcuts', () => {
     }) }))
     window.addEventListener('shortcut-override:caption-request', respond)
     try {
-      await saveSettings({ ...DEFAULT_SETTINGS, subtitlePractice: { ...DEFAULT_SETTINGS.subtitlePractice, enabled: true } })
+      await saveSettings({ ...DEFAULT_SETTINGS, subtitlePractice: { ...DEFAULT_SETTINGS.subtitlePractice, enabled: true, bindings: { ...DEFAULT_SETTINGS.subtitlePractice.bindings, replay: { ...DEFAULT_SETTINGS.subtitlePractice.bindings.replay, enabled: true } } } })
       const video = document.createElement('video')
       let paused = false
       const play = vi.fn(() => { paused = false; return Promise.resolve() })

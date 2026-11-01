@@ -26,6 +26,7 @@ describe('OptionsApp', () => {
   it('shows the subtitle owner beside the default S key without disabling the general shortcut', async () => {
     const settings = structuredClone(DEFAULT_SETTINGS)
     settings.subtitlePractice.enabled = true
+    settings.subtitlePractice.bindings.replay.enabled = true
     await saveSettings(settings)
     render(<OptionsApp />)
 
@@ -69,6 +70,7 @@ describe('OptionsApp', () => {
   it.each(['global', 'subtitle', 'general binding', 'subtitle binding'] as const)('hides subtitle priority when %s is disabled', async disabled => {
     const settings = structuredClone(DEFAULT_SETTINGS)
     settings.subtitlePractice.enabled = true
+    settings.subtitlePractice.bindings.replay.enabled = true
     if (disabled === 'global') settings.enabled = false
     if (disabled === 'subtitle') settings.subtitlePractice.enabled = false
     if (disabled === 'general binding') settings.bindings.skipIntro.enabled = false
@@ -98,6 +100,7 @@ describe('OptionsApp', () => {
   it('removes and restores subtitle priority immediately without changing the general binding', async () => {
     const settings = structuredClone(DEFAULT_SETTINGS)
     settings.subtitlePractice.enabled = true
+    settings.subtitlePractice.bindings.replay.enabled = true
     await saveSettings(settings)
     render(<OptionsApp />)
 

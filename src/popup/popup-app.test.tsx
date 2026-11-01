@@ -157,7 +157,7 @@ describe('PopupApp', () => {
     ] })
     await waitFor(async () => expect((await getSettings()).subtitlePractice.enabled).toBe(true))
     expect(within(section).getByText('Previous subtitle')).toBeInTheDocument()
-    expect(screen.getByText('Subtitle priority')).toBeInTheDocument()
+    expect(screen.queryByText('Subtitle priority')).not.toBeInTheDocument()
     expect(chrome.tabs.create).not.toHaveBeenCalled()
     fireEvent.click(toggle)
     await waitFor(async () => expect((await getSettings()).subtitlePractice.enabled).toBe(false))
@@ -344,6 +344,7 @@ describe('PopupApp', () => {
     vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(`Mozilla/5.0 ${browser}`)
     const settings = structuredClone(DEFAULT_SETTINGS)
     settings.subtitlePractice.enabled = true
+    settings.subtitlePractice.bindings.replay.enabled = true
     settings.subtitlePractice.bindings.previous.key = {
       code: 'KeyZ', key: 'z', ctrl: true, alt: false, shift: false, meta: false,
     }
@@ -382,6 +383,7 @@ describe('PopupApp', () => {
   it('updates subtitle precedence when a row or the master is disabled in Options', async () => {
     const settings = structuredClone(DEFAULT_SETTINGS)
     settings.subtitlePractice.enabled = true
+    settings.subtitlePractice.bindings.replay.enabled = true
     await saveSettings(settings)
     render(<PopupApp />)
     await screen.findByText('Subtitle priority')
