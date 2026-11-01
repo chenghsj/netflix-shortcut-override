@@ -58,6 +58,23 @@ html.popup-page-root {
   overflow-x: hidden;
 }
 
+@supports (-moz-appearance: none) {
+  html.popup-page-root {
+    width: auto;
+    min-width: 0;
+  }
+
+  html.popup-page-root body {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  html.popup-page-root #root {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
 @theme inline {
   --font-heading: var(--font-sans);
   --font-head: var(--font-sans);

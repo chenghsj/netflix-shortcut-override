@@ -104,7 +104,7 @@ export function PopupShortcutsPanel({
                 {!actionSupported ? (
                   <Badge
                     variant="secondary"
-                    className="max-w-24 justify-start truncate px-1.5 text-xs"
+                    className="max-w-24 justify-start truncate rounded px-1.5 text-xs shadow-xs"
                     title={copy.pictureInPictureUnsupported}
                   >
                     {copy.diagnosticsUnsupportedValue}
@@ -132,7 +132,7 @@ export function PopupShortcutsPanel({
                 ) : (
                   <Badge
                     variant="secondary"
-                    className="max-w-24 justify-start truncate px-1.5 text-xs"
+                    className="max-w-24 justify-start truncate rounded px-1.5 text-xs shadow-xs"
                     title={copy.disabledStatus}
                   >
                     {copy.disabledStatus}
