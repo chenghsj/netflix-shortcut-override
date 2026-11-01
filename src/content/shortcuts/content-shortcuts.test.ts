@@ -16,7 +16,7 @@ describe('content media shortcuts', () => {
       return event
     }
     expect(press().defaultPrevented).toBe(false)
-    await saveSettings({ ...DEFAULT_SETTINGS, subtitlePractice: { ...DEFAULT_SETTINGS.subtitlePractice, enabled: true } })
+    await saveSettings({ ...DEFAULT_SETTINGS, subtitleNavigation: { ...DEFAULT_SETTINGS.subtitleNavigation, enabled: true } })
     expect(press({ shiftKey: true }).defaultPrevented).toBe(false)
     expect(press({ repeat: true }).defaultPrevented).toBe(true)
     const input = document.createElement('input')
@@ -30,7 +30,7 @@ describe('content media shortcuts', () => {
 
   it.each([false, true])('cancels a pending subtitle row when disabled, even if re-enabled before delivery (%s)', async reenable => {
     const settings = structuredClone(DEFAULT_SETTINGS)
-    settings.subtitlePractice.enabled = true
+    settings.subtitleNavigation.enabled = true
     await saveSettings(settings)
     document.body.append(document.createElement('video'))
     let finish!: (reply: { text: string }) => void
@@ -49,10 +49,10 @@ describe('content media shortcuts', () => {
     try {
       window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyD', key: 'd', bubbles: true, cancelable: true }))
       await vi.waitFor(() => expect(finish).toBeTypeOf('function'))
-      settings.subtitlePractice.bindings.next.enabled = false
+      settings.subtitleNavigation.bindings.next.enabled = false
       await saveSettings(settings)
       if (reenable) {
-        settings.subtitlePractice.bindings.next.enabled = true
+        settings.subtitleNavigation.bindings.next.enabled = true
         await saveSettings(settings)
       }
       finish({ text: 'WEBVTT\n\n00:00:06.000 --> 00:00:07.000\nThree' })

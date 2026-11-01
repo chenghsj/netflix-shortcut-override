@@ -1,28 +1,28 @@
 import { useEffect, useRef, useState } from 'react'
 
-import { DEFAULT_PRACTICE_BINDINGS, practiceConflict } from '@/shared/subtitle-practice'
+import { findSubtitleNavigationConflict } from '@/shared/subtitle-navigation'
 import {
-  DEFAULT_KEY_BINDINGS,
   findBindingConflict,
   findEnabledBindingConflicts,
   getReplacedNetflixNativeKeyBindings,
   keyBindingsEqual,
 } from '@/shared/shortcut-bindings'
+import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
 import {
   SHORTCUT_ACTIONS,
-  SUBTITLE_PRACTICE_ACTIONS,
+  SUBTITLE_NAVIGATION_ACTIONS,
   type KeyBinding,
   type ShortcutAction,
   type ShortcutBinding,
   type ShortcutSettings,
-  type SubtitlePracticeAction,
+  type SubtitleNavigationAction,
 } from '@/shared/shortcut-types'
 import { subscribeSettings } from '@/shared/storage'
 import type { useShortcutSettingsForm } from '@/shared/use-shortcut-settings-form'
 
 export type ShortcutTarget =
   | { group: 'general'; action: ShortcutAction }
-  | { group: 'practice'; action: SubtitlePracticeAction }
+  | { group: 'subtitleNavigation'; action: SubtitleNavigationAction }
 
 type BindingRequest = ShortcutTarget & {
   savedKey: KeyBinding
@@ -51,9 +51,9 @@ function applyBindingRequest(
   ignoredActions: readonly ShortcutAction[],
 ): ShortcutSettings {
   if (
-    request.group === 'practice' && request.reason === 'enable' && enabled &&
-    !settings.subtitlePractice.bindings[request.action].enabled &&
-    (!settings.enabled || !settings.subtitlePractice.enabled)
+    request.group === 'subtitleNavigation' && request.reason === 'enable' && enabled &&
+    !settings.subtitleNavigation.bindings[request.action].enabled &&
+    (!settings.enabled || !settings.subtitleNavigation.enabled)
   ) return settings
 
   const update = <Action extends string>(
@@ -75,12 +75,12 @@ function applyBindingRequest(
     return next
   }
 
-  if (request.group === 'practice') {
+  if (request.group === 'subtitleNavigation') {
     return {
       ...settings,
-      subtitlePractice: {
-        ...settings.subtitlePractice,
-        bindings: update(settings.subtitlePractice.bindings, SUBTITLE_PRACTICE_ACTIONS, request.action),
+      subtitleNavigation: {
+        ...settings.subtitleNavigation,
+        bindings: update(settings.subtitleNavigation.bindings, SUBTITLE_NAVIGATION_ACTIONS, request.action),
       },
     }
   }
@@ -103,11 +103,11 @@ export function useShortcutEditor({
     setEditing(current => current.kind === 'confirm' ? { kind: 'idle' } : current)
   }), [])
 
-  const bindingFor = (target: ShortcutTarget) => target.group === 'practice'
-    ? settings.subtitlePractice.bindings[target.action]
+  const bindingFor = (target: ShortcutTarget) => target.group === 'subtitleNavigation'
+    ? settings.subtitleNavigation.bindings[target.action]
     : settings.bindings[target.action]
-  const conflictsFor = (target: ShortcutTarget, key: KeyBinding) => target.group === 'practice'
-    ? findEnabledBindingConflicts(settings.subtitlePractice.bindings, SUBTITLE_PRACTICE_ACTIONS, target.action, key)
+  const conflictsFor = (target: ShortcutTarget, key: KeyBinding) => target.group === 'subtitleNavigation'
+    ? findEnabledBindingConflicts(settings.subtitleNavigation.bindings, SUBTITLE_NAVIGATION_ACTIONS, target.action, key)
     : findEnabledBindingConflicts(settings.bindings, SHORTCUT_ACTIONS, target.action, key, ignoredGeneralActions)
   const requestEnabled = (
     target: ShortcutTarget,
@@ -127,7 +127,7 @@ export function useShortcutEditor({
   const request = editing.kind === 'confirm' ? editing.request : null
   const validRequest = request &&
     keyBindingsEqual(request.savedKey, bindingFor(request).key) &&
-    (request.group === 'general' || (settings.enabled && (request.reason === 'reset' || settings.subtitlePractice.enabled)))
+    (request.group === 'general' || (settings.enabled && (request.reason === 'reset' || settings.subtitleNavigation.enabled)))
     ? request : null
   const conflict = validRequest ? {
     group: validRequest.group,
@@ -138,8 +138,8 @@ export function useShortcutEditor({
 
   const recorder = editing.kind === 'record' ? editing.recorder : null
   const activeConflict = recorder?.draft && (recorder.intent.kind === 'enable' || bindingFor(recorder).enabled)
-    ? recorder.group === 'practice'
-      ? practiceConflict(settings, recorder.action, recorder.draft)
+    ? recorder.group === 'subtitleNavigation'
+      ? findSubtitleNavigationConflict(settings, recorder.action, recorder.draft)
       : findBindingConflict(settings, recorder.action, recorder.draft, { ignoredActions: ignoredGeneralActions })
     : null
   const canSaveDraft = Boolean(
@@ -147,7 +147,7 @@ export function useShortcutEditor({
       recorder.group === 'general' || (settings.enabled && (
         recorder.intent.kind === 'preserve-enabled' ||
         recorder.intent.reason === 'reset' ||
-        settings.subtitlePractice.enabled
+        settings.subtitleNavigation.enabled
       ))
     )
   )
@@ -167,8 +167,11 @@ export function useShortcutEditor({
       replacedNetflixKeys,
     },
     setBindingEnabled: (target: ShortcutTarget, enabled: boolean) => requestEnabled(target, enabled),
-    resetBinding: (target: ShortcutTarget) => requestEnabled(target, true, target.group === 'practice'
-      ? DEFAULT_PRACTICE_BINDINGS[target.action].key : DEFAULT_KEY_BINDINGS[target.action], 'reset'),
+    resetBinding: (target: ShortcutTarget) => {
+      const binding = target.group === 'subtitleNavigation'
+        ? DEFAULT_SETTINGS.subtitleNavigation.bindings[target.action] : DEFAULT_SETTINGS.bindings[target.action]
+      requestEnabled(target, binding.enabled, binding.key, 'reset')
+    },
     edit: (target: ShortcutTarget) => {
       const savedKey = bindingFor(target).key
       setEditing({

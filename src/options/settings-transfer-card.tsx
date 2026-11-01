@@ -26,8 +26,8 @@ import {
   type ParsedSettingsBackup,
   type SettingsBackupParseErrorCode,
 } from '@/shared/settings-backup'
-import { SHORTCUT_ACTIONS, SUBTITLE_PRACTICE_ACTIONS, type Locale, type ShortcutSettings } from '@/shared/shortcut-types'
-import { SUBTITLE_PRACTICE_COPY } from '@/shared/subtitle-practice'
+import { SHORTCUT_ACTIONS, SUBTITLE_NAVIGATION_ACTIONS, type Locale, type ShortcutSettings } from '@/shared/shortcut-types'
+import { SUBTITLE_NAVIGATION_COPY } from '@/shared/subtitle-navigation'
 
 type SettingsTransferCardProps = {
   copy: ReturnType<typeof getCopy>
@@ -135,9 +135,9 @@ export function SettingsTransferCard({
   }
 
   const importedSettings = pendingBackup?.settings
-  const subtitleCopy = SUBTITLE_PRACTICE_COPY[locale]
+  const subtitleCopy = SUBTITLE_NAVIGATION_COPY[locale]
   const enabledSubtitleShortcutCount = importedSettings
-    ? SUBTITLE_PRACTICE_ACTIONS.filter(action => importedSettings.subtitlePractice.bindings[action].enabled).length
+    ? SUBTITLE_NAVIGATION_ACTIONS.filter(action => importedSettings.subtitleNavigation.bindings[action].enabled).length
     : 0
   const enabledShortcutCount = importedSettings
     ? Object.values(importedSettings.bindings).filter(binding => binding.enabled).length
@@ -246,13 +246,13 @@ export function SettingsTransferCard({
               <dt className="text-muted-foreground">{subtitleCopy.title}</dt>
               <dd className="min-w-0">
                 <p>{formatTemplate(copy.backupSubtitleNavigationSummary, {
-                  status: enabledLabel(importedSettings.subtitlePractice.enabled),
+                  status: enabledLabel(importedSettings.subtitleNavigation.enabled),
                   count: enabledSubtitleShortcutCount,
-                  total: SUBTITLE_PRACTICE_ACTIONS.length,
+                  total: SUBTITLE_NAVIGATION_ACTIONS.length,
                 })}</p>
                 <ul className="mt-2 flex flex-col gap-2">
-                  {SUBTITLE_PRACTICE_ACTIONS.map(action => {
-                    const binding = importedSettings.subtitlePractice.bindings[action]
+                  {SUBTITLE_NAVIGATION_ACTIONS.map(action => {
+                    const binding = importedSettings.subtitleNavigation.bindings[action]
                     return (
                       <li key={action} className="flex flex-wrap items-center gap-x-2 gap-y-1">
                         <span>{subtitleCopy[action]}</span>

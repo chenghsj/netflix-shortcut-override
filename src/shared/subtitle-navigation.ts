@@ -1,7 +1,7 @@
 import { findEnabledBindingConflicts, keyBindingFromEvent, keyBindingsEqual } from './shortcut-bindings'
-import { SUBTITLE_PRACTICE_ACTIONS, type ShortcutSettings, type KeyBinding, type Locale } from './shortcut-types'
+import { SUBTITLE_NAVIGATION_ACTIONS, type ShortcutSettings, type KeyBinding, type Locale } from './shortcut-types'
 
-export const SUBTITLE_PRACTICE_COPY: Record<Locale, { title: string; description: string; requiresEnabled: string; goToGeneralSettings: string; resetAll: string; enabled: string; previous: string; next: string; replay: string; playback: string; loading: string; unavailable: string; boundary: string }> = {
+export const SUBTITLE_NAVIGATION_COPY: Record<Locale, { title: string; description: string; requiresEnabled: string; goToGeneralSettings: string; resetAll: string; enabled: string; previous: string; next: string; replay: string; playback: string; loading: string; unavailable: string; boundary: string }> = {
   en: { title: 'Subtitle navigation', requiresEnabled: 'First turn on the “Enable extension” switch at the top of the page.', goToGeneralSettings: 'Go to enable switch', description: 'Use shortcuts to jump to the previous or next subtitle, or replay the current one.\n\nIf the same key is assigned to another action, subtitle navigation takes priority.', resetAll: 'Reset subtitle shortcuts', enabled: 'Enable subtitle navigation shortcuts', previous: 'Previous subtitle', next: 'Next subtitle', replay: 'Replay current subtitle', playback: 'Play / pause', loading: 'Loading subtitles…', unavailable: 'Subtitles unavailable. Enable subtitles and retry.', boundary: 'No subtitle in this direction' },
   'zh-TW': { title: '字幕導航', requiresEnabled: '請先開啟頁面上方的「啟用擴充功能」開關。', goToGeneralSettings: '前往啟用開關', description: '用快捷鍵跳到上一句、下一句，或重播目前這句字幕。\n\n如果同一個按鍵也設定了其他功能，會優先執行字幕導航。', resetAll: '重設字幕導航快捷鍵', enabled: '啟用字幕導航快捷鍵', previous: '上一句', next: '下一句', replay: '重播目前句子', playback: '播放／暫停', loading: '正在取得字幕…', unavailable: '無法取得字幕，請開啟字幕後重試。', boundary: '這個方向沒有其他字幕' },
   'zh-CN': { title: '字幕导航', requiresEnabled: '请先打开页面上方的“启用扩展程序”开关。', goToGeneralSettings: '前往启用开关', description: '用快捷键跳到上一句、下一句，或重播当前这句字幕。\n\n如果同一个按键也设置了其他功能，会优先执行字幕导航。', resetAll: '重置字幕导航快捷键', enabled: '启用字幕导航快捷键', previous: '上一句', next: '下一句', replay: '重播当前句子', playback: '播放／暂停', loading: '正在获取字幕…', unavailable: '无法获取字幕，请开启字幕后重试。', boundary: '这个方向没有其他字幕' },
@@ -9,8 +9,8 @@ export const SUBTITLE_PRACTICE_COPY: Record<Locale, { title: string; description
   ko: { title: '자막 탐색', requiresEnabled: '먼저 페이지 상단의 “확장 프로그램 사용” 스위치를 켜 주세요.', goToGeneralSettings: '사용 스위치로 이동', description: '단축키로 이전 또는 다음 자막으로 이동하거나 현재 자막을 다시 재생합니다.\n\n같은 키를 다른 기능에도 설정하면 자막 탐색이 우선합니다.', resetAll: '자막 단축키 초기화', enabled: '자막 탐색 단축키 활성화', previous: '이전 자막', next: '다음 자막', replay: '현재 자막 다시 재생', playback: '재생 / 일시 정지', loading: '자막을 불러오는 중…', unavailable: '자막을 가져올 수 없습니다. 자막을 켜고 다시 시도하세요.', boundary: '이 방향에 자막이 없습니다' },
 }
 
-export type PracticeFailureCode = 'bridge' | 'watch' | 'player' | 'track' | 'document' | 'download' | 'permission' | 'timeout' | 'parse' | 'seek'
-export const PRACTICE_FAILURE_COPY: Record<Locale, Record<PracticeFailureCode, string>> = {
+export type SubtitleNavigationFailureCode = 'bridge' | 'watch' | 'player' | 'track' | 'document' | 'download' | 'permission' | 'timeout' | 'parse' | 'seek'
+export const SUBTITLE_NAVIGATION_FAILURE_COPY: Record<Locale, Record<SubtitleNavigationFailureCode, string>> = {
   en: { bridge: 'Subtitle bridge unavailable. Reload the extension and Netflix tab.', watch: 'Open a Netflix video first.', player: 'Player not ready. Start playback and retry.', track: 'Enable a Netflix subtitle track first.', document: 'Subtitle timing is not available yet. Start playback, then retry.', download: 'Subtitle download failed. Reload the extension and Netflix tab; check subtitle website access.', permission: 'Subtitle website access is missing. Enable Netflix subtitle host access in the extension permissions.', timeout: 'Subtitle download timed out. Press the shortcut to retry.', parse: 'This subtitle format could not be read. Try another subtitle track.', seek: 'Netflix did not accept the subtitle jump. Retry.' },
   'zh-TW': { bridge: '字幕連線未就緒，請重新載入擴充功能和 Netflix 分頁。', watch: '請先開啟 Netflix 影片。', player: '播放器尚未就緒，請先播放影片再重試。', track: '請先開啟 Netflix 字幕。', document: '尚未取得字幕時間，請先播放影片再重試。', download: '字幕下載失敗，請重新載入擴充功能和 Netflix 分頁，並確認字幕來源的網站存取權。', permission: '字幕來源未授權，請在擴充功能權限中啟用 Netflix 字幕網站存取權。', timeout: '字幕下載逾時，請再次按下快捷鍵重試。', parse: '無法讀取這個字幕格式，請嘗試其他字幕軌。', seek: 'Netflix 未接受字幕跳轉，請重試。' },
   'zh-CN': { bridge: '字幕连接未就绪，请重新加载扩展和 Netflix 标签页。', watch: '请先打开 Netflix 视频。', player: '播放器尚未就绪，请先播放视频再重试。', track: '请先开启 Netflix 字幕。', document: '尚未获取字幕时间，请先播放视频再重试。', download: '字幕下载失败，请重新加载扩展和 Netflix 标签页，并确认字幕来源的网站访问权限。', permission: '字幕来源未授权，请在扩展权限中启用 Netflix 字幕网站访问权限。', timeout: '字幕下载超时，请再次按下快捷键重试。', parse: '无法读取这个字幕格式，请尝试其他字幕轨。', seek: 'Netflix 未接受字幕跳转，请重试。' },
@@ -26,17 +26,17 @@ export const SUBTITLE_PERMISSION_COPY: Record<Locale, { denied: string; failed: 
   ko: { denied: '사이트 접근이 허용되지 않았습니다. 자막 탐색은 꺼진 상태로 유지됩니다. 다시 켜서 재시도하세요.', failed: '사이트 접근을 요청하지 못했습니다. 다시 시도하거나 확장 프로그램 권한에서 Netflix와 자막 사이트 접근을 허용하세요.' },
 }
 
-import type { SubtitlePracticeAction } from './shortcut-types'
-export type { SubtitlePracticeAction } from './shortcut-types'
-export const DEFAULT_PRACTICE_BINDINGS = Object.fromEntries(SUBTITLE_PRACTICE_ACTIONS.map((action, index) => [action, { enabled: action !== 'replay', key: { code: ['KeyA', 'KeyD', 'KeyS', 'KeyW'][index], key: ['a', 'd', 's', 'w'][index], ctrl: false, alt: false, shift: false, meta: false } }])) as ShortcutSettings['subtitlePractice']['bindings']
-export function practiceAction(event: KeyboardEvent, settings?: ShortcutSettings): SubtitlePracticeAction | null {
-  if (settings && !settings.subtitlePractice.enabled) return null
+import type { SubtitleNavigationAction } from './shortcut-types'
+export type { SubtitleNavigationAction } from './shortcut-types'
+export const DEFAULT_SUBTITLE_NAVIGATION_BINDINGS = Object.fromEntries(SUBTITLE_NAVIGATION_ACTIONS.map((action, index) => [action, { enabled: action !== 'replay', key: { code: ['KeyA', 'KeyD', 'KeyS', 'KeyW'][index], key: ['a', 'd', 's', 'w'][index], ctrl: false, alt: false, shift: false, meta: false } }])) as ShortcutSettings['subtitleNavigation']['bindings']
+export function findSubtitleNavigationActionForKey(event: KeyboardEvent, settings?: ShortcutSettings): SubtitleNavigationAction | null {
+  if (settings && !settings.subtitleNavigation.enabled) return null
   const pressed = keyBindingFromEvent(event)
-  const bindings = settings?.subtitlePractice.bindings ?? DEFAULT_PRACTICE_BINDINGS
-  return SUBTITLE_PRACTICE_ACTIONS.find(action => bindings[action].enabled && keyBindingsEqual(bindings[action].key, pressed)) ?? null
+  const bindings = settings?.subtitleNavigation.bindings ?? DEFAULT_SUBTITLE_NAVIGATION_BINDINGS
+  return SUBTITLE_NAVIGATION_ACTIONS.find(action => bindings[action].enabled && keyBindingsEqual(bindings[action].key, pressed)) ?? null
 }
-export function practiceConflict(settings: ShortcutSettings, action: SubtitlePracticeAction, key: KeyBinding): SubtitlePracticeAction | null {
-  return findEnabledBindingConflicts(settings.subtitlePractice.bindings, SUBTITLE_PRACTICE_ACTIONS, action, key)[0] ?? null
+export function findSubtitleNavigationConflict(settings: ShortcutSettings, action: SubtitleNavigationAction, key: KeyBinding): SubtitleNavigationAction | null {
+  return findEnabledBindingConflicts(settings.subtitleNavigation.bindings, SUBTITLE_NAVIGATION_ACTIONS, action, key)[0] ?? null
 }
 
 export function subtitleStarts(input: string): number[] {
@@ -55,7 +55,7 @@ export function subtitleStarts(input: string): number[] {
   return [...new Set(starts)].sort((a, b) => a - b)
 }
 
-export function subtitleTarget(starts: number[], currentMs: number, action: Exclude<SubtitlePracticeAction, 'playback'>): number | null {
+export function subtitleTarget(starts: number[], currentMs: number, action: Exclude<SubtitleNavigationAction, 'playback'>): number | null {
   if (!Number.isFinite(currentMs)) return null
   const next = starts.findIndex(start => start > currentMs + 50)
   const current = next === -1 ? starts.length - 1 : next - 1

@@ -79,17 +79,17 @@ describe('feature announcement lifecycle', () => {
     registerEligibleUpdate()
     await vi.waitFor(() => expect(chrome.action.setBadgeText).toHaveBeenLastCalledWith({ text: 'NEW' }))
     const settings = structuredClone(DEFAULT_SETTINGS)
-    settings.subtitlePractice.enabled = true
+    settings.subtitleNavigation.enabled = true
     await saveSettings(settings)
     await vi.waitFor(() => expect(chrome.action.setBadgeText).toHaveBeenLastCalledWith({ text: '' }))
-    settings.subtitlePractice.enabled = false
+    settings.subtitleNavigation.enabled = false
     await saveSettings(settings)
     expect((await subtitleNavigationAnnouncement.getState()).pending).toBe(false)
   })
 
   it('does not announce to users who already enabled the feature', async () => {
     const settings = structuredClone(DEFAULT_SETTINGS)
-    settings.subtitlePractice.enabled = true
+    settings.subtitleNavigation.enabled = true
     await saveSettings(settings)
     registerEligibleUpdate()
     await vi.waitFor(() => expect(chrome.action.setBadgeText).toHaveBeenLastCalledWith({ text: '' }))
@@ -99,9 +99,9 @@ describe('feature announcement lifecycle', () => {
   it('remembers activation when the user immediately switches it off again', async () => {
     registerEligibleUpdate()
     const settings = structuredClone(DEFAULT_SETTINGS)
-    settings.subtitlePractice.enabled = true
+    settings.subtitleNavigation.enabled = true
     await saveSettings(settings)
-    settings.subtitlePractice.enabled = false
+    settings.subtitleNavigation.enabled = false
     await saveSettings(settings)
     await vi.waitFor(() => expect(chrome.action.setBadgeText).toHaveBeenLastCalledWith({ text: '' }))
     expect((await subtitleNavigationAnnouncement.getState()).pending).toBe(false)

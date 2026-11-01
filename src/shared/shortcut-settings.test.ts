@@ -14,6 +14,35 @@ import {
 } from '@/shared/shortcut-settings'
 
 describe('shortcut settings', () => {
+  it.each([11, 12, 13])('migrates subtitle navigation settings from schema v%s without losing custom bindings', version => {
+    const subtitlePractice = structuredClone(DEFAULT_SETTINGS.subtitleNavigation)
+    subtitlePractice.enabled = true
+    subtitlePractice.bindings.next = {
+      enabled: false,
+      key: { code: 'KeyN', key: 'n', ctrl: true, alt: false, shift: false, meta: false },
+    }
+    subtitlePractice.bindings.replay.enabled = true
+    const normalized = normalizeSettings({ version, subtitlePractice })
+
+    expect(normalized.subtitleNavigation).toEqual(subtitlePractice)
+    expect(normalized.version).toBe(SHORTCUT_SETTINGS_VERSION)
+    expect(normalized).not.toHaveProperty('subtitlePractice')
+  })
+
+  it('adds default subtitle bindings when migrating the master-only schema v11', () => {
+    expect(normalizeSettings({ version: 11, subtitlePractice: { enabled: true } }).subtitleNavigation)
+      .toEqual({ ...DEFAULT_SETTINGS.subtitleNavigation, enabled: true })
+  })
+
+  it('uses canonical subtitle navigation settings over a stale compatibility alias', () => {
+    const normalized = normalizeSettings({
+      ...DEFAULT_SETTINGS,
+      subtitlePractice: { ...DEFAULT_SETTINGS.subtitleNavigation, enabled: true },
+    })
+    expect(normalized.subtitleNavigation).toEqual(DEFAULT_SETTINGS.subtitleNavigation)
+    expect(normalizeSettings(normalized)).toEqual(normalized)
+  })
+
   it.each([undefined, null, '', 'unknown'])('keeps the Classic appearance of legacy settings with absent or invalid style %s', uiStyle => {
     const settings = normalizeSettings({ ...DEFAULT_SETTINGS, version: 12, uiStyle })
     expect(settings.uiStyle).toBe('classic')

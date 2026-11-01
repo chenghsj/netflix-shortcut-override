@@ -13,8 +13,8 @@ import { cn } from '@/lib/utils'
 import { SUBTITLE_NAVIGATION_POPUP_COPY } from '@/popup/subtitle-navigation-copy'
 import { getCopy } from '@/shared/i18n'
 import { keyBindingsEqual } from '@/shared/shortcut-bindings'
-import { SUBTITLE_PRACTICE_ACTIONS, type Locale, type ShortcutAction, type ShortcutSettings } from '@/shared/shortcut-types'
-import { SUBTITLE_PERMISSION_COPY, SUBTITLE_PRACTICE_COPY } from '@/shared/subtitle-practice'
+import { SUBTITLE_NAVIGATION_ACTIONS, type Locale, type ShortcutAction, type ShortcutSettings } from '@/shared/shortcut-types'
+import { SUBTITLE_PERMISSION_COPY, SUBTITLE_NAVIGATION_COPY } from '@/shared/subtitle-navigation'
 import type { useSubtitleActivation } from '@/shared/use-subtitle-activation'
 
 const POPUP_SHORTCUT_ACTIONS: ShortcutAction[] = [
@@ -52,9 +52,9 @@ export function PopupShortcutsPanel({
   statusText,
 }: PopupShortcutsPanelProps) {
   const copy = getCopy(locale)
-  const subtitleCopy = SUBTITLE_PRACTICE_COPY[locale]
+  const subtitleCopy = SUBTITLE_NAVIGATION_COPY[locale]
   const subtitlePopupCopy = SUBTITLE_NAVIGATION_POPUP_COPY[locale]
-  const subtitleNavigationEnabled = settings.enabled && settings.subtitlePractice.enabled
+  const subtitleNavigationEnabled = settings.enabled && settings.subtitleNavigation.enabled
   const shouldShowPageStatus = Boolean(statusText)
 
   return (
@@ -79,8 +79,8 @@ export function PopupShortcutsPanel({
               action !== 'pictureInPicture' ||
               supportsSubtitlePreservingPip
             const overridingSubtitleAction = subtitleNavigationEnabled && binding.enabled && actionSupported
-              ? SUBTITLE_PRACTICE_ACTIONS.find(subtitleAction => {
-                  const subtitleBinding = settings.subtitlePractice.bindings[subtitleAction]
+              ? SUBTITLE_NAVIGATION_ACTIONS.find(subtitleAction => {
+                  const subtitleBinding = settings.subtitleNavigation.bindings[subtitleAction]
                   return subtitleBinding.enabled && keyBindingsEqual(subtitleBinding.key, binding.key)
                 })
               : undefined
@@ -173,7 +173,7 @@ export function PopupShortcutsPanel({
           </div>
           <Switch
             id="popup-subtitle-navigation-enabled"
-            checked={settings.subtitlePractice.enabled}
+            checked={settings.subtitleNavigation.enabled}
             disabled={!settings.enabled || subtitleActivation.pending}
             aria-label={subtitleCopy.enabled}
             aria-busy={subtitleActivation.pending}
@@ -196,8 +196,8 @@ export function PopupShortcutsPanel({
         )}
         {subtitleNavigationEnabled && (
           <div className="flex flex-col gap-0.5">
-            {SUBTITLE_PRACTICE_ACTIONS.map(action => {
-              const binding = settings.subtitlePractice.bindings[action]
+            {SUBTITLE_NAVIGATION_ACTIONS.map(action => {
+              const binding = settings.subtitleNavigation.bindings[action]
               return (
                 <div key={action} className="flex min-h-7 items-center justify-between gap-3 rounded-md px-1.5 transition-colors hover:bg-accent">
                   <span className={cn('min-w-0 truncate text-sm leading-normal', !binding.enabled && 'text-muted-foreground')} title={subtitleCopy[action]}>

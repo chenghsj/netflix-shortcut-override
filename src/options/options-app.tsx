@@ -1,4 +1,4 @@
-import { DEFAULT_PRACTICE_BINDINGS, SUBTITLE_PERMISSION_COPY, SUBTITLE_PRACTICE_COPY } from '@/shared/subtitle-practice'
+import { DEFAULT_SUBTITLE_NAVIGATION_BINDINGS, SUBTITLE_PERMISSION_COPY, SUBTITLE_NAVIGATION_COPY } from '@/shared/subtitle-navigation'
 import {
   CaptionsIcon,
   ChevronsLeftRightIcon,
@@ -86,7 +86,7 @@ import {
   SPEED_LIMITS,
 } from '@/shared/shortcut-settings'
 import {
-  SUBTITLE_PRACTICE_ACTIONS,
+  SUBTITLE_NAVIGATION_ACTIONS,
   SHORTCUT_ACTIONS,
   type KeyBinding,
   type ShortcutAction,
@@ -184,14 +184,14 @@ export function OptionsApp() {
   const subtitleActivation = useSubtitleActivation({ settings, updateSettings })
   const { pending: subtitlePermissionPending, error: subtitlePermissionError } = subtitleActivation
   useEffect(() => subscribeSettings(next => {
-    if (next.subtitlePractice.enabled) setSubtitleGuideRequested(false)
+    if (next.subtitleNavigation.enabled) setSubtitleGuideRequested(false)
   }), [])
   const resolvedLocale = resolveLocalePreference(settings.locale)
-  const practiceCopy = SUBTITLE_PRACTICE_COPY[resolvedLocale]
+  const subtitleNavigationCopy = SUBTITLE_NAVIGATION_COPY[resolvedLocale]
   const subtitlePopupCopy = SUBTITLE_NAVIGATION_POPUP_COPY[resolvedLocale]
-  const subtitleNavigationEnabled = settings.enabled && settings.subtitlePractice.enabled
+  const subtitleNavigationEnabled = settings.enabled && settings.subtitleNavigation.enabled
   const activationCopy = SUBTITLE_ACTIVATION_COPY[resolvedLocale]
-  const showSubtitleGuide = subtitleGuideRequested && !settings.subtitlePractice.enabled
+  const showSubtitleGuide = subtitleGuideRequested && !settings.subtitleNavigation.enabled
   const copy = getCopy(resolvedLocale)
   const browserCapabilities = getBrowserCapabilities()
   const conflictCopy = SHORTCUT_CONFLICT_COPY[resolvedLocale]
@@ -201,12 +201,12 @@ export function OptionsApp() {
 
   const editor = useShortcutEditor({ settings, updateSettings, ignoredGeneralActions })
   const { recorder, conflict } = editor
-  const actionLabels = { ...copy.actions, ...practiceCopy }
+  const actionLabels = { ...copy.actions, ...subtitleNavigationCopy }
   const conflictNames = new Intl.ListFormat(resolvedLocale, { style: 'short', type: 'conjunction' }).format(conflict?.actions.map(action => actionLabels[action]) ?? [])
   const conflictSwitch = (target: ShortcutTarget, disabled: boolean) => {
-    const binding = target.group === 'practice' ? settings.subtitlePractice.bindings[target.action] : settings.bindings[target.action]
+    const binding = target.group === 'subtitleNavigation' ? settings.subtitleNavigation.bindings[target.action] : settings.bindings[target.action]
     const open = Boolean(conflict?.group === target.group && conflict.action === target.action && conflict.actions.length)
-    return <ShortcutConflictSwitch checked={binding.enabled && (target.group === 'practice' || !disabled)} disabled={disabled}
+    return <ShortcutConflictSwitch checked={binding.enabled && (target.group === 'subtitleNavigation' || !disabled)} disabled={disabled}
       label={`${actionLabels[target.action]} ${copy.status}`} open={open} copy={conflictCopy}
       title={conflictCopy.title.replace('{key}', formatKeyBinding(conflict?.key ?? binding.key)).replace('{actions}', conflictNames)}
       consequence={conflictCopy.consequence.replace('{actions}', conflictNames)}
@@ -220,7 +220,7 @@ export function OptionsApp() {
   if (!loaded) return null
 
   const subtitleEnableGuidance = <>
-    {practiceCopy.requiresEnabled}{' '}
+    {subtitleNavigationCopy.requiresEnabled}{' '}
     <a href="#enable-shortcut-override"
       className="inline-block rounded-sm text-foreground underline underline-offset-4 hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
       onClick={event => {
@@ -229,7 +229,7 @@ export function OptionsApp() {
         globalEnableSwitch.current?.scrollIntoView({ block: 'center' })
         globalEnableSwitch.current?.focus({ preventScroll: true })
       }}>
-      {practiceCopy.goToGeneralSettings}
+      {subtitleNavigationCopy.goToGeneralSettings}
     </a>
   </>
 
@@ -382,13 +382,13 @@ export function OptionsApp() {
                           action !== 'pictureInPicture' ||
                           browserCapabilities.supportsSubtitlePreservingPip
                         const overridingSubtitleAction = subtitleNavigationEnabled && binding.enabled && actionSupported
-                          ? SUBTITLE_PRACTICE_ACTIONS.find(subtitleAction => {
-                              const subtitleBinding = settings.subtitlePractice.bindings[subtitleAction]
+                          ? SUBTITLE_NAVIGATION_ACTIONS.find(subtitleAction => {
+                              const subtitleBinding = settings.subtitleNavigation.bindings[subtitleAction]
                               return subtitleBinding.enabled && keyBindingsEqual(subtitleBinding.key, binding.key)
                             })
                           : undefined
                         const overrideDescription = overridingSubtitleAction
-                          ? subtitlePopupCopy.overriddenBy.replace('{action}', practiceCopy[overridingSubtitleAction])
+                          ? subtitlePopupCopy.overriddenBy.replace('{action}', subtitleNavigationCopy[overridingSubtitleAction])
                           : undefined
                         return (
                           <TableRow key={action}>
@@ -480,18 +480,18 @@ export function OptionsApp() {
                 <CardHeader className="flex flex-wrap items-center justify-between gap-3">
                   <CardTitle className={cn("flex items-center gap-1.5", !settings.enabled && "text-muted-foreground")}>
                     <CaptionsIcon data-icon="inline-start" aria-hidden="true" />
-                    <span>{practiceCopy.title}</span>
+                    <span>{subtitleNavigationCopy.title}</span>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button type="button"
                           className="inline-flex size-4 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                          aria-label={`${practiceCopy.title} info`}>
+                          aria-label={`${subtitleNavigationCopy.title} info`}>
                           <CircleHelpIcon className="size-3.5" />
                         </button>
                       </TooltipTrigger>
                       <TooltipContent side="top" sideOffset={8} className="max-w-80">
                         <div className="space-y-2 whitespace-normal">
-                          {practiceCopy.description.split('\n\n').map(paragraph => <p key={paragraph}>{paragraph}</p>)}
+                          {subtitleNavigationCopy.description.split('\n\n').map(paragraph => <p key={paragraph}>{paragraph}</p>)}
                         </div>
                       </TooltipContent>
                     </Tooltip>
@@ -501,7 +501,7 @@ export function OptionsApp() {
                       <PopoverAnchor asChild>
                         <div ref={subtitleActivationAnchor} className="flex min-w-0 items-center gap-2">
                           <Label htmlFor="subtitle-navigation-enabled" className="text-muted-foreground">{activationCopy.enableLabel}</Label>
-                          <Switch id="subtitle-navigation-enabled" disabled={!settings.enabled || subtitlePermissionPending} checked={settings.subtitlePractice.enabled} aria-label={practiceCopy.enabled}
+                          <Switch id="subtitle-navigation-enabled" disabled={!settings.enabled || subtitlePermissionPending} checked={settings.subtitleNavigation.enabled} aria-label={subtitleNavigationCopy.enabled}
                             aria-busy={subtitlePermissionPending} aria-describedby={[showSubtitleGuide && 'subtitle-activation-guide', subtitlePermissionError && 'subtitle-permission-error'].filter(Boolean).join(' ') || undefined}
                             onCheckedChange={enabled => {
                               if (!enabled) setSubtitleGuideRequested(false)
@@ -510,7 +510,7 @@ export function OptionsApp() {
                         </div>
                       </PopoverAnchor>
                       <PopoverContent side="bottom" align="end" sideOffset={10} collisionPadding={16} className="w-80 max-w-[calc(100vw-2rem)] gap-2 p-3"
-                        aria-label={practiceCopy.title} aria-describedby="subtitle-activation-guide subtitle-activation-permission"
+                        aria-label={subtitleNavigationCopy.title} aria-describedby="subtitle-activation-guide subtitle-activation-permission"
                         onOpenAutoFocus={event => event.preventDefault()}
                         onCloseAutoFocus={event => event.preventDefault()}
                         onInteractOutside={event => {
@@ -525,8 +525,8 @@ export function OptionsApp() {
                         <PopoverArrow />
                       </PopoverContent>
                     </Popover>
-                    <Button variant="outline" disabled={!settings.enabled} aria-label={practiceCopy.resetAll}
-                      onClick={() => updateSettings(current => ({ ...current, subtitlePractice: { ...current.subtitlePractice, bindings: structuredClone(DEFAULT_PRACTICE_BINDINGS) } }))}>
+                    <Button variant="outline" disabled={!settings.enabled} aria-label={subtitleNavigationCopy.resetAll}
+                      onClick={() => updateSettings(current => ({ ...current, subtitleNavigation: { ...current.subtitleNavigation, bindings: structuredClone(DEFAULT_SUBTITLE_NAVIGATION_BINDINGS) } }))}>
                       <RotateCcwIcon data-icon="inline-start" />
                       {copy.reset}
                     </Button>
@@ -541,19 +541,19 @@ export function OptionsApp() {
                   )}
                   <Table className={cn("min-w-[36rem] table-fixed", !settings.enabled && "opacity-60")}>
                     <ShortcutTableHeader labels={copy} />
-                    <TableBody>{SUBTITLE_PRACTICE_ACTIONS.map(action => {
-                      const binding = settings.subtitlePractice.bindings[action]
+                    <TableBody>{SUBTITLE_NAVIGATION_ACTIONS.map(action => {
+                      const binding = settings.subtitleNavigation.bindings[action]
                       return <TableRow key={action}>
-                        <TableCell className="font-medium whitespace-normal">{practiceCopy[action]}</TableCell>
+                        <TableCell className="font-medium whitespace-normal">{subtitleNavigationCopy[action]}</TableCell>
                         <TableCell><KeyBindingKbd binding={binding.key} className="flex-wrap" /></TableCell>
-                        <TableCell>{conflictSwitch({ group: 'practice', action }, !settings.enabled || !settings.subtitlePractice.enabled)}</TableCell>
+                        <TableCell>{conflictSwitch({ group: 'subtitleNavigation', action }, !settings.enabled || !settings.subtitleNavigation.enabled)}</TableCell>
                         <TableCell><div className="flex items-center justify-end gap-2">
                           <Button disabled={!settings.enabled} variant="ghost" size="icon" className="text-muted-foreground focus-visible:text-foreground"
-                            aria-label={`${copy.edit} ${practiceCopy[action]}`}
-                            onClick={() => editor.edit({ group: 'practice', action })}><PencilIcon /></Button>
+                            aria-label={`${copy.edit} ${subtitleNavigationCopy[action]}`}
+                            onClick={() => editor.edit({ group: 'subtitleNavigation', action })}><PencilIcon /></Button>
                           <Button disabled={!settings.enabled} variant="ghost" size="icon" className="text-muted-foreground focus-visible:text-foreground"
-                            aria-label={`${copy.reset} ${practiceCopy[action]}`}
-                            onClick={() => editor.resetBinding({ group: 'practice', action })}><RotateCcwIcon /></Button>
+                            aria-label={`${copy.reset} ${subtitleNavigationCopy[action]}`}
+                            onClick={() => editor.resetBinding({ group: 'subtitleNavigation', action })}><RotateCcwIcon /></Button>
                         </div></TableCell>
                       </TableRow>
                     })}</TableBody>

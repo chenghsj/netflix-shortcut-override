@@ -43,7 +43,7 @@ export function useSubtitleActivation({
     if (!enabled) {
       updateSettings(current => ({
         ...current,
-        subtitlePractice: { ...current.subtitlePractice, enabled: false },
+        subtitleNavigation: { ...current.subtitleNavigation, enabled: false },
       }))
       return
     }
@@ -70,7 +70,7 @@ export function useSubtitleActivation({
             return
           }
           updateSettings(current => current.enabled
-            ? { ...current, subtitlePractice: { ...current.subtitlePractice, enabled: true } }
+            ? { ...current, subtitleNavigation: { ...current.subtitleNavigation, enabled: true } }
             : current)
         })
         .catch(() => fail('failed'))

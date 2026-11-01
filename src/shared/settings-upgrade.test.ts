@@ -17,8 +17,8 @@ describe('v0.6.4 upgrade compatibility', () => {
   it.each(fixtures.cases)('retains all functional preferences and backup values for $name', async fixture => {
     await setSync({ [SETTINGS_STORAGE_KEY]: fixture.settings })
     await initializeUiStyleDefault('update')
-    const oldSettings = Object.fromEntries(Object.entries(fixture.settings).filter(([key]) => key !== 'spaceHold'))
-    const expected = { ...oldSettings, version: SHORTCUT_SETTINGS_VERSION, uiStyle: 'classic' }
+    const oldSettings = Object.fromEntries(Object.entries(fixture.settings).filter(([key]) => key !== 'spaceHold' && key !== 'subtitlePractice'))
+    const expected = { ...oldSettings, subtitleNavigation: fixture.settings.subtitlePractice, version: SHORTCUT_SETTINGS_VERSION, uiStyle: 'classic' }
     expect(await getSettings()).toEqual(expected)
     expect((await readSync())[SETTINGS_STORAGE_KEY]).toEqual(fixture.settings)
     const restored = parseSettingsBackup(JSON.stringify(fixture.backup))

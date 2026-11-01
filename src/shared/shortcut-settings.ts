@@ -1,8 +1,8 @@
 import { DEFAULT_UI_STYLE, isUiStyle } from './ui-styles'
-import { DEFAULT_PRACTICE_BINDINGS } from './subtitle-practice'
+import { DEFAULT_SUBTITLE_NAVIGATION_BINDINGS } from './subtitle-navigation'
 import { DEFAULT_KEY_BINDINGS, isKeyBinding, keyBindingsEqual } from './shortcut-bindings'
 import {
-  SUBTITLE_PRACTICE_ACTIONS,
+  SUBTITLE_NAVIGATION_ACTIONS,
   LOCALES,
   LOCALE_PREFERENCES,
   SHORTCUT_ACTIONS,
@@ -16,6 +16,7 @@ import {
   type ShortcutAction,
   type ShortcutBinding,
   type ShortcutSettings,
+  type SubtitleNavigationSettings,
   type HoldSpeedSettings,
   type SpeedSettings,
   type ThemeMode,
@@ -59,7 +60,7 @@ export const DEFAULT_PIP_SETTINGS: PipSettings = {
   subtitleBackground: 'translucent',
 }
 
-export const SHORTCUT_SETTINGS_VERSION = 13
+export const SHORTCUT_SETTINGS_VERSION = 14
 export const MIN_SETTINGS_BACKUP_VERSION = 8
 
 const SETTINGS_ACTIONS_BY_VERSION: Record<number, readonly ShortcutAction[]> = {
@@ -71,6 +72,7 @@ const SETTINGS_ACTIONS_BY_VERSION: Record<number, readonly ShortcutAction[]> = {
   11: SHORTCUT_ACTIONS,
   12: SHORTCUT_ACTIONS,
   13: SHORTCUT_ACTIONS,
+  14: SHORTCUT_ACTIONS,
 }
 
 const LEGACY_PICTURE_IN_PICTURE_BINDING = {
@@ -89,7 +91,7 @@ export const DEFAULT_SETTINGS: ShortcutSettings = {
   theme: 'auto',
   uiStyle: DEFAULT_UI_STYLE,
   speed: DEFAULT_SPEED_SETTINGS,
-  subtitlePractice: { enabled: false, bindings: DEFAULT_PRACTICE_BINDINGS },
+  subtitleNavigation: { enabled: false, bindings: DEFAULT_SUBTITLE_NAVIGATION_BINDINGS },
   holdSpeed: DEFAULT_HOLD_SPEED_SETTINGS,
   seek: DEFAULT_SEEK_SETTINGS,
   pip: DEFAULT_PIP_SETTINGS,
@@ -124,10 +126,12 @@ export const isCompleteSettingsForBackup = (
 ): boolean => {
   const requiredActions = SETTINGS_ACTIONS_BY_VERSION[version]
   const holdSpeedKey = version >= 10 ? 'holdSpeed' : 'spaceHold'
+  // Backups through v13 used the former name for subtitle navigation.
+  const subtitleNavigation = settings[version >= 14 ? 'subtitleNavigation' : 'subtitlePractice']
   if (
-    (version >= 11 && (!isRecord(settings.subtitlePractice) || typeof settings.subtitlePractice.enabled !== 'boolean')) ||
-    (version >= 12 && (!isRecord(settings.subtitlePractice) || !isRecord(settings.subtitlePractice.bindings) || !SUBTITLE_PRACTICE_ACTIONS.every(action => {
-      const binding = (settings.subtitlePractice as Record<string, unknown>).bindings as Record<string, unknown>
+    (version >= 11 && (!isRecord(subtitleNavigation) || typeof subtitleNavigation.enabled !== 'boolean')) ||
+    (version >= 12 && (!isRecord(subtitleNavigation) || !isRecord(subtitleNavigation.bindings) || !SUBTITLE_NAVIGATION_ACTIONS.every(action => {
+      const binding = subtitleNavigation.bindings as Record<string, unknown>
       const item = binding[action]
       return isRecord(item) && typeof item.enabled === 'boolean' && isKeyBinding(item.key)
     }))) ||
@@ -246,8 +250,11 @@ export const normalizeSettings = (raw: unknown): ShortcutSettings => {
   const source = raw && typeof raw === 'object' ? (raw as Partial<ShortcutSettings>) : {}
   const legacySource = source as Partial<ShortcutSettings> & {
     spaceHold?: Partial<HoldSpeedSettings>
+    subtitlePractice?: Partial<SubtitleNavigationSettings>
   }
   const sourceVersion = typeof source.version === 'number' ? source.version : 1
+  const subtitleNavigation = source.subtitleNavigation ??
+    (sourceVersion < 14 ? legacySource.subtitlePractice : undefined)
   const shouldMigrateLegacyPictureInPicture = sourceVersion < 2
   const rawBindings =
     source.bindings && typeof source.bindings === 'object'
@@ -305,12 +312,12 @@ export const normalizeSettings = (raw: unknown): ShortcutSettings => {
         ? source.theme
         : DEFAULT_SETTINGS.theme,
     uiStyle: isUiStyle(source.uiStyle) ? source.uiStyle : sourceVersion < 13 && raw != null ? 'classic' : DEFAULT_SETTINGS.uiStyle,
-    subtitlePractice: {
-      enabled: source.subtitlePractice?.enabled === true,
-      bindings: Object.fromEntries(SUBTITLE_PRACTICE_ACTIONS.map(action => {
-        const raw = source.subtitlePractice?.bindings?.[action]
-        return [action, { enabled: typeof raw?.enabled === 'boolean' ? raw.enabled : DEFAULT_PRACTICE_BINDINGS[action].enabled, key: isKeyBinding(raw?.key) ? raw.key : DEFAULT_PRACTICE_BINDINGS[action].key }]
-      })) as ShortcutSettings['subtitlePractice']['bindings'],
+    subtitleNavigation: {
+      enabled: subtitleNavigation?.enabled === true,
+      bindings: Object.fromEntries(SUBTITLE_NAVIGATION_ACTIONS.map(action => {
+        const raw = subtitleNavigation?.bindings?.[action]
+        return [action, { enabled: typeof raw?.enabled === 'boolean' ? raw.enabled : DEFAULT_SUBTITLE_NAVIGATION_BINDINGS[action].enabled, key: isKeyBinding(raw?.key) ? raw.key : DEFAULT_SUBTITLE_NAVIGATION_BINDINGS[action].key }]
+      })) as ShortcutSettings['subtitleNavigation']['bindings'],
     },
     speed: normalizeSpeedSettings(source.speed),
     holdSpeed: normalizeHoldSpeedSettings(

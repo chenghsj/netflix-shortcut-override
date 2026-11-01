@@ -146,6 +146,8 @@ const persistSettings = async (settings: ShortcutSettings): Promise<ShortcutSett
     ...normalized,
     // Keep this alias while v0.5.x installations may share sync storage with v0.6.x.
     spaceHold: normalized.holdSpeed,
+    // Older installations sharing sync storage still read this former name.
+    subtitlePractice: normalized.subtitleNavigation,
   }
   const values = { [SETTINGS_STORAGE_KEY]: persisted, [UI_STYLE_STORAGE_KEY]: normalized.uiStyle }
   if (!hasChromeStorage()) {

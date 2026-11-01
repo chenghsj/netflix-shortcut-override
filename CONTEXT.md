@@ -48,6 +48,4 @@ _Avoid_: Native video timeline, playback clock
 The extension-managed playback, seek, volume, and subtitle controls presented within a PiP session.
 _Avoid_: Netflix controls, native video controls
 
-**Subtitle navigation**:
-Optional keyboard actions that use the selected Netflix subtitle track to move to a previous or next subtitle start, replay the current subtitle once, or toggle playback. The feature has its own master switch and requires the global shortcut override to be enabled.
-_Avoid_: Subtitle practice, subtitle exercise
+Subtitle navigation terminology is defined in [GLOSSARY.md](GLOSSARY.md).

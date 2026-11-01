@@ -10,16 +10,16 @@ import {
 } from '@/shared/settings-backup'
 import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
 import { LOCALES } from '@/shared/shortcut-types'
-import { SUBTITLE_PRACTICE_COPY } from '@/shared/subtitle-practice'
+import { SUBTITLE_NAVIGATION_COPY } from '@/shared/subtitle-navigation'
 
 const customSubtitleSettings = () => {
   const settings = structuredClone(DEFAULT_SETTINGS)
   settings.enabled = false
-  settings.subtitlePractice.enabled = true
-  settings.subtitlePractice.bindings.next.key = {
+  settings.subtitleNavigation.enabled = true
+  settings.subtitleNavigation.bindings.next.key = {
     code: 'KeyN', key: 'n', ctrl: true, alt: false, shift: true, meta: false,
   }
-  settings.subtitlePractice.bindings.playback.enabled = false
+  settings.subtitleNavigation.bindings.playback.enabled = false
   settings.bindings.mute.enabled = false
   return settings
 }
@@ -96,7 +96,7 @@ describe('SettingsTransferCard', () => {
       formatVersion: 1,
       exportedAt: '2026-08-12T03:04:05.000Z',
       extensionVersion: '0.4.1',
-      settings: { enabled: false, subtitlePractice: settings.subtitlePractice },
+      settings: { enabled: false, subtitleNavigation: settings.subtitleNavigation },
     })
     expect(parseSettingsBackup(source)).toMatchObject({ ok: true, value: { settings } })
     expect(click).toHaveBeenCalledOnce()
@@ -105,7 +105,7 @@ describe('SettingsTransferCard', () => {
 
   it.each(LOCALES)('previews configured subtitle keys and separate counts in %s', async locale => {
     const localizedCopy = getCopy(locale)
-    const subtitleCopy = SUBTITLE_PRACTICE_COPY[locale]
+    const subtitleCopy = SUBTITLE_NAVIGATION_COPY[locale]
     const settings = customSubtitleSettings()
     const onImport = vi.fn().mockResolvedValue(settings)
     render(<SettingsTransferCard copy={localizedCopy} locale={locale} settings={DEFAULT_SETTINGS} onImport={onImport} />)
@@ -131,7 +131,7 @@ describe('SettingsTransferCard', () => {
 
   it('shows a disabled subtitle master without hiding retained keys or row counts', async () => {
     const settings = customSubtitleSettings()
-    settings.subtitlePractice.enabled = false
+    settings.subtitleNavigation.enabled = false
     const onImport = vi.fn()
     render(<SettingsTransferCard copy={copy} locale="en" settings={DEFAULT_SETTINGS} onImport={onImport} />)
     selectFile(serializeSettingsBackup(createSettingsBackup(settings, { extensionVersion: 'test' })))

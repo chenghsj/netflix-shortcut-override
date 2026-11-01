@@ -19,6 +19,7 @@ describe('settings storage', () => {
         [SETTINGS_STORAGE_KEY]: {
           ...settings,
           spaceHold: settings.holdSpeed,
+          subtitlePractice: settings.subtitleNavigation,
         },
       },
       expect.any(Function)

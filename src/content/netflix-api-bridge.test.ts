@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { requestCaptionMetadata } from './subtitle-practice'
+import { requestCaptionMetadata } from './subtitle-navigation'
 import { CAPTION_REQUEST_EVENT, CAPTION_RESPONSE_EVENT } from '@/shared/netflix-caption-events'
 
 import {

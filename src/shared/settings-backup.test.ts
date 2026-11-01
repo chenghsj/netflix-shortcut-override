@@ -37,10 +37,54 @@ const createVersion9Settings = () => {
 }
 
 describe('settings backup', () => {
+  it.each([11, 12, 13])('imports the original subtitle field from a schema v%s backup', version => {
+    const subtitleNavigation = structuredClone(DEFAULT_SETTINGS.subtitleNavigation)
+    subtitleNavigation.enabled = true
+    subtitleNavigation.bindings.next.key = { code: 'KeyN', key: 'n', ctrl: true, alt: false, shift: false, meta: false }
+    subtitleNavigation.bindings.replay.enabled = true
+    const backup = createSettingsBackup({ ...DEFAULT_SETTINGS, subtitleNavigation }, { extensionVersion: '0.6.4', exportedAt })
+    const settings = { ...backup.settings, subtitleNavigation: undefined }
+    const result = parseSettingsBackup(JSON.stringify({
+      ...backup,
+      settings: {
+        ...settings,
+        version,
+        subtitlePractice: version === 11 ? { enabled: true } : subtitleNavigation,
+      },
+    }))
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.value.settings.subtitleNavigation).toEqual(version === 11
+        ? { ...DEFAULT_SETTINGS.subtitleNavigation, enabled: true } : subtitleNavigation)
+      expect(result.value.settings).not.toHaveProperty('subtitlePractice')
+    }
+    expect(backup.settings).toHaveProperty('subtitleNavigation')
+    expect(backup.settings).not.toHaveProperty('subtitlePractice')
+  })
+
+  it.each([12, 13])('rejects incomplete subtitle bindings in a schema v%s backup', version => {
+    const backup = createSettingsBackup(DEFAULT_SETTINGS, { extensionVersion: '0.6.4', exportedAt })
+    const settings = { ...backup.settings, subtitleNavigation: undefined }
+    expect(parseSettingsBackup(JSON.stringify({
+      ...backup,
+      settings: { ...settings, version, subtitlePractice: { enabled: true, bindings: {} } },
+    }))).toEqual({ ok: false, error: 'invalidSettings' })
+  })
+
+  it('requires the canonical subtitle field in a current backup', () => {
+    const backup = createSettingsBackup(DEFAULT_SETTINGS, { extensionVersion: '0.6.6', exportedAt })
+    const { subtitleNavigation, ...settings } = backup.settings
+    expect(parseSettingsBackup(JSON.stringify({
+      ...backup, settings: { ...settings, subtitlePractice: subtitleNavigation },
+    }))).toEqual({ ok: false, error: 'invalidSettings' })
+  })
+
   it('restores a version 12 backup without a style using Classic', () => {
     const backup = createSettingsBackup(DEFAULT_SETTINGS, { extensionVersion: '0.6.4', exportedAt })
+    const { subtitleNavigation, ...settings } = backup.settings
     const result = parseSettingsBackup(JSON.stringify({
-      ...backup, settings: { ...backup.settings, version: 12, uiStyle: undefined },
+      ...backup, settings: { ...settings, version: 12, uiStyle: undefined, subtitlePractice: subtitleNavigation },
     }))
     expect(result.ok).toBe(true)
     if (result.ok) {

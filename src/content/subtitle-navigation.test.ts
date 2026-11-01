@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { createSubtitlePractice, requestCaptionMetadata } from './subtitle-practice'
+import { createSubtitleNavigation, requestCaptionMetadata } from './subtitle-navigation'
 import { createNetflixPlaybackSession } from './netflix-playback-session'
 import { getHintManager } from './hints/hint-manager'
 import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
@@ -21,15 +21,15 @@ it('explains missing subtitle host access and allows retry after granting it', a
   const seek = vi.spyOn(session, 'seekTo').mockResolvedValue({ response: { success: true }, failureLabel: null })
   const settings = structuredClone(DEFAULT_SETTINGS)
   settings.locale = 'zh-TW'
-  settings.subtitlePractice.enabled = true
-  settings.subtitlePractice.bindings.replay.enabled = true
-  const practice = createSubtitlePractice(() => settings, session, vi.fn())
-  await practice.execute('next', document)
+  settings.subtitleNavigation.enabled = true
+  settings.subtitleNavigation.bindings.replay.enabled = true
+  const subtitleNavigation = createSubtitleNavigation(() => settings, session, vi.fn())
+  await subtitleNavigation.execute('next', document)
   expect(document.getElementById('shortcut-override-text-hint-label')).toHaveTextContent('字幕來源未授權')
   expect(document.querySelector('[data-hint-loading]')).toBeNull()
   expect(seek).not.toHaveBeenCalled()
   granted = true
-  await practice.execute('next', document)
+  await subtitleNavigation.execute('next', document)
   expect(seek).toHaveBeenCalledWith(6000)
 })
 
@@ -56,13 +56,13 @@ it('gets subtitle metadata in Firefox without a page bridge', async () => {
       const success = { response: { success: true }, failureLabel: null }
       const seek = vi.spyOn(session, 'seekTo').mockResolvedValue(success)
       const play = vi.spyOn(session, 'play').mockResolvedValue(success)
-      const practice = createSubtitlePractice(() => ({ ...DEFAULT_SETTINGS, subtitlePractice: { ...DEFAULT_SETTINGS.subtitlePractice, enabled: true, bindings: { ...DEFAULT_SETTINGS.subtitlePractice.bindings, replay: { ...DEFAULT_SETTINGS.subtitlePractice.bindings.replay, enabled: true } } } }), session, vi.fn())
-      await practice.execute('next', document)
+      const subtitleNavigation = createSubtitleNavigation(() => ({ ...DEFAULT_SETTINGS, subtitleNavigation: { ...DEFAULT_SETTINGS.subtitleNavigation, enabled: true, bindings: { ...DEFAULT_SETTINGS.subtitleNavigation.bindings, replay: { ...DEFAULT_SETTINGS.subtitleNavigation.bindings.replay, enabled: true } } } }), session, vi.fn())
+      await subtitleNavigation.execute('next', document)
       expect(seek).toHaveBeenLastCalledWith(6000)
-      await practice.execute('previous', document)
+      await subtitleNavigation.execute('previous', document)
       expect(seek).toHaveBeenLastCalledWith(1000)
       expect(play).not.toHaveBeenCalled()
-      await practice.execute('replay', document)
+      await subtitleNavigation.execute('replay', document)
       expect(seek).toHaveBeenLastCalledWith(3000)
       expect(play).toHaveBeenCalledWith(video)
       expect(document.getElementById('shortcut-override-text-hint')).toBeNull()
@@ -102,11 +102,11 @@ it('fetches once per track, preserves navigation state, and explicitly plays onl
   }
   window.addEventListener('shortcut-override:caption-request', respond)
   try {
-    const practice = createSubtitlePractice(() => ({ ...DEFAULT_SETTINGS, subtitlePractice: { ...DEFAULT_SETTINGS.subtitlePractice, enabled: true, bindings: { ...DEFAULT_SETTINGS.subtitlePractice.bindings, replay: { ...DEFAULT_SETTINGS.subtitlePractice.bindings.replay, enabled: true } } } }), session, onSeek)
-    await practice.execute('next', document)
+    const subtitleNavigation = createSubtitleNavigation(() => ({ ...DEFAULT_SETTINGS, subtitleNavigation: { ...DEFAULT_SETTINGS.subtitleNavigation, enabled: true, bindings: { ...DEFAULT_SETTINGS.subtitleNavigation.bindings, replay: { ...DEFAULT_SETTINGS.subtitleNavigation.bindings.replay, enabled: true } } } }), session, onSeek)
+    await subtitleNavigation.execute('next', document)
     expect(seek).toHaveBeenLastCalledWith(6000)
     expect(play).not.toHaveBeenCalled()
-    await practice.execute('replay', document)
+    await subtitleNavigation.execute('replay', document)
     expect(seek).toHaveBeenLastCalledWith(3000)
     expect(play).toHaveBeenCalledWith(video)
     expect(fetch).toHaveBeenCalledTimes(1)
@@ -124,10 +124,10 @@ it('does not seek when disabled while a subtitle download is pending', async () 
   const respond = (event: Event) => window.dispatchEvent(new CustomEvent('shortcut-override:caption-response', { detail: JSON.stringify({ source: 'shortcut-override', id: JSON.parse((event as CustomEvent<string>).detail).id, metadata }) }))
   window.addEventListener('shortcut-override:caption-request', respond)
   try {
-    const practice = createSubtitlePractice(() => ({ ...DEFAULT_SETTINGS, subtitlePractice: { ...DEFAULT_SETTINGS.subtitlePractice, enabled: true, bindings: { ...DEFAULT_SETTINGS.subtitlePractice.bindings, replay: { ...DEFAULT_SETTINGS.subtitlePractice.bindings.replay, enabled: true } } } }), session, vi.fn())
-    const request = practice.execute('next', document)
+    const subtitleNavigation = createSubtitleNavigation(() => ({ ...DEFAULT_SETTINGS, subtitleNavigation: { ...DEFAULT_SETTINGS.subtitleNavigation, enabled: true, bindings: { ...DEFAULT_SETTINGS.subtitleNavigation.bindings, replay: { ...DEFAULT_SETTINGS.subtitleNavigation.bindings.replay, enabled: true } } } }), session, vi.fn())
+    const request = subtitleNavigation.execute('next', document)
     await Promise.resolve()
-    practice.cancel()
+    subtitleNavigation.cancel()
     finish({ text: 'WEBVTT\n\n00:00:06.000 --> 00:00:07.000\nThree' })
     await request
     expect(seek).not.toHaveBeenCalled()
@@ -142,27 +142,27 @@ it('ends a stalled subtitle delivery with an actionable timeout and allows retry
   const respond = (event: Event) => window.dispatchEvent(new CustomEvent('shortcut-override:caption-response', { detail: JSON.stringify({ source: 'shortcut-override', id: JSON.parse((event as CustomEvent<string>).detail).id, metadata }) }))
   window.addEventListener('shortcut-override:caption-request', respond)
   try {
-    const practice = createSubtitlePractice(() => ({ ...DEFAULT_SETTINGS, subtitlePractice: { ...DEFAULT_SETTINGS.subtitlePractice, enabled: true, bindings: { ...DEFAULT_SETTINGS.subtitlePractice.bindings, replay: { ...DEFAULT_SETTINGS.subtitlePractice.bindings.replay, enabled: true } } } }), session, vi.fn())
-    void practice.execute('next', document)
+    const subtitleNavigation = createSubtitleNavigation(() => ({ ...DEFAULT_SETTINGS, subtitleNavigation: { ...DEFAULT_SETTINGS.subtitleNavigation, enabled: true, bindings: { ...DEFAULT_SETTINGS.subtitleNavigation.bindings, replay: { ...DEFAULT_SETTINGS.subtitleNavigation.bindings.replay, enabled: true } } } }), session, vi.fn())
+    void subtitleNavigation.execute('next', document)
     await vi.advanceTimersByTimeAsync(12500)
     expect(document.getElementById('shortcut-override-text-hint-label')).toHaveTextContent('Subtitle download timed out')
     expect(document.getElementById('shortcut-override-text-hint')?.querySelector('svg')).toBeNull()
     expect(document.querySelector('[data-hint-loading]')).toBeNull()
     expect(seek).not.toHaveBeenCalled()
-    void practice.execute('next', document)
+    void subtitleNavigation.execute('next', document)
     await Promise.resolve()
     expect(deliver).toHaveBeenCalledTimes(2)
-    practice.cancel()
+    subtitleNavigation.cancel()
     await vi.advanceTimersByTimeAsync(12500)
   } finally { window.removeEventListener('shortcut-override:caption-request', respond); vi.useRealTimers() }
 })
 
 const captionText = 'WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nOne\n\n00:00:03.000 --> 00:00:04.000\nTwo\n\n00:00:06.000 --> 00:00:07.000\nTwo'
 
-function pendingPractice(currentMs = metadata.currentMs) {
+function pendingSubtitleNavigation(currentMs = metadata.currentMs) {
   const settings = structuredClone(DEFAULT_SETTINGS)
-  settings.subtitlePractice.enabled = true
-  settings.subtitlePractice.bindings.replay.enabled = true
+  settings.subtitleNavigation.enabled = true
+  settings.subtitleNavigation.bindings.replay.enabled = true
   const video = document.createElement('video')
   document.body.append(video)
   const session = createNetflixPlaybackSession()
@@ -176,17 +176,17 @@ function pendingPractice(currentMs = metadata.currentMs) {
   const fetch = vi.spyOn(chrome.runtime, 'sendMessage').mockImplementation(() => new Promise(resolve => { finish = resolve }) as never)
   const respond = (event: Event) => window.dispatchEvent(new CustomEvent('shortcut-override:caption-response', { detail: JSON.stringify({ source: 'shortcut-override', id: JSON.parse((event as CustomEvent<string>).detail).id, metadata: { ...metadata, currentMs } }) }))
   window.addEventListener('shortcut-override:caption-request', respond)
-  const practice = createSubtitlePractice(() => settings, session, vi.fn())
-  return { settings, video, seek, play, fetch, practice,
+  const subtitleNavigation = createSubtitleNavigation(() => settings, session, vi.fn())
+  return { settings, video, seek, play, fetch, subtitleNavigation,
     deliver: () => finish({ text: captionText }),
-    cleanup: () => { practice.cancel(); window.removeEventListener('shortcut-override:caption-request', respond); video.remove() },
+    cleanup: () => { subtitleNavigation.cancel(); window.removeEventListener('shortcut-override:caption-request', respond); video.remove() },
   }
 }
 
 it.each(['pause', 'play'])('cancels pending replay on a native video %s event and allows retry', async event => {
-  const fixture = pendingPractice()
+  const fixture = pendingSubtitleNavigation()
   try {
-    const request = fixture.practice.execute('replay', document)
+    const request = fixture.subtitleNavigation.execute('replay', document)
     await Promise.resolve()
     fixture.video.dispatchEvent(new Event(event))
     fixture.deliver()
@@ -194,28 +194,28 @@ it.each(['pause', 'play'])('cancels pending replay on a native video %s event an
     expect(fixture.seek).not.toHaveBeenCalled()
     expect(fixture.play).not.toHaveBeenCalled()
     expect(document.getElementById('shortcut-override-text-hint')).toBeNull()
-    const retry = fixture.practice.execute('replay', document)
+    const retry = fixture.subtitleNavigation.execute('replay', document)
     await Promise.resolve()
     fixture.deliver()
     await retry
     expect(fixture.seek).toHaveBeenCalledWith(3000)
     expect(fixture.play).toHaveBeenCalledOnce()
     expect(document.querySelector('[id^="shortcut-override-"][id$="hint"]')).toBeNull()
-    await fixture.practice.execute('next', document)
+    await fixture.subtitleNavigation.execute('next', document)
     expect(fixture.fetch).toHaveBeenCalledTimes(2)
     expect(fixture.seek).toHaveBeenLastCalledWith(6000)
   } finally { fixture.cleanup() }
 })
 
 it.each(['pause', 'play'])('cancels pending replay on a replacement video %s event and allows retry', async event => {
-  const fixture = pendingPractice()
+  const fixture = pendingSubtitleNavigation()
   const replacement = document.createElement('video')
   fixture.play.mockImplementation(async video => {
     video.dispatchEvent(new Event('play'))
     return { response: { success: true }, failureLabel: null }
   })
   try {
-    const request = fixture.practice.execute('replay', document)
+    const request = fixture.subtitleNavigation.execute('replay', document)
     await Promise.resolve()
     fixture.video.replaceWith(replacement)
     replacement.dispatchEvent(new Event(event))
@@ -224,7 +224,7 @@ it.each(['pause', 'play'])('cancels pending replay on a replacement video %s eve
     expect(fixture.seek).not.toHaveBeenCalled()
     expect(fixture.play).not.toHaveBeenCalled()
     expect(document.getElementById('shortcut-override-text-hint')).toBeNull()
-    const retry = fixture.practice.execute('replay', document)
+    const retry = fixture.subtitleNavigation.execute('replay', document)
     await Promise.resolve()
     fixture.deliver()
     await retry
@@ -232,18 +232,18 @@ it.each(['pause', 'play'])('cancels pending replay on a replacement video %s eve
     expect(fixture.play).toHaveBeenCalledExactlyOnceWith(replacement)
     // Playback changes after completion preserve cached timings.
     replacement.dispatchEvent(new Event('pause'))
-    await fixture.practice.execute('next', document)
+    await fixture.subtitleNavigation.execute('next', document)
     expect(fixture.fetch).toHaveBeenCalledTimes(2)
     expect(fixture.seek).toHaveBeenLastCalledWith(6000)
   } finally { replacement.remove(); fixture.cleanup() }
 })
 
 it('does not cancel pending replay for a pause event from an unrelated video', async () => {
-  const fixture = pendingPractice()
+  const fixture = pendingSubtitleNavigation()
   const unrelated = document.createElement('video')
   document.body.append(unrelated)
   try {
-    const request = fixture.practice.execute('replay', document)
+    const request = fixture.subtitleNavigation.execute('replay', document)
     await Promise.resolve()
     unrelated.dispatchEvent(new Event('pause'))
     fixture.deliver()
@@ -254,13 +254,13 @@ it('does not cancel pending replay for a pause event from an unrelated video', a
 })
 
 it('does not resume playback if the target window exits while a seek is pending', async () => {
-  const fixture = pendingPractice()
+  const fixture = pendingSubtitleNavigation()
   let finishSeek!: () => void
   fixture.seek.mockImplementation(() => new Promise(resolve => {
     finishSeek = () => resolve({ response: { success: true }, failureLabel: null })
   }))
   try {
-    const request = fixture.practice.execute('replay', document)
+    const request = fixture.subtitleNavigation.execute('replay', document)
     await Promise.resolve()
     fixture.deliver()
     await vi.waitFor(() => expect(finishSeek).toBeTypeOf('function'))
@@ -273,11 +273,11 @@ it('does not resume playback if the target window exits while a seek is pending'
 })
 
 it.each(['previous', 'next', 'replay'] as const)('does not execute pending %s when its row is disabled', async action => {
-  const fixture = pendingPractice()
+  const fixture = pendingSubtitleNavigation()
   try {
-    const request = fixture.practice.execute(action, document)
+    const request = fixture.subtitleNavigation.execute(action, document)
     await Promise.resolve()
-    fixture.settings.subtitlePractice.bindings[action].enabled = false
+    fixture.settings.subtitleNavigation.bindings[action].enabled = false
     fixture.deliver()
     await request
     expect(fixture.seek).not.toHaveBeenCalled()
@@ -286,12 +286,12 @@ it.each(['previous', 'next', 'replay'] as const)('does not execute pending %s wh
 })
 
 it('keeps a pending subtitle action when a different row is disabled', async () => {
-  const fixture = pendingPractice()
+  const fixture = pendingSubtitleNavigation()
   try {
-    const request = fixture.practice.execute('next', document)
+    const request = fixture.subtitleNavigation.execute('next', document)
     await Promise.resolve()
-    fixture.settings.subtitlePractice.bindings.replay.enabled = false
-    fixture.practice.updateSettings(fixture.settings)
+    fixture.settings.subtitleNavigation.bindings.replay.enabled = false
+    fixture.subtitleNavigation.updateSettings(fixture.settings)
     fixture.deliver()
     await request
     expect(fixture.seek).toHaveBeenCalledWith(6000)
@@ -300,10 +300,10 @@ it('keeps a pending subtitle action when a different row is disabled', async () 
 })
 
 it('shows a loading hint during delivery and no hint at the subtitle boundary', async () => {
-  const fixture = pendingPractice(500)
+  const fixture = pendingSubtitleNavigation(500)
   const showHint = vi.spyOn(getHintManager(document), 'show')
   try {
-    const request = fixture.practice.execute('previous', document)
+    const request = fixture.subtitleNavigation.execute('previous', document)
     await Promise.resolve()
     expect(document.getElementById('shortcut-override-text-hint-label')).toHaveTextContent('Loading subtitles…')
     fixture.deliver()
@@ -316,9 +316,9 @@ it('shows a loading hint during delivery and no hint at the subtitle boundary', 
 
 it('keeps loading feedback visible beyond two seconds until delivery finishes', async () => {
   vi.useFakeTimers()
-  const fixture = pendingPractice()
+  const fixture = pendingSubtitleNavigation()
   try {
-    const request = fixture.practice.execute('next', document)
+    const request = fixture.subtitleNavigation.execute('next', document)
     await vi.advanceTimersByTimeAsync(8000)
     const label = document.getElementById('shortcut-override-text-hint-label')
     expect(label).toHaveTextContent('Loading subtitles…')

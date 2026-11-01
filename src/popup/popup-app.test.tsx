@@ -6,7 +6,7 @@ import { registerFeatureAnnouncements } from '@/background/feature-announcements
 import { EXTERNAL_LINKS } from '@/shared/external-links'
 import { PLAYBACK_FOCUS_RESTORATION_MESSAGE_TYPE } from '@/shared/playback-focus-restoration'
 import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
-import { SUBTITLE_PRACTICE_COPY } from '@/shared/subtitle-practice'
+import { SUBTITLE_NAVIGATION_COPY } from '@/shared/subtitle-navigation'
 import { getSettings, saveSettings } from '@/shared/storage'
 import { subtitleNavigationAnnouncement } from '@/shared/feature-announcements'
 
@@ -135,7 +135,7 @@ describe('PopupApp', () => {
     vi.spyOn(info, 'matches').mockImplementation(selector => selector === ':focus-visible' ? true : matches(selector))
     act(() => info.focus())
     const tooltip = await screen.findByRole('tooltip')
-    for (const paragraph of SUBTITLE_PRACTICE_COPY.en.description.split('\n\n')) {
+    for (const paragraph of SUBTITLE_NAVIGATION_COPY.en.description.split('\n\n')) {
       expect(within(tooltip).getByText(paragraph)).toBeInTheDocument()
     }
     fireEvent.keyDown(info, { key: 'Escape' })
@@ -155,12 +155,12 @@ describe('PopupApp', () => {
     expect(chrome.permissions.request).toHaveBeenCalledExactlyOnceWith({ origins: [
       '*://*.netflix.com/*', 'https://*.nflxvideo.net/*',
     ] })
-    await waitFor(async () => expect((await getSettings()).subtitlePractice.enabled).toBe(true))
+    await waitFor(async () => expect((await getSettings()).subtitleNavigation.enabled).toBe(true))
     expect(within(section).getByText('Previous subtitle')).toBeInTheDocument()
     expect(screen.queryByText('Subtitle priority')).not.toBeInTheDocument()
     expect(chrome.tabs.create).not.toHaveBeenCalled()
     fireEvent.click(toggle)
-    await waitFor(async () => expect((await getSettings()).subtitlePractice.enabled).toBe(false))
+    await waitFor(async () => expect((await getSettings()).subtitleNavigation.enabled).toBe(false))
     expect(within(section).queryByText('Previous subtitle')).not.toBeInTheDocument()
     expect(screen.queryByText('Subtitle priority')).not.toBeInTheDocument()
     expect(chrome.permissions.request).toHaveBeenCalledTimes(1)
@@ -168,7 +168,7 @@ describe('PopupApp', () => {
 
   it('keeps settings unchanged after denied subtitle access and allows retry', async () => {
     const settings = structuredClone(DEFAULT_SETTINGS)
-    settings.subtitlePractice.bindings.next.enabled = false
+    settings.subtitleNavigation.bindings.next.enabled = false
     const saved = await saveSettings(settings)
     vi.mocked(chrome.permissions.request).mockImplementationOnce(() => Promise.resolve(false) as never)
     render(<PopupApp />)
@@ -180,7 +180,7 @@ describe('PopupApp', () => {
     expect(toggle).toBeEnabled()
     expect(await getSettings()).toEqual(saved)
     fireEvent.click(toggle)
-    await waitFor(async () => expect((await getSettings()).subtitlePractice).toEqual({ ...saved.subtitlePractice, enabled: true }))
+    await waitFor(async () => expect((await getSettings()).subtitleNavigation).toEqual({ ...saved.subtitleNavigation, enabled: true }))
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
@@ -195,7 +195,7 @@ describe('PopupApp', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not request website access')
     expect(toggle).toHaveAttribute('aria-checked', 'false')
     expect(toggle).toBeEnabled()
-    expect((await getSettings()).subtitlePractice.enabled).toBe(false)
+    expect((await getSettings()).subtitleNavigation.enabled).toBe(false)
   })
 
   it('cancels pending subtitle activation when the global switch is turned off', async () => {
@@ -211,7 +211,7 @@ describe('PopupApp', () => {
     fireEvent.click(screen.getByRole('switch', { name: 'Enable extension' }))
     await waitFor(async () => expect((await getSettings()).enabled).toBe(false))
     await act(async () => { approve(true) })
-    expect((await getSettings()).subtitlePractice.enabled).toBe(false)
+    expect((await getSettings()).subtitleNavigation.enabled).toBe(false)
     expect(toggle).toBeDisabled()
     expect(toggle).toHaveAttribute('aria-busy', 'false')
     expect(toggle).toHaveAccessibleDescription(/Enable extension.*above/)
@@ -224,11 +224,11 @@ describe('PopupApp', () => {
     fireEvent.click(await screen.findByRole('switch', { name: 'Enable subtitle navigation shortcuts' }))
     popup.unmount()
     await act(async () => { approve(true) })
-    expect((await getSettings()).subtitlePractice.enabled).toBe(false)
+    expect((await getSettings()).subtitleNavigation.enabled).toBe(false)
   })
 
   it('preserves the subtitle preference when toggling the global switch', async () => {
-    await saveSettings({ ...structuredClone(DEFAULT_SETTINGS), subtitlePractice: { ...structuredClone(DEFAULT_SETTINGS.subtitlePractice), enabled: true } })
+    await saveSettings({ ...structuredClone(DEFAULT_SETTINGS), subtitleNavigation: { ...structuredClone(DEFAULT_SETTINGS.subtitleNavigation), enabled: true } })
     render(<PopupApp />)
     const toggle = await screen.findByRole('switch', { name: 'Enable subtitle navigation shortcuts' })
     const globalToggle = screen.getByRole('switch', { name: 'Enable extension' })
@@ -236,7 +236,7 @@ describe('PopupApp', () => {
     await waitFor(async () => expect((await getSettings()).enabled).toBe(false))
     expect(toggle).toBeDisabled()
     expect(toggle).toHaveAttribute('aria-checked', 'true')
-    expect((await getSettings()).subtitlePractice.enabled).toBe(true)
+    expect((await getSettings()).subtitleNavigation.enabled).toBe(true)
     expect(screen.queryByText('Previous subtitle')).not.toBeInTheDocument()
     fireEvent.click(globalToggle)
     await waitFor(async () => expect((await getSettings()).enabled).toBe(true))
@@ -279,10 +279,10 @@ describe('PopupApp', () => {
     render(<PopupApp />)
     await screen.findByRole('region', { name: 'New: Subtitle navigation' })
     const settings = structuredClone(DEFAULT_SETTINGS)
-    settings.subtitlePractice.enabled = true
+    settings.subtitleNavigation.enabled = true
     await act(async () => { await saveSettings(settings) })
     await waitFor(() => expect(screen.queryByRole('region', { name: 'New: Subtitle navigation' })).not.toBeInTheDocument())
-    settings.subtitlePractice.enabled = false
+    settings.subtitleNavigation.enabled = false
     await act(async () => { await saveSettings(settings) })
     expect((await subtitleNavigationAnnouncement.getState()).pending).toBe(false)
   })
@@ -292,7 +292,7 @@ describe('PopupApp', () => {
     render(<PopupApp />)
     await screen.findByRole('region', { name: 'New: Subtitle navigation' })
     const settings = structuredClone(DEFAULT_SETTINGS)
-    settings.subtitlePractice.enabled = true
+    settings.subtitleNavigation.enabled = true
     vi.mocked(chrome.storage.sync.set).mockImplementationOnce((_items, callback) => {
       Object.defineProperty(chrome.runtime, 'lastError', { configurable: true, value: { message: 'Save failed' } })
       callback?.()
@@ -323,14 +323,14 @@ describe('PopupApp', () => {
 
   it.each(['subtitle master', 'global override'])('collapses subtitle navigation when the %s is off', async master => {
     const settings = structuredClone(DEFAULT_SETTINGS)
-    settings.subtitlePractice.enabled = master === 'global override'
+    settings.subtitleNavigation.enabled = master === 'global override'
     settings.enabled = master !== 'global override'
     await saveSettings(settings)
     render(<PopupApp />)
 
     const section = await screen.findByRole('region', { name: 'Subtitle navigation' })
     const toggle = within(section).getByRole('switch', { name: 'Enable subtitle navigation shortcuts' })
-    expect(toggle).toHaveAttribute('aria-checked', String(settings.subtitlePractice.enabled))
+    expect(toggle).toHaveAttribute('aria-checked', String(settings.subtitleNavigation.enabled))
     if (settings.enabled) expect(toggle).toBeEnabled()
     else expect(toggle).toBeDisabled()
     expect(within(section).queryByText('Previous subtitle')).not.toBeInTheDocument()
@@ -343,13 +343,13 @@ describe('PopupApp', () => {
   it.each(['Chrome/140.0', 'Firefox/156.0'])('shows configured subtitle keys and precedence in %s', async browser => {
     vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(`Mozilla/5.0 ${browser}`)
     const settings = structuredClone(DEFAULT_SETTINGS)
-    settings.subtitlePractice.enabled = true
-    settings.subtitlePractice.bindings.replay.enabled = true
-    settings.subtitlePractice.bindings.previous.key = {
+    settings.subtitleNavigation.enabled = true
+    settings.subtitleNavigation.bindings.replay.enabled = true
+    settings.subtitleNavigation.bindings.previous.key = {
       code: 'KeyZ', key: 'z', ctrl: true, alt: false, shift: false, meta: false,
     }
-    settings.bindings.volumeUp.key = { ...settings.subtitlePractice.bindings.previous.key }
-    settings.subtitlePractice.bindings.next.enabled = false
+    settings.bindings.volumeUp.key = { ...settings.subtitleNavigation.bindings.previous.key }
+    settings.subtitleNavigation.bindings.next.enabled = false
     await saveSettings(settings)
     render(<PopupApp />)
 
@@ -382,13 +382,13 @@ describe('PopupApp', () => {
 
   it('updates subtitle precedence when a row or the master is disabled in Options', async () => {
     const settings = structuredClone(DEFAULT_SETTINGS)
-    settings.subtitlePractice.enabled = true
-    settings.subtitlePractice.bindings.replay.enabled = true
+    settings.subtitleNavigation.enabled = true
+    settings.subtitleNavigation.bindings.replay.enabled = true
     await saveSettings(settings)
     render(<PopupApp />)
     await screen.findByText('Subtitle priority')
 
-    settings.subtitlePractice.bindings.replay.enabled = false
+    settings.subtitleNavigation.bindings.replay.enabled = false
     await act(async () => { await saveSettings(settings) })
     const skipIntro = screen.getByText('Skip intro').closest('div') as HTMLElement
     expect(within(skipIntro).getByText('S')).toBeInTheDocument()
@@ -397,7 +397,7 @@ describe('PopupApp', () => {
     const replay = within(section).getByText('Replay current subtitle').closest('div') as HTMLElement
     expect(within(replay).getByText('Disabled')).toBeInTheDocument()
 
-    settings.subtitlePractice.enabled = false
+    settings.subtitleNavigation.enabled = false
     await act(async () => { await saveSettings(settings) })
     expect(within(section).getByRole('switch', { name: 'Enable subtitle navigation shortcuts' })).toHaveAttribute('aria-checked', 'false')
     expect(within(section).queryByText('Replay current subtitle')).not.toBeInTheDocument()
@@ -406,8 +406,8 @@ describe('PopupApp', () => {
   it('uses physical keys and modifiers for localized custom subtitle precedence', async () => {
     const settings = structuredClone(DEFAULT_SETTINGS)
     settings.locale = 'zh-TW'
-    settings.subtitlePractice.enabled = true
-    settings.subtitlePractice.bindings.replay.key.shift = true
+    settings.subtitleNavigation.enabled = true
+    settings.subtitleNavigation.bindings.replay.key.shift = true
     await saveSettings(settings)
     render(<PopupApp />)
     const section = await screen.findByRole('region', { name: '字幕導航' })
@@ -416,7 +416,7 @@ describe('PopupApp', () => {
     expect(screen.queryByText('字幕導航優先')).not.toBeInTheDocument()
 
     // Match the actual shortcut router: physical code and modifiers, not key text.
-    settings.subtitlePractice.bindings.previous.key = {
+    settings.subtitleNavigation.bindings.previous.key = {
       ...settings.bindings.seekForward.key, key: 'custom label',
     }
     await act(async () => { await saveSettings(settings) })

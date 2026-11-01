@@ -1,5 +1,5 @@
-import { createSubtitlePractice } from './subtitle-practice'
-import { practiceAction } from '@/shared/subtitle-practice'
+import { createSubtitleNavigation } from './subtitle-navigation'
+import { findSubtitleNavigationActionForKey } from '@/shared/subtitle-navigation'
 import {
   canHandlePlaybackShortcut,
   findVideo,
@@ -36,12 +36,12 @@ const persistPipSettings = (patch: PipSettingsPatch) => updateSettings(current =
 }))
 
 const playbackSession = createNetflixPlaybackSession()
-const subtitlePractice = createSubtitlePractice(() => settings, playbackSession, () => pipManager?.recordUserSeek())
+const subtitleNavigation = createSubtitleNavigation(() => settings, playbackSession, () => pipManager?.recordUserSeek())
 const commandController = createShortcutCommandController(
   () => settings,
   playbackSession,
   {
-    onPlaybackToggleRequested: () => subtitlePractice.cancel(),
+    onPlaybackToggleRequested: () => subtitleNavigation.cancel(),
     onSeekRequested: () => pipManager?.recordUserSeek(),
     onSubtitlesToggled: (subtitlesEnabled, targetDoc) => {
       if (!isPipDocument(targetDoc)) return
@@ -70,7 +70,7 @@ const stopContentListeners = () => {
   window.removeEventListener('blur', clearHoldSpeedOnWindowBlur)
   document.removeEventListener('visibilitychange', clearHoldSpeedOnVisibilityChange)
   commandController.clearHoldSpeedInteraction()
-  subtitlePractice.cancel()
+  subtitleNavigation.cancel()
   pipManager?.destroy()
 }
 
@@ -90,17 +90,17 @@ const handleKeydown = (event: KeyboardEvent, explicitTargetDoc?: Document) => {
     return
   }
 
-  const practice = settings.subtitlePractice.enabled ? practiceAction(event, settings) : null
-  if (practice) {
+  const subtitleNavigationAction = settings.subtitleNavigation.enabled ? findSubtitleNavigationActionForKey(event, settings) : null
+  if (subtitleNavigationAction) {
     if (!canHandlePlaybackShortcut(targetDoc) || !findVideo(targetDoc)) return
     interceptShortcutEvent(event)
     if (event.repeat) return
     commandController.clearHoldSpeedInteraction()
-    if (practice === 'playback') {
-      subtitlePractice.cancel()
+    if (subtitleNavigationAction === 'playback') {
+      subtitleNavigation.cancel()
       commandController.execute('playPause', targetDoc)
     } else {
-      void subtitlePractice.execute(practice, targetDoc)
+      void subtitleNavigation.execute(subtitleNavigationAction, targetDoc)
     }
     return
   }
@@ -124,7 +124,7 @@ const handleKeydown = (event: KeyboardEvent, explicitTargetDoc?: Document) => {
 
   if (!canHandlePlaybackShortcut(targetDoc)) return
 
-  if (action) subtitlePractice.cancel()
+  if (action) subtitleNavigation.cancel()
   if (action === 'playPause') {
     const video = findVideo(targetDoc)
     if (!video) return
@@ -219,7 +219,7 @@ const applySettings = (
   nextSettings: ShortcutSettings,
   subtitleStateConfirmed = false
 ) => {
-  subtitlePractice.updateSettings(nextSettings)
+  subtitleNavigation.updateSettings(nextSettings)
   settings = nextSettings
   settingsLoaded = true
   if (subtitleStateConfirmed) pipManager?.confirmSubtitleState(nextSettings)

@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { OptionsApp } from '@/options/options-app'
 import { SUBTITLE_ACTIVATION_COPY } from '@/options/subtitle-activation-copy'
 import { EXTERNAL_LINKS } from '@/shared/external-links'
-import { SUBTITLE_PRACTICE_COPY } from '@/shared/subtitle-practice'
+import { SUBTITLE_NAVIGATION_COPY } from '@/shared/subtitle-navigation'
 import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
 import { createSettingsBackup, serializeSettingsBackup } from '@/shared/settings-backup'
 import { getSettings, saveSettings } from '@/shared/storage'
@@ -25,8 +25,8 @@ function focusAsKeyboard(element: HTMLElement) {
 describe('OptionsApp', () => {
   it('shows the subtitle owner beside the default S key without disabling the general shortcut', async () => {
     const settings = structuredClone(DEFAULT_SETTINGS)
-    settings.subtitlePractice.enabled = true
-    settings.subtitlePractice.bindings.replay.enabled = true
+    settings.subtitleNavigation.enabled = true
+    settings.subtitleNavigation.bindings.replay.enabled = true
     await saveSettings(settings)
     render(<OptionsApp />)
 
@@ -42,9 +42,9 @@ describe('OptionsApp', () => {
   it('matches custom physical keys and modifiers even when the displayed key differs', async () => {
     const settings = structuredClone(DEFAULT_SETTINGS)
     settings.locale = 'zh-TW'
-    settings.subtitlePractice.enabled = true
+    settings.subtitleNavigation.enabled = true
     settings.bindings.skipIntro.key = { code: 'KeyQ', key: 'q', ctrl: true, alt: true, shift: true, meta: true }
-    settings.subtitlePractice.bindings.next.key = { ...settings.bindings.skipIntro.key, key: 'Ω' }
+    settings.subtitleNavigation.bindings.next.key = { ...settings.bindings.skipIntro.key, key: 'Ω' }
     await saveSettings(settings)
     render(<OptionsApp />)
 
@@ -55,11 +55,11 @@ describe('OptionsApp', () => {
 
   it.each(['ctrl', 'alt', 'shift', 'meta', 'code'] as const)('does not mark a shortcut overridden when its %s differs', async field => {
     const settings = structuredClone(DEFAULT_SETTINGS)
-    settings.subtitlePractice.enabled = true
+    settings.subtitleNavigation.enabled = true
     settings.bindings.skipIntro.key = { code: 'KeyQ', key: 'q', ctrl: false, alt: false, shift: false, meta: false }
-    settings.subtitlePractice.bindings.next.key = { ...settings.bindings.skipIntro.key }
-    if (field === 'code') settings.subtitlePractice.bindings.next.key.code = 'KeyR'
-    else settings.subtitlePractice.bindings.next.key[field] = true
+    settings.subtitleNavigation.bindings.next.key = { ...settings.bindings.skipIntro.key }
+    if (field === 'code') settings.subtitleNavigation.bindings.next.key.code = 'KeyR'
+    else settings.subtitleNavigation.bindings.next.key[field] = true
     await saveSettings(settings)
     render(<OptionsApp />)
 
@@ -69,12 +69,12 @@ describe('OptionsApp', () => {
 
   it.each(['global', 'subtitle', 'general binding', 'subtitle binding'] as const)('hides subtitle priority when %s is disabled', async disabled => {
     const settings = structuredClone(DEFAULT_SETTINGS)
-    settings.subtitlePractice.enabled = true
-    settings.subtitlePractice.bindings.replay.enabled = true
+    settings.subtitleNavigation.enabled = true
+    settings.subtitleNavigation.bindings.replay.enabled = true
     if (disabled === 'global') settings.enabled = false
-    if (disabled === 'subtitle') settings.subtitlePractice.enabled = false
+    if (disabled === 'subtitle') settings.subtitleNavigation.enabled = false
     if (disabled === 'general binding') settings.bindings.skipIntro.enabled = false
-    if (disabled === 'subtitle binding') settings.subtitlePractice.bindings.replay.enabled = false
+    if (disabled === 'subtitle binding') settings.subtitleNavigation.bindings.replay.enabled = false
     await saveSettings(settings)
     render(<OptionsApp />)
 
@@ -87,8 +87,8 @@ describe('OptionsApp', () => {
       'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:141.0) Gecko/20100101 Firefox/141.0'
     )
     const settings = structuredClone(DEFAULT_SETTINGS)
-    settings.subtitlePractice.enabled = true
-    settings.subtitlePractice.bindings.next.key = { ...settings.bindings.pictureInPicture.key }
+    settings.subtitleNavigation.enabled = true
+    settings.subtitleNavigation.bindings.next.key = { ...settings.bindings.pictureInPicture.key }
     await saveSettings(settings)
     render(<OptionsApp />)
 
@@ -99,8 +99,8 @@ describe('OptionsApp', () => {
 
   it('removes and restores subtitle priority immediately without changing the general binding', async () => {
     const settings = structuredClone(DEFAULT_SETTINGS)
-    settings.subtitlePractice.enabled = true
-    settings.subtitlePractice.bindings.replay.enabled = true
+    settings.subtitleNavigation.enabled = true
+    settings.subtitleNavigation.bindings.replay.enabled = true
     await saveSettings(settings)
     render(<OptionsApp />)
 
@@ -150,15 +150,15 @@ describe('OptionsApp', () => {
       fireEvent.click(document.querySelector('label[for="subtitle-navigation-enabled"]')!)
       await screen.findByRole('alert')
       expect((await subtitleNavigationAnnouncement.getState()).pending).toBe(true)
-      expect((await getSettings()).subtitlePractice.enabled).toBe(false)
+      expect((await getSettings()).subtitleNavigation.enabled).toBe(false)
       expect(screen.getByText(SUBTITLE_ACTIVATION_COPY.en.guide)).toBeInTheDocument()
       expect(toggle).toHaveAttribute('aria-describedby', 'subtitle-activation-guide subtitle-permission-error')
       fireEvent.click(toggle)
-      await waitFor(async () => expect((await getSettings()).subtitlePractice.enabled).toBe(true))
+      await waitFor(async () => expect((await getSettings()).subtitleNavigation.enabled).toBe(true))
       expect(screen.queryByText(SUBTITLE_ACTIVATION_COPY.en.guide)).not.toBeInTheDocument()
       expect(toggle).not.toHaveAttribute('aria-describedby')
       fireEvent.click(toggle)
-      await waitFor(async () => expect((await getSettings()).subtitlePractice.enabled).toBe(false))
+      await waitFor(async () => expect((await getSettings()).subtitleNavigation.enabled).toBe(false))
       expect(screen.queryByText(SUBTITLE_ACTIVATION_COPY.en.guide)).not.toBeInTheDocument()
     } finally {
       window.history.replaceState(null, '', '/options.html')
@@ -201,7 +201,7 @@ describe('OptionsApp', () => {
       }
       await waitFor(() => expect(guide).not.toBeInTheDocument())
       expect(chrome.permissions.request).not.toHaveBeenCalled()
-      expect((await getSettings()).subtitlePractice.enabled).toBe(false)
+      expect((await getSettings()).subtitleNavigation.enabled).toBe(false)
       expect((await subtitleNavigationAnnouncement.getState()).pending).toBe(true)
       await act(async () => { await saveSettings({ ...(await getSettings()), theme: 'dark' }) })
       expect(screen.queryByRole('dialog', { name: 'Subtitle navigation' })).not.toBeInTheDocument()
@@ -213,14 +213,14 @@ describe('OptionsApp', () => {
   it.each([false, true])('handles the global prerequisite and existing activation on arrival (%s)', async subtitleEnabled => {
     const settings = structuredClone(DEFAULT_SETTINGS)
     settings.enabled = false
-    settings.subtitlePractice.enabled = subtitleEnabled
+    settings.subtitleNavigation.enabled = subtitleEnabled
     await saveSettings(settings)
     window.history.replaceState(null, '', '/options.html#subtitle-navigation')
     try {
       render(<OptionsApp />)
       const toggle = await screen.findByRole('switch', { name: 'Enable subtitle navigation shortcuts' })
       expect(toggle).toBeDisabled()
-      expect(screen.getByText(SUBTITLE_PRACTICE_COPY.en.requiresEnabled)).toBeInTheDocument()
+      expect(screen.getByText(SUBTITLE_NAVIGATION_COPY.en.requiresEnabled)).toBeInTheDocument()
       expect(screen.queryByText(SUBTITLE_ACTIVATION_COPY.en.guide)).not.toBeInTheDocument()
       if (!subtitleEnabled) expect(screen.getByText(SUBTITLE_ACTIVATION_COPY.en.permission)).toBeInTheDocument()
       else expect(screen.queryByText(SUBTITLE_ACTIVATION_COPY.en.permission)).not.toBeInTheDocument()
@@ -235,16 +235,16 @@ describe('OptionsApp', () => {
   })
   const subtitleOverlap = () => {
     const settings = structuredClone(DEFAULT_SETTINGS)
-    settings.subtitlePractice.enabled = true
-    settings.subtitlePractice.bindings.playback.enabled = false
-    settings.subtitlePractice.bindings.next.key = { ...settings.subtitlePractice.bindings.playback.key }
+    settings.subtitleNavigation.enabled = true
+    settings.subtitleNavigation.bindings.playback.enabled = false
+    settings.subtitleNavigation.bindings.next.key = { ...settings.subtitleNavigation.bindings.playback.key }
     return settings
   }
 
   it('allows reusing a disabled subtitle key and asks before enabling its former owner', async () => {
     const settings = structuredClone(DEFAULT_SETTINGS)
-    settings.subtitlePractice.enabled = true
-    settings.subtitlePractice.bindings.playback.enabled = false
+    settings.subtitleNavigation.enabled = true
+    settings.subtitleNavigation.bindings.playback.enabled = false
     await saveSettings(settings)
     render(<OptionsApp />)
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Next subtitle' }))
@@ -252,7 +252,7 @@ describe('OptionsApp', () => {
     fireEvent.keyDown(editor, { code: 'KeyW', key: 'w' })
     expect(within(editor).getByRole('button', { name: 'Save' })).toBeEnabled()
     fireEvent.click(within(editor).getByRole('button', { name: 'Save' }))
-    await waitFor(async () => expect((await getSettings()).subtitlePractice.bindings.next.key.code).toBe('KeyW'))
+    await waitFor(async () => expect((await getSettings()).subtitleNavigation.bindings.next.key.code).toBe('KeyW'))
     const saved = await getSettings()
     const toggle = screen.getByRole('switch', { name: 'Play / pause Enabled' })
     fireEvent.click(toggle)
@@ -266,13 +266,13 @@ describe('OptionsApp', () => {
     expect(toggle).toHaveFocus()
   })
 
-  it.each(['practice', 'general'] as const)('transfers a conflicting %s key only after an explicit choice', async group => {
+  it.each(['subtitleNavigation', 'general'] as const)('transfers a conflicting %s key only after an explicit choice', async group => {
     const settings = subtitleOverlap()
     settings.bindings.mute = { enabled: false, key: { ...settings.bindings.skipIntro.key } }
     const saved = await saveSettings(settings)
     render(<OptionsApp />)
-    const action = group === 'practice' ? 'Play / pause' : 'Mute'
-    const other = group === 'practice' ? 'Next subtitle' : 'Skip intro'
+    const action = group === 'subtitleNavigation' ? 'Play / pause' : 'Mute'
+    const other = group === 'subtitleNavigation' ? 'Next subtitle' : 'Skip intro'
     const toggle = await screen.findByRole('switch', { name: `${action} Enabled` })
     vi.mocked(chrome.storage.sync.set).mockClear()
     fireEvent.click(toggle)
@@ -282,14 +282,14 @@ describe('OptionsApp', () => {
     fireEvent.click(within(popover).getByRole('button', { name: `Use for ${action}` }))
     await waitFor(() => expect(toggle).toHaveAttribute('aria-checked', 'true'))
     const next = await getSettings()
-    if (group === 'practice') {
-      expect(next.subtitlePractice.bindings.playback).toEqual({ ...saved.subtitlePractice.bindings.playback, enabled: true })
-      expect(next.subtitlePractice.bindings.next).toEqual({ ...saved.subtitlePractice.bindings.next, enabled: false })
+    if (group === 'subtitleNavigation') {
+      expect(next.subtitleNavigation.bindings.playback).toEqual({ ...saved.subtitleNavigation.bindings.playback, enabled: true })
+      expect(next.subtitleNavigation.bindings.next).toEqual({ ...saved.subtitleNavigation.bindings.next, enabled: false })
       expect(next.bindings).toEqual(saved.bindings)
     } else {
       expect(next.bindings.mute).toEqual({ ...saved.bindings.mute, enabled: true })
       expect(next.bindings.skipIntro).toEqual({ ...saved.bindings.skipIntro, enabled: false })
-      expect(next.subtitlePractice).toEqual(saved.subtitlePractice)
+      expect(next.subtitleNavigation).toEqual(saved.subtitleNavigation)
     }
     expect(chrome.storage.sync.set).toHaveBeenCalledTimes(1)
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
@@ -305,8 +305,8 @@ describe('OptionsApp', () => {
     expect(within(editor).getByRole('button', { name: 'Save' })).toBeDisabled()
     fireEvent.keyDown(editor, { key: 'q', code: 'KeyQ' })
     fireEvent.click(within(editor).getByRole('button', { name: 'Save' }))
-    await waitFor(async () => expect((await getSettings()).subtitlePractice.bindings.playback).toMatchObject({ enabled: true, key: { code: 'KeyQ' } }))
-    expect((await getSettings()).subtitlePractice.bindings.next).toEqual(settings.subtitlePractice.bindings.next)
+    await waitFor(async () => expect((await getSettings()).subtitleNavigation.bindings.playback).toMatchObject({ enabled: true, key: { code: 'KeyQ' } }))
+    expect((await getSettings()).subtitleNavigation.bindings.next).toEqual(settings.subtitleNavigation.bindings.next)
   })
 
   it('dismisses a conflict without changes when clicking outside', async () => {
@@ -340,10 +340,10 @@ describe('OptionsApp', () => {
     render(<OptionsApp />)
     fireEvent.click(await screen.findByRole('switch', { name: 'Play / pause Enabled' }))
     await screen.findByRole('dialog')
-    settings.subtitlePractice.enabled = false
+    settings.subtitleNavigation.enabled = false
     await act(async () => { await saveSettings(settings) })
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    settings.subtitlePractice.enabled = true
+    settings.subtitleNavigation.enabled = true
     await act(async () => { await saveSettings(settings) })
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.getByRole('switch', { name: 'Play / pause Enabled' })).toHaveAttribute('aria-checked', 'false')
@@ -351,15 +351,41 @@ describe('OptionsApp', () => {
 
   it('checks conflicts before a single-row reset changes the key or enables the row', async () => {
     const settings = subtitleOverlap()
-    settings.subtitlePractice.bindings.playback = { enabled: true, key: { ...settings.subtitlePractice.bindings.playback.key, code: 'KeyQ', key: 'q' } }
+    settings.subtitleNavigation.bindings.playback = { enabled: true, key: { ...settings.subtitleNavigation.bindings.playback.key, code: 'KeyQ', key: 'q' } }
     const saved = await saveSettings(settings)
     render(<OptionsApp />)
     fireEvent.click(await screen.findByRole('button', { name: 'Reset Play / pause' }))
     const popover = await screen.findByRole('dialog', { name: 'W is used by Next subtitle' })
     expect(await getSettings()).toEqual(saved)
     fireEvent.click(within(popover).getByRole('button', { name: 'Use for Play / pause' }))
-    await waitFor(async () => expect((await getSettings()).subtitlePractice.bindings.playback.key.code).toBe('KeyW'))
-    expect((await getSettings()).subtitlePractice.bindings.next.enabled).toBe(false)
+    await waitFor(async () => expect((await getSettings()).subtitleNavigation.bindings.playback.key.code).toBe('KeyW'))
+    expect((await getSettings()).subtitleNavigation.bindings.next.enabled).toBe(false)
+  })
+
+  it.each([false, true])('resets replay to S and disabled from enabled=%s without taking over another shortcut', async enabled => {
+    const settings = structuredClone(DEFAULT_SETTINGS)
+    settings.subtitleNavigation.enabled = true
+    settings.subtitleNavigation.bindings.replay = {
+      enabled,
+      key: { code: 'KeyQ', key: 'q', ctrl: false, alt: false, shift: false, meta: false },
+    }
+    settings.subtitleNavigation.bindings.next.key = { ...settings.bindings.skipIntro.key }
+    const saved = await saveSettings(settings)
+    render(<OptionsApp />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Reset Replay current subtitle' }))
+
+    await waitFor(async () => expect(await getSettings()).toEqual({
+      ...saved,
+      subtitleNavigation: {
+        ...saved.subtitleNavigation,
+        bindings: { ...saved.subtitleNavigation.bindings, replay: DEFAULT_SETTINGS.subtitleNavigation.bindings.replay },
+      },
+    }))
+    const row = screen.getByRole('row', { name: /Replay current subtitle/ })
+    expect(within(row).getByText('S')).toBeInTheDocument()
+    expect(within(row).getByRole('switch', { name: 'Replay current subtitle Enabled' })).toHaveAttribute('aria-checked', 'false')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it.each(['Chrome/140.0', 'Chrome/140.0 Edg/140.0', 'Firefox/156.0'])('requests subtitle access directly from the switch click in %s', async browser => {
@@ -371,16 +397,16 @@ describe('OptionsApp', () => {
     expect(chrome.permissions.request).toHaveBeenCalledExactlyOnceWith({ origins: [
       '*://*.netflix.com/*', 'https://*.nflxvideo.net/*',
     ] })
-    await waitFor(async () => expect((await getSettings()).subtitlePractice.enabled).toBe(true))
+    await waitFor(async () => expect((await getSettings()).subtitleNavigation.enabled).toBe(true))
     fireEvent.click(toggle)
-    await waitFor(async () => expect((await getSettings()).subtitlePractice.enabled).toBe(false))
+    await waitFor(async () => expect((await getSettings()).subtitleNavigation.enabled).toBe(false))
     expect(chrome.permissions.request).toHaveBeenCalledTimes(1)
   })
 
   it('keeps subtitle settings unchanged after denying access and allows another attempt', async () => {
     const custom = structuredClone(DEFAULT_SETTINGS)
-    custom.subtitlePractice.bindings.next.enabled = false
-    custom.subtitlePractice.bindings.previous.key.code = 'KeyZ'
+    custom.subtitleNavigation.bindings.next.enabled = false
+    custom.subtitleNavigation.bindings.previous.key.code = 'KeyZ'
     const saved = await saveSettings(custom)
     vi.mocked(chrome.permissions.request).mockImplementationOnce(() => Promise.resolve(false) as never)
     render(<OptionsApp />)
@@ -390,7 +416,7 @@ describe('OptionsApp', () => {
     expect(await getSettings()).toEqual(saved)
     expect(toggle).toHaveAttribute('aria-checked', 'false')
     fireEvent.click(toggle)
-    await waitFor(async () => expect((await getSettings()).subtitlePractice).toEqual({ ...saved.subtitlePractice, enabled: true }))
+    await waitFor(async () => expect((await getSettings()).subtitleNavigation).toEqual({ ...saved.subtitleNavigation, enabled: true }))
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
@@ -401,9 +427,9 @@ describe('OptionsApp', () => {
     fireEvent.click(toggle)
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not request website access')
     expect(toggle).not.toBeDisabled()
-    expect((await getSettings()).subtitlePractice.enabled).toBe(false)
+    expect((await getSettings()).subtitleNavigation.enabled).toBe(false)
     fireEvent.click(toggle)
-    await waitFor(async () => expect((await getSettings()).subtitlePractice.enabled).toBe(true))
+    await waitFor(async () => expect((await getSettings()).subtitleNavigation.enabled).toBe(true))
   })
 
   it('keeps subtitle approval pending through unrelated settings updates while the extension stays enabled', async () => {
@@ -416,7 +442,7 @@ describe('OptionsApp', () => {
     expect(toggle).toBeDisabled()
     expect(toggle).toHaveAttribute('aria-busy', 'true')
     await act(async () => approve(true))
-    expect((await getSettings()).subtitlePractice.enabled).toBe(true)
+    expect((await getSettings()).subtitleNavigation.enabled).toBe(true)
     expect((await getSettings()).theme).toBe('dark')
     expect(toggle).not.toBeDisabled()
   })
@@ -431,11 +457,11 @@ describe('OptionsApp', () => {
     expect(toggle).toBeDisabled()
     fireEvent.click(toggle)
     expect(chrome.permissions.request).toHaveBeenCalledTimes(1)
-    expect((await getSettings()).subtitlePractice.enabled).toBe(false)
+    expect((await getSettings()).subtitleNavigation.enabled).toBe(false)
     fireEvent.click(global)
     fireEvent.click(global)
     await act(async () => approve(true))
-    expect((await getSettings()).subtitlePractice.enabled).toBe(false)
+    expect((await getSettings()).subtitleNavigation.enabled).toBe(false)
     expect(toggle).not.toBeDisabled()
   })
 
@@ -451,10 +477,10 @@ describe('OptionsApp', () => {
       await saveSettings({ ...settings, enabled: true })
     })
     await act(async () => approve(true))
-    expect((await getSettings()).subtitlePractice.enabled).toBe(false)
+    expect((await getSettings()).subtitleNavigation.enabled).toBe(false)
     expect(toggle).not.toBeDisabled()
     fireEvent.click(toggle)
-    await waitFor(async () => expect((await getSettings()).subtitlePractice.enabled).toBe(true))
+    await waitFor(async () => expect((await getSettings()).subtitleNavigation.enabled).toBe(true))
   })
 
   it.each([true, false])('keeps a new permission attempt pending after a stale external approval returns %s', async granted => {
@@ -474,11 +500,11 @@ describe('OptionsApp', () => {
     fireEvent.click(toggle)
     expect(chrome.permissions.request).toHaveBeenCalledTimes(2)
     await act(async () => approveOld(granted))
-    expect((await getSettings()).subtitlePractice.enabled).toBe(false)
+    expect((await getSettings()).subtitleNavigation.enabled).toBe(false)
     expect(toggle).toBeDisabled()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     await act(async () => approveNew(true))
-    expect((await getSettings()).subtitlePractice.enabled).toBe(true)
+    expect((await getSettings()).subtitleNavigation.enabled).toBe(true)
     expect(toggle).not.toBeDisabled()
   })
 
@@ -490,10 +516,10 @@ describe('OptionsApp', () => {
     fireEvent.click(toggle)
     unmount()
     await act(async () => approve(true))
-    expect((await getSettings()).subtitlePractice.enabled).toBe(false)
+    expect((await getSettings()).subtitleNavigation.enabled).toBe(false)
   })
 
-  it('persists the subtitle practice master switch and independent row bindings', async () => {
+  it('persists the subtitle navigation master switch and independent row bindings', async () => {
     render(<OptionsApp />)
     const toggle = await screen.findByRole('switch', { name: 'Enable subtitle navigation shortcuts' })
     await waitFor(() => expect(toggle).not.toBeDisabled())
@@ -503,19 +529,20 @@ describe('OptionsApp', () => {
     expect(card).toHaveTextContent('Previous subtitle')
     expect(card).toHaveTextContent('Replay current subtitle')
     fireEvent.click(toggle)
-    await waitFor(async () => expect((await getSettings()).subtitlePractice.enabled).toBe(true))
+    await waitFor(async () => expect((await getSettings()).subtitleNavigation.enabled).toBe(true))
     const nextToggle = within(card).getByRole('switch', { name: 'Next subtitle Enabled' })
     fireEvent.click(nextToggle)
-    await waitFor(async () => expect((await getSettings()).subtitlePractice.bindings.next.enabled).toBe(false))
+    await waitFor(async () => expect((await getSettings()).subtitleNavigation.bindings.next.enabled).toBe(false))
     fireEvent.click(within(card).getByRole('button', { name: 'Edit Next subtitle' }))
     const dialog = screen.getByRole('dialog')
     fireEvent.keyDown(dialog, { code: 'KeyN', key: 'n' })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
-    await waitFor(async () => expect((await getSettings()).subtitlePractice.bindings.next.key.code).toBe('KeyN'))
+    await waitFor(async () => expect((await getSettings()).subtitleNavigation.bindings.next.key.code).toBe('KeyN'))
     fireEvent.click(within(card).getByRole('button', { name: 'Reset Next subtitle' }))
-    await waitFor(async () => expect((await getSettings()).subtitlePractice.bindings.next.key.code).toBe('KeyD'))
+    await waitFor(async () => expect((await getSettings()).subtitleNavigation.bindings.next.key.code).toBe('KeyD'))
+    expect((await getSettings()).subtitleNavigation.bindings.next.enabled).toBe(true)
     fireEvent.click(toggle)
-    await waitFor(async () => expect((await getSettings()).subtitlePractice.enabled).toBe(false))
+    await waitFor(async () => expect((await getSettings()).subtitleNavigation.enabled).toBe(false))
   })
 
   it.each([false, true])('resets subtitle bindings while preserving the master switch (%s) and other settings', async enabled => {
@@ -523,11 +550,11 @@ describe('OptionsApp', () => {
     custom.enabled = true
     custom.speed.step = 0.5
     custom.bindings.playPause.enabled = false
-    custom.subtitlePractice.enabled = enabled
-    custom.subtitlePractice.bindings.previous.key = { code: 'KeyZ', key: 'z', ctrl: false, alt: false, shift: false, meta: false }
-    custom.subtitlePractice.bindings.next.enabled = false
-    custom.subtitlePractice.bindings.replay.enabled = false
-    custom.subtitlePractice.bindings.playback.key = { code: 'KeyX', key: 'x', ctrl: false, alt: false, shift: false, meta: false }
+    custom.subtitleNavigation.enabled = enabled
+    custom.subtitleNavigation.bindings.previous.key = { code: 'KeyZ', key: 'z', ctrl: false, alt: false, shift: false, meta: false }
+    custom.subtitleNavigation.bindings.next.enabled = false
+    custom.subtitleNavigation.bindings.replay.enabled = false
+    custom.subtitleNavigation.bindings.playback.key = { code: 'KeyX', key: 'x', ctrl: false, alt: false, shift: false, meta: false }
     const saved = await saveSettings(custom)
     render(<OptionsApp />)
     const reset = await screen.findByRole('button', { name: 'Reset subtitle shortcuts' })
@@ -535,17 +562,17 @@ describe('OptionsApp', () => {
     fireEvent.click(reset)
     await waitFor(async () => expect(await getSettings()).toEqual({
       ...saved,
-      subtitlePractice: { ...saved.subtitlePractice, bindings: DEFAULT_SETTINGS.subtitlePractice.bindings },
+      subtitleNavigation: { ...saved.subtitleNavigation, bindings: DEFAULT_SETTINGS.subtitleNavigation.bindings },
     }))
   })
 
   it('shows subtitle navigation guidance in a tooltip instead of a permanent description', async () => {
     render(<OptionsApp />)
     const info = await screen.findByRole('button', { name: 'Subtitle navigation info' })
-    expect(screen.queryByText(SUBTITLE_PRACTICE_COPY.en.description)).not.toBeInTheDocument()
+    expect(screen.queryByText(SUBTITLE_NAVIGATION_COPY.en.description)).not.toBeInTheDocument()
     focusAsKeyboard(info)
     const tooltip = await screen.findByRole('tooltip')
-    for (const paragraph of SUBTITLE_PRACTICE_COPY.en.description.split('\n\n')) {
+    for (const paragraph of SUBTITLE_NAVIGATION_COPY.en.description.split('\n\n')) {
       expect(within(tooltip).getByText(paragraph)).toBeInTheDocument()
     }
   })
@@ -555,7 +582,7 @@ describe('OptionsApp', () => {
     window.history.replaceState(null, '', surface === 'inline' ? '/options.html' : '/options.html#subtitle-navigation')
     try {
       render(<OptionsApp />)
-      const link = await screen.findByRole('link', { name: SUBTITLE_PRACTICE_COPY.en.goToGeneralSettings })
+      const link = await screen.findByRole('link', { name: SUBTITLE_NAVIGATION_COPY.en.goToGeneralSettings })
       const globalSwitch = screen.getByRole('switch', { name: 'Enable extension' })
       expect(link).toHaveAttribute('href', '#enable-shortcut-override')
       fireEvent.click(link)
@@ -565,7 +592,7 @@ describe('OptionsApp', () => {
       expect(await getSettings()).toEqual(saved)
       expect(chrome.permissions.request).not.toHaveBeenCalled()
       fireEvent.click(globalSwitch)
-      await waitFor(() => expect(screen.queryByRole('link', { name: SUBTITLE_PRACTICE_COPY.en.goToGeneralSettings })).not.toBeInTheDocument())
+      await waitFor(() => expect(screen.queryByRole('link', { name: SUBTITLE_NAVIGATION_COPY.en.goToGeneralSettings })).not.toBeInTheDocument())
       expect((await getSettings()).enabled).toBe(true)
     } finally {
       window.history.replaceState(null, '', '/options.html')
@@ -574,9 +601,9 @@ describe('OptionsApp', () => {
 
   it.each([false, true])('disables subtitle controls under the global switch and preserves their settings (%s)', async enabled => {
     const custom = structuredClone(DEFAULT_SETTINGS)
-    custom.subtitlePractice.enabled = enabled
-    custom.subtitlePractice.bindings.previous.enabled = false
-    custom.subtitlePractice.bindings.next.key = { code: 'KeyN', key: 'n', ctrl: false, alt: false, shift: false, meta: false }
+    custom.subtitleNavigation.enabled = enabled
+    custom.subtitleNavigation.bindings.previous.enabled = false
+    custom.subtitleNavigation.bindings.next.key = { code: 'KeyN', key: 'n', ctrl: false, alt: false, shift: false, meta: false }
     const saved = await saveSettings(custom)
     render(<OptionsApp />)
     const globalSwitch = await screen.findByRole('switch', { name: 'Enable extension' })
@@ -590,19 +617,19 @@ describe('OptionsApp', () => {
     for (const button of within(card).getAllByRole('button').filter(button => button.getAttribute('aria-label') !== 'Subtitle navigation info')) expect(button).toBeDisabled()
     const info = within(card).getByRole('button', { name: 'Subtitle navigation info' })
     expect(info).not.toBeDisabled()
-    expect(within(card).getByText(SUBTITLE_PRACTICE_COPY.en.requiresEnabled)).toBeVisible()
+    expect(within(card).getByText(SUBTITLE_NAVIGATION_COPY.en.requiresEnabled)).toBeVisible()
     focusAsKeyboard(info)
     const tooltip = await screen.findByRole('tooltip')
-    for (const paragraph of SUBTITLE_PRACTICE_COPY.en.description.split('\n\n')) {
+    for (const paragraph of SUBTITLE_NAVIGATION_COPY.en.description.split('\n\n')) {
       expect(within(tooltip).getByText(paragraph)).toBeInTheDocument()
     }
-    expect(tooltip).not.toHaveTextContent(SUBTITLE_PRACTICE_COPY.en.requiresEnabled)
-    expect((await getSettings()).subtitlePractice).toEqual(saved.subtitlePractice)
+    expect(tooltip).not.toHaveTextContent(SUBTITLE_NAVIGATION_COPY.en.requiresEnabled)
+    expect((await getSettings()).subtitleNavigation).toEqual(saved.subtitleNavigation)
     fireEvent.click(globalSwitch)
     await waitFor(() => expect(master).not.toBeDisabled())
     expect(master).toHaveAttribute('aria-checked', String(enabled))
     expect(within(card).getByRole('button', { name: 'Edit Next subtitle' })).not.toBeDisabled()
-    expect((await getSettings()).subtitlePractice).toEqual(saved.subtitlePractice)
+    expect((await getSettings()).subtitleNavigation).toEqual(saved.subtitleNavigation)
   })
 
   afterEach(() => {

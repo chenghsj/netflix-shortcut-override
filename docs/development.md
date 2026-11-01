@@ -121,7 +121,8 @@ Key areas:
 - `src/content/pip/`: Document Picture-in-Picture lifecycle, subtitle mirroring, and PiP keyboard routing.
 - `src/content/pip/pip-video-handoff.ts`: candidate selection and explicit waiting, replacement, or episode decisions. Recovery timers and episode evidence remain in this owner.
 - `src/content/netflix-api-bridge.ts`: page-world bridge for Netflix player API access and selected subtitle metadata.
-- `src/content/subtitle-practice.ts`: subtitle navigation, timing cache, loading feedback, and pending-action cancellation.
+- `src/content/subtitle-navigation.ts`: subtitle navigation, timing cache, loading feedback, and pending-action cancellation.
+- Subtitle navigation uses `subtitleNavigation` in settings and shortcut groups, and `SubtitleNavigation` / `SUBTITLE_NAVIGATION` in type and constant names. Settings schema v14 migrates the former `subtitlePractice` field from older settings and backups. Synced writes retain that field as an alias for older installations; current backups export only `subtitleNavigation`.
 - `src/shared/netflix-caption-events.ts`: JSON string message protocol for caption metadata across browser worlds.
 - `src/shared/netflix-subtitles.ts`: bounded Netflix timed-text normalization.
 - `src/background/service-worker.ts`: distinct manifest entry point for the background bundle.
