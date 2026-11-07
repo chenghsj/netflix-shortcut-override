@@ -1,7 +1,7 @@
 /** Browser-accessible caption documents only. Never decrypt media or fetch arbitrary URLs. */
 export const MAX_SUBTITLE_BYTES = 2_000_000;
-export const MAX_SUBTITLE_CUES = 3_000;
-export const MAX_SUBTITLE_CHARS = 220_000;
+export const MAX_SUBTITLE_CUES = 10_000;
+export const MAX_SUBTITLE_CHARS = 500_000;
 
 export type SubtitleDocument = { text: string; language: string };
 

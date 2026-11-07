@@ -252,6 +252,9 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
         bridgeReady,
         playerApiFound: response.result?.playerApiFound === true,
         playerFound: response.result?.playerFound === true,
+        ...(response.result?.subtitleDiagnostics
+          ? { subtitleDiagnostics: response.result.subtitleDiagnostics }
+          : {}),
         pipSupported: PipManager.isSupported(window),
         pipActive: pipManager?.isActive === true,
         ...(response.success

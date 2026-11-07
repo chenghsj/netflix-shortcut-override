@@ -13,6 +13,7 @@ describe('compatibility diagnostics report', () => {
         bridgeReady: true,
         playerApiFound: true,
         playerFound: true,
+        subtitleDiagnostics: '2 selectable (3 total, off: forced-narrative)',
         pipSupported: false,
         pipActive: false,
       },
@@ -24,6 +25,7 @@ describe('compatibility diagnostics report', () => {
     expect(report).toContain('Generated: 2026-07-19T00:00:00.000Z')
     expect(report).toContain('Extension version: 1.2.3')
     expect(report).toContain('Netflix player API found: yes')
+    expect(report).toContain('Subtitle tracks: 2 selectable (3 total, off: forced-narrative)')
     expect(report).toContain('Document Picture-in-Picture supported: no')
     expect(report).not.toContain('/watch/')
   })

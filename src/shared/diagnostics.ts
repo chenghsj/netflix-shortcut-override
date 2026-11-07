@@ -13,6 +13,7 @@ export type CompatibilityDiagnostics = {
   bridgeReady: boolean
   playerApiFound: boolean
   playerFound: boolean
+  subtitleDiagnostics?: string
   pipSupported: boolean
   pipActive: boolean
   error?: string
@@ -64,6 +65,7 @@ export const formatCompatibilityDiagnosticsReport = ({
     `Main-world bridge ready: ${value(diagnostics?.bridgeReady)}`,
     `Netflix player API found: ${value(diagnostics?.playerApiFound)}`,
     `Netflix player session found: ${value(diagnostics?.playerFound)}`,
+    `Subtitle tracks: ${diagnostics?.subtitleDiagnostics ?? 'unavailable'}`,
     `Document Picture-in-Picture supported: ${value(diagnostics?.pipSupported)}`,
     `Picture-in-Picture active: ${value(diagnostics?.pipActive)}`,
     `Diagnostic error: ${diagnostics?.error ?? 'none'}`,

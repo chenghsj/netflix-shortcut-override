@@ -29,3 +29,46 @@ it.each(['nflximg.net', 'nflxext.com'])('rejects %s subtitle URLs in both bridge
   expect(getCaptionMetadata()).toMatchObject({ url: 'https://a.nflxvideo.net/sub.vtt' })
   expect(injected('getCaptionMetadata').captionMetadata).toMatchObject({ url: 'https://a.nflxvideo.net/sub.vtt' })
 })
+
+it('matches internal tracks across id and new_track_id and rejects forced narrative off tracks', () => {
+  window.history.replaceState(null, '', '/watch/82000745')
+  const selected = { trackId: 'T:2:0;1;fr;1;1;0;0;', bcp47: 'fr' }
+  const internalCatalogue = [
+    {
+      id: '1762750366',
+      new_track_id: 'T:2:0;1;fr;1;1;0;0;',
+      ttDownloadables: {
+        'imsc1.1': { downloadUrls: { main: 'https://c001.nflxvideo.net/sub.xml' } },
+      },
+    },
+  ]
+  const player = {
+    getCurrentTime: () => 3902864,
+    getTimedTextTrack: () => selected,
+    getTimedTextTrackList: () => [selected],
+    internalTracks: internalCatalogue,
+  }
+  vi.stubGlobal('netflix', {
+    appContext: {
+      state: {
+        playerApp: {
+          getAPI: () => ({
+            videoPlayer: {
+              getAllPlayerSessionIds: () => ['session'],
+              getVideoPlayerBySessionId: () => player,
+            },
+          }),
+        },
+      },
+    },
+  })
+  expect(getCaptionMetadata()).toMatchObject({
+    key: '82000745:session:T:2:0;1;fr;1;1;0;0;',
+    url: 'https://c001.nflxvideo.net/sub.xml',
+    currentMs: 3902864,
+  })
+
+  // When subtitles are turned off onto a forced narrative track, treat it as off ('track').
+  Object.assign(selected, { isForcedNarrative: true })
+  expect(() => getCaptionMetadata()).toThrow('track')
+})

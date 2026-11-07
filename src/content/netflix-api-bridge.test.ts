@@ -21,6 +21,7 @@ type BridgeResponse = {
     subtitleToggleCalled?: boolean
     subtitlesEnabled?: boolean
     subtitleTrack?: string
+    subtitleDiagnostics?: string
   }
 }
 
@@ -224,6 +225,98 @@ describe('main-world Netflix API bridge', () => {
         subtitleTrack: 'English',
       })
     )
+  })
+
+  const mockPlayer = (player: Record<string, unknown>) => {
+    Object.assign(window, {
+      netflix: {
+        appContext: {
+          state: {
+            playerApp: {
+              getAPI: () => ({
+                videoPlayer: {
+                  getAllPlayerSessionIds: () => ['session-id'],
+                  getVideoPlayerBySessionId: () => ({ getCurrentTime: () => 30_000, ...player }),
+                },
+              }),
+            },
+          },
+        },
+      },
+    })
+  }
+
+  it('toggles subtitles using the audio-matched forced narrative track when no noneTrack exists', () => {
+    const frenchForced = { trackId: 'T:2:0;1;fr;0;0;0;0;', bcp47: 'fr', displayName: 'Off', isForcedNarrative: true }
+    const frenchSub = { trackId: 'T:2:0;1;fr;1;1;0;0;', bcp47: 'fr', displayName: 'Français', isForcedNarrative: false }
+    let current = frenchSub
+    const setTextTrack = vi.fn((track: typeof frenchForced) => { current = track })
+    mockPlayer({
+      getAudioTrack: () => ({ bcp47: 'fr' }),
+      getTextTrackList: () => [frenchForced, frenchSub],
+      getTextTrack: () => ({ trackId: current.trackId, bcp47: current.bcp47 }),
+      setTextTrack,
+    })
+
+    expect(callBridge('toggleSubtitles')?.result).toMatchObject({ subtitleToggleCalled: true, subtitlesEnabled: false, subtitleTrack: 'Off' })
+    expect(callBridge('getSubtitleState')?.result).toMatchObject({ subtitlesEnabled: false })
+    expect(callBridge('toggleSubtitles')?.result).toMatchObject({ subtitleToggleCalled: true, subtitlesEnabled: true, subtitleTrack: 'Français' })
+    expect(setTextTrack).toHaveBeenNthCalledWith(1, frenchForced)
+    expect(setTextTrack).toHaveBeenNthCalledWith(2, frenchSub)
+  })
+
+  it('falls back to visibility and DOM hiding when neither noneTrack nor forced narrative track exists, and clears on manual track change', () => {
+    const english = { id: 'en', displayName: 'English', bcp47: 'en' }
+    const french = { id: 'fr', displayName: 'Français', bcp47: 'fr' }
+    let current = english
+    const setTimedTextVisibility = vi.fn()
+    mockPlayer({
+      getTextTrackList: () => [english, french],
+      getTextTrack: () => current,
+      setTextTrack: vi.fn((next: typeof english) => { current = next }),
+      setTimedTextVisibility,
+    })
+
+    expect(callBridge('toggleSubtitles')?.result).toMatchObject({ subtitleToggleCalled: true, subtitlesEnabled: false, subtitleTrack: 'Off' })
+    expect(setTimedTextVisibility).toHaveBeenCalledWith(false)
+    expect(document.documentElement.getAttribute('data-shortcut-override-subtitles-hidden')).toBe('true')
+
+    expect(callBridge('toggleSubtitles')?.result).toMatchObject({ subtitleToggleCalled: true, subtitlesEnabled: true, subtitleTrack: 'English' })
+    expect(setTimedTextVisibility).toHaveBeenLastCalledWith(true)
+    expect(document.documentElement.getAttribute('data-shortcut-override-subtitles-hidden')).toBeNull()
+
+    callBridge('toggleSubtitles')
+    current = french
+    expect(callBridge('getSubtitleState')?.result).toMatchObject({ subtitlesEnabled: true, subtitleTrack: 'Français' })
+    expect(document.documentElement.getAttribute('data-shortcut-override-subtitles-hidden')).toBeNull()
+  })
+
+  it('retries forced narrative when noneTrack is ignored, preserves displayName variant, and reports diagnostics', () => {
+    const staleNone = { id: 'none', displayName: 'Off', isNoneTrack: true }
+    const jaForced = { id: 'ja-fn', bcp47: 'ja', displayName: 'Off (Forced)', isForcedNarrative: true }
+    const zhCc = { id: 'zh-cc-v1', bcp47: 'zh-Hant', displayName: '中文（繁體）[CC]' }
+    const zhNormal = { id: 'zh-normal-v1', bcp47: 'zh-Hant', displayName: '中文（繁體）' }
+    let current: { id: string; displayName: string; bcp47?: string } = zhNormal
+    let tracks = [staleNone, jaForced, zhCc, zhNormal]
+    const setTextTrack = vi.fn((next: typeof current) => {
+      if (next !== staleNone) current = next
+    })
+    mockPlayer({
+      getAudioTrack: () => ({ bcp47: 'ja' }),
+      getTextTrackList: () => tracks,
+      getTextTrack: () => current,
+      setTextTrack,
+    })
+
+    expect(callBridge('toggleSubtitles')?.result?.subtitlesEnabled).toBe(false)
+    expect(setTextTrack).toHaveBeenNthCalledWith(1, staleNone)
+    expect(setTextTrack).toHaveBeenNthCalledWith(2, jaForced)
+
+    const regeneratedZhNormal = { ...zhNormal, id: 'zh-normal-v2' }
+    tracks = [jaForced, { ...zhCc, id: 'zh-cc-v2' }, regeneratedZhNormal]
+    expect(callBridge('toggleSubtitles')?.result).toMatchObject({ subtitlesEnabled: true, subtitleTrack: '中文（繁體）' })
+    expect(setTextTrack).toHaveBeenLastCalledWith(regeneratedZhNormal)
+    expect(callBridge('diagnose')?.result).toMatchObject({ subtitleDiagnostics: '2 selectable (3 total, off: forced-narrative)' })
   })
 
   it('reads the selected Netflix subtitle track without changing it', () => {

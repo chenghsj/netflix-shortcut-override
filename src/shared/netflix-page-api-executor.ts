@@ -1,5 +1,10 @@
 import type { NetflixApiAction, NetflixPageResult } from '@/shared/netflix-api'
 
+type NetflixAudioTrack = {
+  bcp47?: string
+  language?: string
+}
+
 type NetflixPlayer = {
   play(): void
   pause(): void
@@ -7,28 +12,36 @@ type NetflixPlayer = {
   getCurrentTime(): number
   setVolume(value: number): void
   setMuted(value: boolean): void
+  getAudioTrack?(): NetflixAudioTrack | null | undefined
+  getTimedAudioTrack?(): NetflixAudioTrack | null | undefined
   getTextTrackList?(): NetflixTextTrack[]
   getTimedTextTrackList?(): NetflixTextTrack[]
   getTextTrack?(): NetflixTextTrack | null | undefined
   getTimedTextTrack?(): NetflixTextTrack | null | undefined
   setTextTrack?(track: NetflixTextTrack): void
   setTimedTextTrack?(track: NetflixTextTrack): void
+  getTimedTextVisibility?(): boolean
+  setTimedTextVisibility?(visible: boolean): void
 }
 
 type NetflixTextTrack = {
   id?: string
   trackId?: string
+  new_track_id?: string
   bcp47?: string
   language?: string
   displayName?: string
   isNoneTrack?: boolean
+  isForcedNarrative?: boolean
+  rawTrackType?: string
+  trackType?: string
   isSelected?: boolean
   selected?: boolean
 }
 
 type NetflixTextTrackReference = Pick<
   NetflixTextTrack,
-  'id' | 'trackId' | 'bcp47' | 'language' | 'displayName'
+  'id' | 'trackId' | 'new_track_id' | 'bcp47' | 'language' | 'displayName'
 >
 
 type NetflixVideoPlayerApi = {
@@ -51,7 +64,11 @@ type NetflixWindow = typeof window & {
   }
   __shortcutOverrideSubtitleState?: {
     lastTrack?: NetflixTextTrackReference
+    lastOffTrack?: NetflixTextTrackReference
     subtitlesEnabled?: boolean
+    hiddenWithoutOffTrack?: boolean
+    hiddenWatchPath?: string
+    hiddenTrackId?: string | null
   }
 }
 
@@ -114,12 +131,23 @@ export const executeNetflixPageApi = (
     return null;
   }
 
-  type NetflixCaptionTrack = { id?: string; trackId?: string; new_track_id?: string; bcp47?: string; language?: string; isNoneTrack?: boolean }
-  function trackId(track: NetflixCaptionTrack | null): string | null {
-    return track?.trackId ?? track?.new_track_id ?? track?.id ?? null;
-  }
+  type NetflixCaptionTrack = NetflixTextTrack
+  const trackIds = (track: NetflixCaptionTrack | null | undefined): string[] =>
+    [track?.trackId, track?.new_track_id, track?.id].filter((id): id is string => Boolean(id))
+  const matchesTrackIds = (
+    track: NetflixCaptionTrack | null | undefined,
+    wantedIds: readonly string[]
+  ): boolean => trackIds(track).some(id => wantedIds.includes(id))
+  const isNoneTextTrack = (track: NetflixCaptionTrack | null | undefined): boolean =>
+    track?.isNoneTrack === true
+  const isForcedNarrativeTextTrack = (track: NetflixCaptionTrack | null | undefined): boolean =>
+    track?.isForcedNarrative === true ||
+    track?.rawTrackType === 'FORCED_NARRATIVE' ||
+    track?.trackType === 'FORCED_NARRATIVE'
+  const isOffTextTrack = (track: NetflixCaptionTrack | null | undefined): boolean =>
+    isNoneTextTrack(track) || isForcedNarrativeTextTrack(track)
 
-  function findInternalTrackUrl(root: unknown, wantedId: string): string | null {
+  function findInternalTrackUrl(root: unknown, wantedIds: readonly string[]): string | null {
     const visited = new WeakSet<object>();
     let checked = 0;
     function walk(value: unknown, depth: number): string | null {
@@ -137,7 +165,7 @@ export const executeNetflixPageApi = (
           if (
             entry &&
             typeof entry === "object" &&
-            trackId(entry as NetflixCaptionTrack) === wantedId
+            matchesTrackIds(entry as NetflixCaptionTrack, wantedIds)
           ) {
             const url = subtitleUrlFromTrack(entry);
             if (url) return url;
@@ -198,15 +226,19 @@ export const executeNetflixPageApi = (
       if (selected) break
     }
     if (!selected) selected = tracks.find(track => (track as NetflixCaptionTrack & { isSelected?: boolean; selected?: boolean }).isSelected || (track as NetflixCaptionTrack & { selected?: boolean }).selected) ?? null
-    if (!selected || (typeof selected !== 'string' && selected.isNoneTrack)) throw new Error('track')
-    const id = typeof selected === 'string' ? selected : trackId(selected)
+    if (!selected || (typeof selected !== 'string' && isOffTextTrack(selected))) throw new Error('track')
+    const wantedIds = typeof selected === 'string' ? [selected] : trackIds(selected)
+    const id = wantedIds[0] ?? null
     if (!id) throw new Error('track')
     // The selected-track API can return only a reference; delivery URLs live in
     // the complete catalog. Match by identity, never silently pick a language.
-    const candidates = tracks.filter(track => trackId(track) === id && !track.isNoneTrack)
+    const candidates = tracks.filter(track => matchesTrackIds(track, wantedIds) && !isOffTextTrack(track))
+    if (typeof selected !== 'string' && candidates.length === 0 && tracks.some(track => matchesTrackIds(track, wantedIds) && isOffTextTrack(track))) {
+      throw new Error('track')
+    }
     const url = (typeof selected === 'object' ? subtitleUrlFromTrack(selected) : null)
       ?? candidates.map(subtitleUrlFromTrack).find(Boolean)
-      ?? findInternalTrackUrl(page.netflix?.player?.MediaSession, id)
+      ?? findInternalTrackUrl([page.netflix?.player?.MediaSession, player, page.netflix?.player], wantedIds)
     if (!url) throw new Error('document')
     const currentMs = player.getCurrentTime()
     if (!Number.isFinite(currentMs)) throw new Error('player')
@@ -266,55 +298,187 @@ export const executeNetflixPageApi = (
       return null
     }
   }
-  const getTextTracks = (player: NetflixPlayer): NetflixTextTrack[] => {
-    const tracks = player.getTextTrackList?.() ?? player.getTimedTextTrackList?.() ?? []
-    return Array.isArray(tracks) ? tracks : []
+  const SUBTITLE_HIDDEN_ATTR = 'data-shortcut-override-subtitles-hidden'
+  const SUBTITLE_HIDDEN_STYLE_ID = 'shortcut-override-subtitle-visibility-style'
+  const setSubtitleDomHidden = (hidden: boolean): void => {
+    const root = document.documentElement
+    if (!root) return
+    if (!hidden) {
+      root.removeAttribute(SUBTITLE_HIDDEN_ATTR)
+      return
+    }
+    if (!document.getElementById(SUBTITLE_HIDDEN_STYLE_ID)) {
+      const style = document.createElement('style')
+      style.id = SUBTITLE_HIDDEN_STYLE_ID
+      style.textContent = `html[${SUBTITLE_HIDDEN_ATTR}="true"] .player-timedtext, html[${SUBTITLE_HIDDEN_ATTR}="true"] [data-uia="subtitle-text"] { display: none !important; }`
+      ;(document.head ?? root).appendChild(style)
+    }
+    root.setAttribute(SUBTITLE_HIDDEN_ATTR, 'true')
   }
-  const isNoneTextTrack = (track: NetflixTextTrack | null | undefined): boolean =>
-    track?.isNoneTrack === true
+  const getTextTracks = (player: NetflixPlayer): NetflixTextTrack[] => {
+    const tracks: NetflixTextTrack[] = []
+    for (const read of [player.getTextTrackList, player.getTimedTextTrackList]) {
+      try {
+        for (const track of read?.call(player) ?? []) {
+          if (track && !tracks.some(t => t === track || matchesTrackIds(t, trackIds(track)))) {
+            tracks.push(track)
+          }
+        }
+      } catch { /* Fall back to the other supported track-list API. */ }
+    }
+    return tracks
+  }
   const getSelectedTextTrack = (
     player: NetflixPlayer,
     tracks: NetflixTextTrack[]
-  ): NetflixTextTrack | null =>
-    player.getTextTrack?.() ??
-    player.getTimedTextTrack?.() ??
-    tracks.find(track => track.isSelected === true || track.selected === true) ??
-    null
+  ): NetflixTextTrack | null => {
+    const selected =
+      player.getTextTrack?.() ??
+      player.getTimedTextTrack?.() ??
+      tracks.find(track => track.isSelected === true || track.selected === true) ??
+      null
+    const match = selected ? tracks.find(track => matchesTrackIds(track, trackIds(selected))) : undefined
+    return match && match !== selected ? { ...match, ...selected } : selected
+  }
   const rememberTextTrack = (track: NetflixTextTrack): NetflixTextTrackReference => ({
     id: track.id,
     trackId: track.trackId,
+    new_track_id: track.new_track_id,
     bcp47: track.bcp47,
     language: track.language,
     displayName: track.displayName,
   })
+  const sameTrackLanguage = (
+    left?: { bcp47?: string; language?: string } | null,
+    right?: { bcp47?: string; language?: string } | null
+  ): boolean => {
+    if (left?.bcp47 && left.bcp47 === right?.bcp47) return true
+    if (left?.language && left.language === right?.language) return true
+    return false
+  }
+  const selectOffTextTrack = (
+    player: NetflixPlayer,
+    tracks: NetflixTextTrack[],
+    setTextTrack: ((track: NetflixTextTrack) => void) | undefined,
+    lastOffTrack: NetflixTextTrackReference | undefined
+  ): NetflixTextTrack | null => {
+    if (typeof setTextTrack !== 'function') return null
+
+    const audioTrack = player.getAudioTrack?.() ?? player.getTimedAudioTrack?.()
+    const offTracks = tracks.filter(isOffTextTrack)
+    const forcedTracks = tracks.filter(isForcedNarrativeTextTrack)
+    const rememberedOffTrack = offTracks.find(
+      track =>
+        matchesTrackIds(track, trackIds(lastOffTrack)) || sameTrackLanguage(track, lastOffTrack)
+    )
+    const audioForcedTrack = forcedTracks.find(track => sameTrackLanguage(track, audioTrack))
+    const prioritizedCandidates = [
+      rememberedOffTrack,
+      ...tracks.filter(isNoneTextTrack),
+      audioForcedTrack,
+      ...forcedTracks,
+    ]
+    const candidates = prioritizedCandidates.filter(
+      (track, index): track is NetflixTextTrack =>
+        Boolean(track) && prioritizedCandidates.indexOf(track) === index
+    )
+
+    for (const [index, candidate] of candidates.entries()) {
+      setTextTrack.call(player, candidate)
+      const hasMoreCandidates = index < candidates.length - 1
+      if (!hasMoreCandidates) return candidate
+
+      const updatedTrack = getSelectedTextTrack(player, tracks)
+      if (!updatedTrack || isOffTextTrack(updatedTrack) || updatedTrack === candidate) {
+        return candidate
+      }
+    }
+    return null
+  }
   const findRememberedTextTrack = (
     tracks: NetflixTextTrack[],
     reference: NetflixTextTrackReference | undefined
   ): NetflixTextTrack | null => {
-    const selectableTracks = tracks.filter(track => !isNoneTextTrack(track))
+    const selectableTracks = tracks.filter(track => !isOffTextTrack(track))
     if (!reference) return selectableTracks[0] ?? null
 
-    return (
-      selectableTracks.find(
-        track =>
-          (reference.id && track.id === reference.id) ||
-          (reference.trackId && track.trackId === reference.trackId)
-      ) ??
-      selectableTracks.find(
-        track =>
-          (reference.bcp47 && track.bcp47 === reference.bcp47) ||
-          (reference.language && track.language === reference.language)
-      ) ??
-      selectableTracks.find(
-        track => reference.displayName && track.displayName === reference.displayName
-      ) ??
-      selectableTracks[0] ??
-      null
-    )
+    const referenceIds = trackIds(reference)
+    const exactIdMatch = selectableTracks.find(track => matchesTrackIds(track, referenceIds))
+    if (exactIdMatch) return exactIdMatch
+
+    if (reference.displayName) {
+      const languageAndLabelMatch = selectableTracks.find(
+        track => sameTrackLanguage(track, reference) && track.displayName === reference.displayName
+      )
+      if (languageAndLabelMatch) return languageAndLabelMatch
+    }
+
+    const languageMatch = selectableTracks.find(track => sameTrackLanguage(track, reference))
+    if (languageMatch) return languageMatch
+
+    if (reference.displayName) {
+      const labelMatch = selectableTracks.find(track => track.displayName === reference.displayName)
+      if (labelMatch) return labelMatch
+    }
+
+    return selectableTracks[0] ?? null
+  }
+  const setFallbackSubtitleHidden = (
+    player: NetflixPlayer,
+    state: NonNullable<NetflixWindow['__shortcutOverrideSubtitleState']> | undefined,
+    hidden: boolean,
+    currentTrack?: NetflixTextTrack | null
+  ): void => {
+    player.setTimedTextVisibility?.(!hidden)
+    setSubtitleDomHidden(hidden)
+    if (!state) return
+    state.hiddenWithoutOffTrack = hidden
+    state.hiddenWatchPath = hidden ? location.pathname : undefined
+    state.hiddenTrackId = hidden ? (trackIds(currentTrack)[0] ?? null) : undefined
+  }
+  const shouldKeepDomSubtitleHide = (
+    state: NonNullable<NetflixWindow['__shortcutOverrideSubtitleState']> | undefined,
+    currentTrack: NetflixTextTrack | null
+  ): boolean => {
+    if (state?.hiddenWithoutOffTrack !== true) return false
+    if (state.hiddenWatchPath && state.hiddenWatchPath !== location.pathname) return false
+    if (!currentTrack) return true
+    if (isOffTextTrack(currentTrack)) return false
+    if (state.hiddenTrackId && !matchesTrackIds(currentTrack, [state.hiddenTrackId])) return false
+    return true
+  }
+  const syncFallbackSubtitleHide = (
+    player: NetflixPlayer,
+    state: NonNullable<NetflixWindow['__shortcutOverrideSubtitleState']> | undefined,
+    currentTrack: NetflixTextTrack | null
+  ): boolean => {
+    const keepDomHidden = shouldKeepDomSubtitleHide(state, currentTrack)
+    if (!keepDomHidden) {
+      if (state?.hiddenWithoutOffTrack) {
+        setFallbackSubtitleHidden(player, state, false)
+      } else {
+        setSubtitleDomHidden(false)
+      }
+    }
+    return keepDomHidden || player.getTimedTextVisibility?.() === false
+  }
+  const resolveSubtitleOffMode = (player: NetflixPlayer, tracks: NetflixTextTrack[]): string => {
+    if (tracks.some(isNoneTextTrack)) return 'none-track'
+    if (tracks.some(isForcedNarrativeTextTrack)) return 'forced-narrative'
+    if (typeof player.setTimedTextVisibility === 'function') return 'visibility-api'
+    return 'dom-fallback'
+  }
+  const summarizeSubtitleDiagnostics = (player: NetflixPlayer): string => {
+    const tracks = getTextTracks(player)
+    if (tracks.length === 0) return '0 tracks'
+    const selectableCount = tracks.filter(track => !isOffTextTrack(track)).length
+    const offMode = resolveSubtitleOffMode(player, tracks)
+    return `${selectableCount} selectable (${tracks.length} total, off: ${offMode})`
   }
   const getTextTrackLabel = (track: NetflixTextTrack): string | undefined =>
-    track.displayName ?? track.bcp47 ?? track.language ?? track.id ?? track.trackId
+    track.displayName ?? track.bcp47 ?? track.language ?? track.id ?? track.trackId ?? track.new_track_id
   const readSubtitleState = (
+    pageWindow: NetflixWindow,
     player: NetflixPlayer,
     result: NetflixPageResult
   ): void => {
@@ -322,8 +486,12 @@ export const executeNetflixPageApi = (
     if (!currentTrack) {
       throw new Error('Unable to determine the current Netflix subtitle track.')
     }
-
-    result.subtitlesEnabled = !isNoneTextTrack(currentTrack)
+    const hiddenByFallback = syncFallbackSubtitleHide(
+      player,
+      pageWindow.__shortcutOverrideSubtitleState,
+      currentTrack
+    )
+    result.subtitlesEnabled = !isOffTextTrack(currentTrack) && !hiddenByFallback
     result.subtitleTrack = getTextTrackLabel(currentTrack)
   }
   const toggleSubtitles = (
@@ -333,33 +501,48 @@ export const executeNetflixPageApi = (
   ): void => {
     const tracks = getTextTracks(player)
     const setTextTrack = player.setTextTrack ?? player.setTimedTextTrack
-    if (tracks.length === 0 || typeof setTextTrack !== 'function') {
+    const canToggleTrack = typeof setTextTrack === 'function'
+    const canToggleVisibility = typeof player.setTimedTextVisibility === 'function'
+    if (tracks.length === 0 || (!canToggleTrack && !canToggleVisibility)) {
       throw new Error('Netflix subtitle track API is unavailable.')
     }
 
     const state = pageWindow.__shortcutOverrideSubtitleState ?? {}
     const currentTrack = getSelectedTextTrack(player, tracks)
-    const currentlyEnabled = currentTrack
-      ? !isNoneTextTrack(currentTrack)
-      : state.subtitlesEnabled
+    if (currentTrack && isOffTextTrack(currentTrack)) {
+      state.lastOffTrack = rememberTextTrack(currentTrack)
+    }
+
+    const hiddenByFallback = syncFallbackSubtitleHide(player, state, currentTrack)
+    const currentlyEnabled = hiddenByFallback
+      ? false
+      : currentTrack
+        ? !isOffTextTrack(currentTrack)
+        : state.subtitlesEnabled
     if (currentlyEnabled === undefined) {
       throw new Error('Unable to determine the current Netflix subtitle track.')
     }
 
     if (currentlyEnabled) {
-      const noneTrack = tracks.find(isNoneTextTrack)
-      if (!noneTrack) throw new Error('Netflix subtitle off track is unavailable.')
-      if (currentTrack && !isNoneTextTrack(currentTrack)) {
+      if (currentTrack && !isOffTextTrack(currentTrack)) {
         state.lastTrack = rememberTextTrack(currentTrack)
       }
-      setTextTrack.call(player, noneTrack)
+      const appliedOffTrack = selectOffTextTrack(player, tracks, setTextTrack, state.lastOffTrack)
+      if (appliedOffTrack) {
+        state.lastOffTrack = rememberTextTrack(appliedOffTrack)
+        setFallbackSubtitleHidden(player, state, false)
+        result.subtitleTrack = getTextTrackLabel(appliedOffTrack)
+      } else {
+        setFallbackSubtitleHidden(player, state, true, currentTrack)
+        result.subtitleTrack = 'Off'
+      }
       state.subtitlesEnabled = false
       result.subtitlesEnabled = false
-      result.subtitleTrack = getTextTrackLabel(noneTrack)
     } else {
+      setFallbackSubtitleHidden(player, state, false)
       const nextTrack = findRememberedTextTrack(tracks, state.lastTrack)
       if (!nextTrack) throw new Error('No Netflix subtitle track is available.')
-      setTextTrack.call(player, nextTrack)
+      setTextTrack?.call(player, nextTrack)
       state.lastTrack = rememberTextTrack(nextTrack)
       state.subtitlesEnabled = true
       result.subtitlesEnabled = true
@@ -427,6 +610,7 @@ export const executeNetflixPageApi = (
     } else if (player) {
       if (action === 'diagnose') {
         // Diagnostics only inspect API availability and must not alter playback.
+        result.subtitleDiagnostics = summarizeSubtitleDiagnostics(player)
       } else if (action === 'play') {
         player.play()
       } else if (action === 'pause') {
@@ -447,7 +631,7 @@ export const executeNetflixPageApi = (
         player.setMuted(false)
         player.setVolume(restored)
       } else if (action === 'getSubtitleState') {
-        readSubtitleState(player, result)
+        readSubtitleState(window as NetflixWindow, player, result)
       } else if (action === 'toggleSubtitles') {
         toggleSubtitles(window as NetflixWindow, player, result)
       }

@@ -41,6 +41,7 @@ export type NetflixPageResult = {
   subtitleToggleCalled?: boolean
   subtitlesEnabled?: boolean
   subtitleTrack?: string
+  subtitleDiagnostics?: string
   captionMetadata?: { key: string; watchId: string; url: string; currentMs: number }
   currentTime?: number
   targetTime?: number
