@@ -27,12 +27,6 @@ export type CompatibilityReadinessPolicy = {
   shouldRefreshDiagnostics(state: CompatibilityDiagnosticsState): boolean
 }
 
-export type CompatibilityRequestGeneration = {
-  start(): number
-  cancel(): void
-  isCurrent(generation: number): boolean
-}
-
 const MISSING_MESSAGE_RECEIVER_PATTERN =
   /could not establish connection|receiving end does not exist/i
 
@@ -79,20 +73,5 @@ export const createCompatibilityReadinessPolicy = (
       state.status === 'reload-required' && attempt < missingReceiverMaxAttempts,
     shouldRefreshDiagnostics: state =>
       state.status !== 'reload-required' && !isCoreReady(state),
-  }
-}
-
-export const createCompatibilityRequestGeneration = (): CompatibilityRequestGeneration => {
-  let currentGeneration = 0
-
-  return {
-    start: () => {
-      currentGeneration += 1
-      return currentGeneration
-    },
-    cancel: () => {
-      currentGeneration += 1
-    },
-    isCurrent: generation => generation === currentGeneration,
   }
 }

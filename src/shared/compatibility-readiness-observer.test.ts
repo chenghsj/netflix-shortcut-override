@@ -94,6 +94,24 @@ describe('CompatibilityReadinessObserver', () => {
     expect(onState).toHaveBeenNthCalledWith(2, ready)
   })
 
+  it('keeps the initial observation running until pending playback becomes ready', async () => {
+    vi.useFakeTimers()
+    const { policy, ready } = createStates()
+    const pending = policy.resolveState({ diagnostics: { ...READY_DIAGNOSTICS, playerFound: false } })
+    const requestDiagnostics = vi.fn().mockResolvedValueOnce(pending).mockResolvedValue(ready)
+    const onState = vi.fn()
+    const observer = createCompatibilityReadinessObserver({ readinessPolicy: policy, requestDiagnostics })
+
+    observer.observeInitial(17, onState)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(onState).toHaveBeenLastCalledWith(pending)
+    await vi.advanceTimersByTimeAsync(policy.diagnosticsRefreshIntervalMs)
+    expect(onState).toHaveBeenLastCalledWith(ready)
+    expect(requestDiagnostics).toHaveBeenCalledTimes(2)
+    await vi.advanceTimersByTimeAsync(policy.diagnosticsRefreshIntervalMs * 2)
+    expect(requestDiagnostics).toHaveBeenCalledTimes(2)
+  })
+
   it('stops focus observation when the pending request expires', async () => {
     vi.useFakeTimers()
     const { policy, unavailable } = createStates()
@@ -116,5 +134,22 @@ describe('CompatibilityReadinessObserver', () => {
 
     expect(requestDiagnostics).toHaveBeenCalledOnce()
     expect(onCancel).toHaveBeenCalledOnce()
+  })
+
+  it('keeps missing-receiver retries bounded after a pending playback result', async () => {
+    vi.useFakeTimers()
+    const { policy, reloadRequired } = createStates()
+    const pending = policy.resolveState({ diagnostics: { ...READY_DIAGNOSTICS, playerFound: false } })
+    const requestDiagnostics = vi.fn().mockResolvedValueOnce(pending).mockResolvedValue(reloadRequired)
+    const onState = vi.fn()
+    const observer = createCompatibilityReadinessObserver({ readinessPolicy: policy, requestDiagnostics })
+
+    observer.observeInitial(17, onState)
+    await vi.advanceTimersByTimeAsync(0)
+    await vi.advanceTimersByTimeAsync(policy.diagnosticsRefreshIntervalMs + 400)
+    expect(requestDiagnostics).toHaveBeenCalledTimes(4)
+    expect(onState).toHaveBeenNthCalledWith(2, reloadRequired)
+    await vi.advanceTimersByTimeAsync(4_000)
+    expect(requestDiagnostics).toHaveBeenCalledTimes(4)
   })
 })

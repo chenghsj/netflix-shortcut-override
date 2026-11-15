@@ -1,7 +1,7 @@
 {
   "name": "netflix-shortcut-override",
   "private": true,
-  "version": "0.6.8",
+  "version": "0.6.9",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "rm -rf dist && npm run typecheck && npm run build:chromium && npm run build:firefox && npm run verify:build",
+    "build": "rm -rf dist && npm run typecheck && node scripts/build-browsers.ts && npm run verify:build",
     "build:chromium": "vite build --mode chromium --outDir dist/chromium",
     "build:firefox": "vite build --mode firefox --outDir dist/firefox",
     "test": "vitest run",

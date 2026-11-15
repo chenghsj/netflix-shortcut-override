@@ -1,19 +1,26 @@
-import { DEFAULT_SETTINGS, normalizeSettings } from '@/shared/shortcut-settings'
+import { DEFAULT_SETTINGS, normalizeSettings, parseSettingsForBackup, SHORTCUT_SETTINGS_VERSION } from '@/shared/shortcut-settings'
 import type { ShortcutSettings, UiStyle } from '@/shared/shortcut-types'
 import { isUiStyle } from '@/shared/ui-styles'
+import { resolveLocalePreference } from '@/shared/browser-locale'
+import { getCopy } from '@/shared/i18n'
+import { recoverCompatibleSettings } from '@/shared/settings-compatibility'
 
 export const SETTINGS_STORAGE_KEY = 'shortcutSettings'
+export const SETTINGS_COMPATIBILITY_KEY = 'shortcutSettingsCompatibility'
 export const UI_STYLE_STORAGE_KEY = 'shortcutUiStyle'
 export const UI_STYLE_DEFAULT_KEY = 'shortcutUiStyleDefault'
+const SYNC_ITEM_LIMIT_BYTES = 8192
 type StorageValues = Record<string, unknown>
 type SettingsSnapshot = {
   functional?: unknown
+  compatibility?: unknown
   selection?: unknown
   syncedDefault?: unknown
   localDefault?: unknown
 }
 const storageFields = [
   { area: 'sync', key: SETTINGS_STORAGE_KEY, field: 'functional' },
+  { area: 'sync', key: SETTINGS_COMPATIBILITY_KEY, field: 'compatibility' },
   { area: 'sync', key: UI_STYLE_STORAGE_KEY, field: 'selection' },
   { area: 'sync', key: UI_STYLE_DEFAULT_KEY, field: 'syncedDefault' },
   { area: 'local', key: UI_STYLE_DEFAULT_KEY, field: 'localDefault' },
@@ -53,6 +60,7 @@ const readSnapshot = async (): Promise<SettingsSnapshot> => {
     }))
     return {
       functional: sync[SETTINGS_STORAGE_KEY],
+      compatibility: sync[SETTINGS_COMPATIBILITY_KEY],
       selection: sync[UI_STYLE_STORAGE_KEY],
       syncedDefault: sync[UI_STYLE_DEFAULT_KEY],
     }
@@ -63,6 +71,7 @@ const readSnapshot = async (): Promise<SettingsSnapshot> => {
   ])
   return {
     functional: sync[SETTINGS_STORAGE_KEY],
+    compatibility: sync[SETTINGS_COMPATIBILITY_KEY],
     selection: sync[UI_STYLE_STORAGE_KEY],
     syncedDefault: sync[UI_STYLE_DEFAULT_KEY],
     localDefault: local[UI_STYLE_DEFAULT_KEY],
@@ -95,7 +104,7 @@ const styleForInitialization = (
 }
 
 const projectSettings = (snapshot: SettingsSnapshot): ShortcutSettings => {
-  const settings = normalizeSettings(snapshot.functional ?? DEFAULT_SETTINGS)
+  const settings = recoverCompatibleSettings(snapshot.functional ?? DEFAULT_SETTINGS, snapshot.compatibility)
   const style = styleForRead(snapshot)
   return style ? { ...settings, uiStyle: style } : settings
 }
@@ -140,16 +149,49 @@ export const initializeUiStyleDefault = async (reason?: 'install' | 'update'): P
   await writeArea('sync', { [UI_STYLE_DEFAULT_KEY]: style })
 }
 
+const settingsForStorage = (settings: ShortcutSettings) => ({
+  ...settings,
+  // Keep this alias while v0.5.x installations may share sync storage with v0.6.x.
+  spaceHold: settings.holdSpeed,
+  // Older installations sharing sync storage still read this former name.
+  subtitlePractice: settings.subtitleNavigation,
+})
+
+const settingsStorageValues = (settings: ShortcutSettings) => ({
+  [SETTINGS_STORAGE_KEY]: settingsForStorage(settings),
+  [SETTINGS_COMPATIBILITY_KEY]: settings,
+  [UI_STYLE_STORAGE_KEY]: settings.uiStyle,
+})
+
+// Sync counts the JSON bytes and storage key, including compatibility aliases.
+export const fitsSettingsStorageLimit = (settings: ShortcutSettings): boolean =>
+  Object.entries(settingsStorageValues(normalizeSettings(settings))).every(([key, value]) =>
+    new TextEncoder().encode(JSON.stringify(value)).byteLength + key.length <= SYNC_ITEM_LIMIT_BYTES)
+
+// Seed or upgrade protection without discarding preferences retained for older clients.
+// Never rewrite the shared object or classify an empty installation here.
+export const initializeSettingsCompatibility = (): Promise<void> => withStableSnapshot(async snapshot => {
+  const raw = snapshot.functional
+  if (!raw || typeof raw !== 'object') return
+  const saved = snapshot.compatibility
+  if (saved && typeof saved === 'object' && 'version' in saved && typeof saved.version === 'number') {
+    if (saved.version > SHORTCUT_SETTINGS_VERSION) return
+    if (saved.version === SHORTCUT_SETTINGS_VERSION && parseSettingsForBackup(saved as Record<string, unknown>).ok) return
+  }
+  const parsed = parseSettingsForBackup(raw as Record<string, unknown>)
+  if (!parsed.ok) return
+  const settings = recoverCompatibleSettings(raw, saved)
+  if (!fitsSettingsStorageLimit(settings)) return
+  if (hasChromeStorage()) await writeArea('sync', { [SETTINGS_COMPATIBILITY_KEY]: settings })
+  else globalThis.localStorage?.setItem(SETTINGS_COMPATIBILITY_KEY, JSON.stringify(settings))
+})
+
 const persistSettings = async (settings: ShortcutSettings): Promise<ShortcutSettings> => {
   const normalized = normalizeSettings(settings)
-  const persisted = {
-    ...normalized,
-    // Keep this alias while v0.5.x installations may share sync storage with v0.6.x.
-    spaceHold: normalized.holdSpeed,
-    // Older installations sharing sync storage still read this former name.
-    subtitlePractice: normalized.subtitleNavigation,
+  if (!fitsSettingsStorageLimit(normalized)) {
+    throw new Error(getCopy(resolveLocalePreference(normalized.locale)).settingsStorageFull)
   }
-  const values = { [SETTINGS_STORAGE_KEY]: persisted, [UI_STYLE_STORAGE_KEY]: normalized.uiStyle }
+  const values = settingsStorageValues(normalized)
   if (!hasChromeStorage()) {
     for (const [key, value] of Object.entries(values)) {
       globalThis.localStorage?.setItem(key, JSON.stringify(value))
@@ -190,11 +232,11 @@ const createSettingsObservation = (
   const changedSinceSubscribe = new Set<keyof SettingsSnapshot>()
   let active = true
   let hydrated = false
-  let pendingAppearanceChange = false
+  let pendingChange = false
   let delivered: SettingsUpdate | undefined
   const emit = () => {
     if (!active) return
-    pendingAppearanceChange = false
+    pendingChange = false
     const { uiStyle, ...functional } = projectSettings(snapshot)
     delivered = hydrated || isUiStyle(snapshot.selection)
       ? { ...functional, uiStyle }
@@ -210,7 +252,7 @@ const createSettingsObservation = (
     }
     // Deliver each functional snapshot immediately, including a rapid off/on pair.
     if ('functional' in snapshot) emit()
-    else pendingAppearanceChange = true
+    else pendingChange = true
   })
   const ready = readSnapshot().then(initial => {
     if (!active) return
@@ -218,7 +260,10 @@ const createSettingsObservation = (
       if (key in initial && !changedSinceSubscribe.has(key)) snapshot[key] = initial[key]
     }
     hydrated = true
-    if (emitInitial || pendingAppearanceChange || (delivered && delivered.uiStyle !== projectSettings(snapshot).uiStyle)) emit()
+    const current = projectSettings(snapshot)
+    if (emitInitial || pendingChange || (delivered && (
+      delivered.uiStyle !== current.uiStyle || JSON.stringify(normalizeSettings(delivered)) !== JSON.stringify(current)
+    ))) emit()
   }, error => {
     if (emitInitial) throw error
     if (active) console.error('Unable to load settings subscription', error)

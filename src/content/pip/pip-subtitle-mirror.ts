@@ -1,8 +1,9 @@
+import { subtitleSizePercent } from '@/shared/subtitle-size-shortcuts'
 import { PLAYER_ROOT_SELECTOR } from './pip-selectors'
 import type {
   PipSettings,
   PipSubtitleBackground,
-  PipSubtitleSize,
+  SubtitleSize,
 } from '@/shared/shortcut-types'
 
 const PIP_SUBTITLE_ID = 'shortcut-override-pip-subtitle'
@@ -22,11 +23,6 @@ const SUBTITLE_SELECTOR = SUBTITLE_SELECTORS.join(', ')
 const DEFAULT_PIP_SUBTITLE_BOTTOM = '8%'
 const CONTROLS_VISIBLE_SUBTITLE_CLEARANCE_PX = 36
 const DEFAULT_VIDEO_ASPECT_RATIO = 16 / 9
-const SUBTITLE_SIZE_SCALE: Record<PipSubtitleSize, number> = {
-  small: 0.8,
-  medium: 1,
-  large: 1.25,
-}
 const SUBTITLE_BACKGROUND_COLORS: Record<Exclude<PipSubtitleBackground, 'none'>, string> = {
   translucent: 'rgba(0, 0, 0, 0.55)',
   dark: 'rgba(0, 0, 0, 0.8)',
@@ -490,7 +486,7 @@ export class SubtitleMirror {
   private resizeHandler: (() => void) | null = null
   private controlsVisible = false
   private subtitlesEnabled: boolean
-  private subtitleSize: PipSubtitleSize
+  private subtitleSize: SubtitleSize
   private subtitleBackground: PipSubtitleBackground
   private started = false
 
@@ -702,7 +698,7 @@ export class SubtitleMirror {
     copySubtitleAttributes(source, inner)
     copyComputedSubtitleStyles(source, inner)
     inner.replaceChildren(...Array.from(source.childNodes, node => node.cloneNode(true)))
-    applyScaledSubtitleTypography(source, inner, SUBTITLE_SIZE_SCALE[this.subtitleSize])
+    applyScaledSubtitleTypography(source, inner, subtitleSizePercent(this.subtitleSize) / 100)
 
     const { width: sourceWidth, height: sourceHeight } = getSubtitleFrameSize(
       source,

@@ -12,6 +12,11 @@ function ThemeHarness({ theme }: ThemeHarnessProps) {
   return <output>{resolvedTheme}</output>
 }
 
+function LoadingThemeHarness({ ready }: { ready: boolean }) {
+  useTheme('light', ready)
+  return null
+}
+
 const originalMatchMedia = window.matchMedia
 
 describe('useTheme', () => {
@@ -30,6 +35,18 @@ describe('useTheme', () => {
     expect(document.documentElement).toHaveClass('dark')
     expect(document.documentElement.style.colorScheme).toBe('dark')
     expect(screen.getByText('dark')).toBeInTheDocument()
+  })
+
+  it('preserves the current brightness until settings finish loading', () => {
+    document.documentElement.classList.add('dark')
+    document.documentElement.style.colorScheme = 'dark'
+    const view = render(<LoadingThemeHarness ready={false} />)
+    expect(document.documentElement).toHaveClass('dark')
+    expect(document.documentElement.style.colorScheme).toBe('dark')
+
+    view.rerender(<LoadingThemeHarness ready />)
+    expect(document.documentElement).not.toHaveClass('dark')
+    expect(document.documentElement.style.colorScheme).toBe('light')
   })
 
   it('updates an automatic theme when the system preference changes', () => {

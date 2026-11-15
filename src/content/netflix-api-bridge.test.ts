@@ -1,6 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { requestCaptionMetadata } from './subtitle-navigation'
 import { CAPTION_REQUEST_EVENT, CAPTION_RESPONSE_EVENT } from '@/shared/netflix-caption-events'
+import type { SubtitleFavorite } from '@/shared/subtitle-favorites'
 
 import {
   NETFLIX_API_BRIDGE_READY_ATTR,
@@ -25,7 +26,9 @@ type BridgeResponse = {
   }
 }
 
-const callBridge = (action: string, value?: number): BridgeResponse | null => {
+const callBridge = (
+  action: string, value?: number, subtitleFavorites?: readonly SubtitleFavorite[], audioFavorites?: unknown,
+): BridgeResponse | null => {
   const id = `test-${action}-${value ?? 'none'}`
   let response: BridgeResponse | null = null
   const handleResponse = (event: Event) => {
@@ -36,7 +39,7 @@ const callBridge = (action: string, value?: number): BridgeResponse | null => {
   window.addEventListener(NETFLIX_API_RESPONSE_EVENT, handleResponse)
   window.dispatchEvent(
     new CustomEvent(NETFLIX_API_REQUEST_EVENT, {
-      detail: { source: 'shortcut-override', id, action, value },
+      detail: { source: 'shortcut-override', id, action, value, subtitleFavorites, audioFavorites },
     })
   )
   window.removeEventListener(NETFLIX_API_RESPONSE_EVENT, handleResponse)
@@ -57,6 +60,20 @@ describe('main-world Netflix API bridge', () => {
       .documentPictureInPicture
     delete (window as typeof window & { __shortcutOverrideSubtitleState?: unknown })
       .__shortcutOverrideSubtitleState
+  })
+
+  it('normalizes favorite audio preferences before choosing the requested variant', () => {
+    const standard = { trackId: 'en', bcp47: 'en' }
+    const description = { trackId: 'en-ad', bcp47: 'en', rawTrackType: 'ASSISTIVE' }
+    const setAudioTrack = vi.fn()
+    const player = { getAudioTrackList: () => [standard, description], getAudioTrack: () => standard, setAudioTrack }
+    Object.assign(window, { netflix: { appContext: { state: { playerApp: { getAPI: () => ({
+      videoPlayer: { getAllPlayerSessionIds: () => ['player'], getVideoPlayerBySessionId: () => player },
+    }) } } } } })
+    expect(callBridge('cycleAudioTrack', 1, undefined, [
+      { language: ' EN ', audioDescription: true }, { language: 'en', audioDescription: true }, null,
+    ])).toMatchObject({ success: true, result: { audioTrackSwitchCalled: true } })
+    expect(setAudioTrack).toHaveBeenCalledExactlyOnceWith(description)
   })
 
   it('marks the DOM when the page bridge is ready', () => {
@@ -317,6 +334,171 @@ describe('main-world Netflix API bridge', () => {
     expect(callBridge('toggleSubtitles')?.result).toMatchObject({ subtitlesEnabled: true, subtitleTrack: '中文（繁體）' })
     expect(setTextTrack).toHaveBeenLastCalledWith(regeneratedZhNormal)
     expect(callBridge('diagnose')?.result).toMatchObject({ subtitleDiagnostics: '2 selectable (3 total, off: forced-narrative)' })
+  })
+
+  it('cycles regular and CC tracks while skipping Off and forced tracks', () => {
+    const off = { id: 'none', displayName: 'Off', isNoneTrack: true }
+    const forced = { id: 'ja-fn', bcp47: 'ja', isForcedNarrative: true }
+    const english = { id: 'en', bcp47: 'en', displayName: 'English' }
+    const englishCc = { id: 'en-cc', bcp47: 'en', displayName: 'English [CC]' }
+    const japanese = { id: 'ja', bcp47: 'ja', displayName: '日本語', trackType: 'ASSISTIVE' }
+    let current: { id: string } = off
+    const setTextTrack = vi.fn((track: typeof current) => { current = track })
+    mockPlayer({
+      getTimedTextTrackList: () => [off, english, forced, englishCc, japanese],
+      getTimedTextTrack: () => ({ id: current.id }),
+      setTimedTextTrack: setTextTrack,
+    })
+
+    for (const track of [english, englishCc, japanese, english]) {
+      expect(callBridge('cycleSubtitleTrack')?.result).toMatchObject({
+        subtitlesEnabled: true,
+        subtitleTrack: track.displayName,
+        subtitleTrackLanguage: track.bcp47,
+        subtitleTrackIsClosedCaption: track !== english,
+      })
+      expect(setTextTrack).toHaveBeenLastCalledWith(track)
+    }
+    expect(callBridge('cycleSubtitleTrack', -1)?.result).toMatchObject({ subtitleTrackLanguage: 'ja' })
+    expect(setTextTrack).toHaveBeenLastCalledWith(japanese)
+    callBridge('cycleSubtitleTrack')
+    callBridge('toggleSubtitles')
+    expect(setTextTrack).toHaveBeenLastCalledWith(off)
+    callBridge('toggleSubtitles')
+    expect(setTextTrack).toHaveBeenLastCalledWith(english)
+  })
+
+  it('leaves a single active subtitle track selected', () => {
+    const english = { id: 'en', bcp47: 'en', displayName: 'English', rawTrackType: 'closedcaptions' }
+    const setTextTrack = vi.fn()
+    mockPlayer({
+      getTextTrackList: () => [english],
+      getTextTrack: () => english,
+      setTextTrack,
+    })
+    expect(callBridge('cycleSubtitleTrack')?.result).toMatchObject({
+      subtitlesEnabled: true,
+      subtitleTrack: 'English',
+    })
+    expect(setTextTrack).not.toHaveBeenCalled()
+  })
+
+  it('cycles available favorites in order and reevaluates them when the title changes', () => {
+    const off = { id: 'none', isNoneTrack: true }
+    const englishUS = { id: 'en-us', bcp47: 'en-US', rawTrackType: 'closedcaptions' }
+    const englishUK = { id: 'en-gb', bcp47: 'en-GB', rawTrackType: 'closedcaptions' }
+    const chinese = { id: 'zh', bcp47: 'zh' }
+    const traditional = { id: 'zh-tw', bcp47: 'zh-TW', rawTrackType: 'closedcaptions' }
+    const simplified = { id: 'zh-cn', bcp47: 'zh-CN', rawTrackType: 'closedcaptions' }
+    const japanese = { id: 'ja', bcp47: 'ja' }
+    const japaneseCC = { id: 'ja-cc', bcp47: 'ja', rawTrackType: 'closedcaptions' }
+    let current: { id: string } = off
+    let tracks = [off, englishUS, japanese, chinese, simplified, englishUK, traditional, japaneseCC]
+    const setTextTrack = vi.fn((next: typeof current) => { current = next })
+    mockPlayer({
+      getTextTrackList: () => tracks,
+      getTextTrack: () => current,
+      setTextTrack,
+    })
+    const favorites = [
+      { language: 'en' },
+      { language: 'zh-Hant' },
+      { language: 'ja' },
+      { language: 'en-US' },
+    ] as const
+    const cycle = (direction?: -1) => callBridge('cycleSubtitleTrack', direction, favorites)?.result
+
+    for (const track of [englishUK, traditional, japanese, englishUS, englishUK]) {
+      expect(cycle()).toMatchObject({ subtitleTrackLanguage: track.bcp47, subtitlesEnabled: true })
+      expect(setTextTrack).toHaveBeenLastCalledWith(track)
+    }
+    current = off
+    for (const track of [englishUS, japanese, traditional, englishUK, englishUS]) {
+      expect(cycle(-1)).toMatchObject({ subtitleTrackLanguage: track.bcp47, subtitlesEnabled: true })
+      expect(setTextTrack).toHaveBeenLastCalledWith(track)
+    }
+
+    tracks = [off, chinese, simplified, japanese]
+    current = japanese
+    setTextTrack.mockClear()
+    expect(cycle(-1)).toMatchObject({ subtitleTrackLanguage: 'ja', subtitleTrackIsClosedCaption: false })
+    expect(setTextTrack).not.toHaveBeenCalled()
+
+    tracks = [off, japaneseCC]
+    expect(cycle()).toMatchObject({ subtitleTrackIsClosedCaption: true, subtitlesEnabled: true })
+    expect(setTextTrack).toHaveBeenCalledExactlyOnceWith(japaneseCC)
+    cycle()
+    expect(setTextTrack).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([
+    { favorite: 'en', regularLanguage: 'en-US', ccLanguage: 'en', useRegular: true },
+    { favorite: 'zh-Hant', regularLanguage: 'zh-TW', ccLanguage: 'zh-Hant', useRegular: true },
+    { favorite: 'en-US', regularLanguage: 'en-Latn-US', ccLanguage: 'en-US', useRegular: true },
+    { favorite: 'en-US', regularLanguage: 'en-GB', ccLanguage: 'en-US', useRegular: false },
+    { favorite: 'zh-Hant', regularLanguage: 'zh-Hans', ccLanguage: 'zh-Hant', useRegular: false },
+  ])('respects regular-subtitle preference and locale constraints for $favorite with $regularLanguage', ({
+    favorite, regularLanguage, ccLanguage, useRegular,
+  }) => {
+    const off = { id: 'none', isNoneTrack: true }
+    const regular = { id: 'regular', bcp47: regularLanguage }
+    const cc = { id: 'cc', bcp47: ccLanguage, rawTrackType: 'closedcaptions' }
+    const setTextTrack = vi.fn()
+    mockPlayer({
+      getTextTrackList: () => [off, cc, regular],
+      getTextTrack: () => off,
+      setTextTrack,
+    })
+
+    expect(callBridge('cycleSubtitleTrack', undefined, [{ language: favorite }])?.result)
+      .toMatchObject({ subtitlesEnabled: true, subtitleTrackIsClosedCaption: !useRegular })
+    expect(setTextTrack).toHaveBeenCalledExactlyOnceWith(useRegular ? regular : cc)
+  })
+
+  it('reserves a regular regional track before falling back to CC for a generic favorite', () => {
+    const off = { id: 'none', isNoneTrack: true }
+    const regular = { id: 'en-us', bcp47: 'en-US' }
+    const cc = { id: 'en-cc', bcp47: 'en', rawTrackType: 'closedcaptions' }
+    let current: { id: string } = off
+    const setTextTrack = vi.fn((track: typeof current) => { current = track })
+    mockPlayer({
+      getTextTrackList: () => [off, regular, cc],
+      getTextTrack: () => current,
+      setTextTrack,
+    })
+    const favorites = [{ language: 'en' }, { language: 'en-US' }]
+
+    for (const track of [cc, regular, cc]) {
+      callBridge('cycleSubtitleTrack', undefined, favorites)
+      expect(setTextTrack).toHaveBeenLastCalledWith(track)
+    }
+  })
+
+  it('prefers regular subtitles for favorites and falls back to CC when needed', () => {
+    const off = { id: 'none', isNoneTrack: true }
+    const japanese = { id: 'ja', bcp47: 'ja' }
+    const japaneseCC = { id: 'ja-cc', bcp47: 'ja', rawTrackType: 'closedcaptions' }
+    const english = { id: 'en', bcp47: 'en' }
+    let current: { id: string } = off
+    let tracks = [off, japaneseCC, japanese, english]
+    const setTextTrack = vi.fn((track: typeof current) => { current = track })
+    mockPlayer({ getTextTrackList: () => tracks, getTextTrack: () => current, setTextTrack })
+    const favorite = { language: 'ja' } as const
+
+    expect(callBridge('cycleSubtitleTrack', undefined, [favorite])?.result)
+      .toMatchObject({ subtitleTrackIsClosedCaption: false })
+    expect(setTextTrack).toHaveBeenLastCalledWith(japanese)
+
+    tracks = [off, japaneseCC, english]
+    expect(callBridge('cycleSubtitleTrack', undefined, [favorite])?.result)
+      .toMatchObject({ subtitleTrackIsClosedCaption: true })
+    expect(setTextTrack).toHaveBeenLastCalledWith(japaneseCC)
+
+    tracks = [off, english]
+    setTextTrack.mockClear()
+    expect(callBridge('cycleSubtitleTrack', undefined, [favorite])?.result)
+      .toMatchObject({ subtitleCycleOutcome: 'no-tracks-available' })
+    expect(setTextTrack).not.toHaveBeenCalled()
   })
 
   it('reads the selected Netflix subtitle track without changing it', () => {

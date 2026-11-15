@@ -15,21 +15,38 @@ The generated `dist/firefox` directory is disposable. The Chromium build remains
 
 ## Netflix smoke test
 
-Open a Netflix watch page and check with Subtitle navigation off for the ordinary shortcuts (otherwise its default `S` takes priority over Skip Intro):
+Open a Netflix watch page and check the ordinary shortcuts; enabling Subtitle navigation must not override them:
 
 - The extension loads without a manifest or background-script error.
 - The configured shortcuts work for play/pause, seeking, volume, mute, Netflix subtitles, fullscreen, skip intro, and playback speed.
+- Run the frame-step and audio-language checks in the [Chrome shortcut checklist](chrome-real-browser-test.md), excluding PiP. Confirm comma/period pause playing video before stepping, Shift+A / Shift+D wrap through available audio tracks once per press, and the Firefox MAIN-world execution path performs each command once.
+- With General settings → Hide pause overlay enabled, pause using Netflix's controls, the configured Play / Pause shortcut, and comma/period frame stepping. Leave playback paused for at least 60 seconds for each route. Confirm the title/synopsis/paused overlay and its dark backdrop stay hidden, subtitles and controls remain available, and the position stays fixed. Turn Hide pause overlay off to restore the overlay immediately, then on to hide it. Confirm the saved off value survives reopening Options and a global-disable cycle; restore it to on after testing. Disabling the global override must also restore the overlay.
 - Holding the configured Play / Pause shortcut temporarily applies hold speed, and `Shift+"` applies the configured preferred speed directly.
 - Press `C` twice and confirm Netflix's native subtitles turn off and then restore the previously selected track when it remains available.
+- Run the [subtitle-track queue and settings checklist](chrome-real-browser-test.md#subtitle-track-queue-and-settings-checks) through Firefox's MAIN-world execution path, omitting PiP-only cases. Confirm queued switches stop after global/row disable or a watch/video change, and that global re-enable does not revive them. Confirm the Sentence jumps and replay heading has no information button or tooltip, inline prerequisite guidance appears with the global switch off, and percentage-label drags retain 5-percentage-point steps. Mark request-timing cases unverified if no pending queue can be established.
 - The popup reports the Netflix page status and shows the configured shortcuts.
 - The options page can edit, enable, disable, and reset shortcuts.
 - The Picture-in-Picture row is visible but disabled and marked unsupported.
 - Run the [disabled-key reuse and conflict popover checklist](chrome-real-browser-test.md#disabled-key-reuse-and-conflict-popover) in both shortcut tables. Unsupported Picture-in-Picture must not block key reuse. Verify cancellation, focus return, editing, transfer, and single-row reset before restoring original settings.
 - Press `Shift+P`; Firefox receives the shortcut without an extension hint or intercepted action.
 
+### Local frame idle-overlay check, 2026-11-15
+
+This check records the earlier frame-only behavior. The current implementation also hides the idle overlay during ordinary pauses while the global override is enabled.
+
+Firefox Desktop 160.0, extension 0.6.9, temporarily loaded from this checkout's `dist/firefox` (`index.ts-0rUubw4S.js`). Reloaded the add-on and Netflix tab after building. Pressing period on the real Netflix watch page paused playback and enabled frame inspection. After 61 seconds, Netflix had inserted its evidence-overlay container; its computed display remained `none`, the video remained paused, and its playback time exactly matched the value at the start of the wait. Space resumed playback and a subsequent ordinary pause cleared frame inspection; Netflix's idle overlay became visible again (`display: block`). Pressing period with that overlay already present removed it. Restored the initial playback position (approximately 242.742 seconds), left it paused with frame inspection active, removed the temporary measurement state, and closed DevTools. Captions and controls were also checked during the initial isolated overlay probe; delayed insertion, other players, errors, cancellation and global-disable cleanup have automated regression coverage. Chrome/Edge, real episode replacement and live global-disable behavior were not checked in this targeted run.
+
+### Local ordinary pause-overlay check, 2026-11-15
+
+Firefox Desktop 160.0, extension 0.6.9, reloaded from this checkout's `dist/firefox` (`index.ts-DGOlJrcs.js`). On the real Netflix watch page, verified that the toolbar global switch restored the idle title/synopsis overlay when off and hid it immediately when on. Following an ordinary Netflix player pause without frame stepping, a 61-second sample confirmed `paused: true`, an unchanged playback time, no frame-step state, the pause stylesheet present, and the subsequently inserted overlay at `display: none`. Playback controls remained available and captions were visible in the restored final paused view near the initial 257.466-second position. Removed temporary measurements and closed DevTools. The automated content-script tests cover Netflix pause events, the configured Play / Pause shortcut, frame stepping, delayed overlays, replacement watch players, unrelated page content and global-switch changes. This targeted run does not establish Chrome/Edge or complete Firefox smoke-test acceptance.
+
+### Local pause-overlay preference check, 2026-11-15
+
+Firefox Desktop 160.0, extension 0.6.9, reloaded from this checkout's `dist/firefox`. The final General settings page showed Hide pause overlay off, an information button, and no inline explanation. The off choice survived reopening the settings page. The tooltip text rendered in the installed page with a synthetic pointer-move probe through DevTools; native hover and keyboard activation were not established by this run. Automated focus-visible tests cover its localized explanation and saved toggle state in all five interface languages. Reloaded Netflix, left playback paused near the initial 257.467-second position, and confirmed that the hiding stylesheet was absent with the preference off. Closed DevTools and left General settings open with the preference off. The final build passed all 1,244 automated tests, ESLint, TypeScript, both browser builds and build verification.
+
 ## Subtitle navigation smoke test
 
-Check Subtitle navigation on the popup's Shortcuts tab. Its header has a master switch, and the action rows are hidden while either master is off. All four configured keys and disabled row states appear while both masters are on. Enabled subtitle rows replace overlapping ordinary key displays with Subtitle priority; the tooltip identifies the subtitle action. Check the default S/Skip Intro overlap, a custom modified key, and release after disabling its subtitle row. The popup master uses the same website permission flow as Options. Key editing and reset controls remain in Options.
+Open the popup and confirm it directly shows shortcut reference with search and a category selector, without tabs or preference controls beyond the global enable switch. Select Subtitle navigation and confirm all four configured keys remain available while either master is off, with a category Disabled indicator while the subtitle master is off. Enable subtitle navigation through Open settings in Options. For legacy overlaps, general shortcuts stay active and subtitle rows show Shortcut priority identifying the general action in their accessible description. Check a custom modified key and release after disabling its subtitle row in Options. Key editing, subtitle permissions, and reset controls remain in Options.
 
 This checklist does not establish a completed Firefox run. Record the Firefox version, extension version, loaded `dist/firefox` build, selected subtitle language, and pass/fail/unverified status.
 
@@ -40,7 +57,7 @@ This checklist does not establish a completed Firefox run. Record the Firefox ve
 5. Verify a localized failure hint remains for about five seconds and retry is possible. Reports must not include signed subtitle URLs, cookies, or subtitle content.
    With subtitle host access disabled, an uncached A/D/S request must show `CAPTION_PERMISSION_REQUIRED`, stop its loading indicator, and send no CDN request. Turn the subtitle master off and on to request access, then retry the shortcut without changing the subtitle language. `CAPTION_NETWORK` indicates a request failure after access was checked; inspect connectivity or blocking rather than repeatedly reloading the add-on.
 6. Disable the replay row or subtitle master and confirm S is released to the ordinary Skip Intro action when its button is visible. Test editing and both row/section resets.
-7. Turn the global override off and confirm subtitle controls are disabled, its help tooltip remains available, and configured keys and row/master states are retained when turning it on again. Restore any changed settings afterward.
+7. Turn the global override off and confirm subtitle controls are disabled, inline prerequisite guidance appears, and configured keys and row/master states are retained when turning it on again. Restore any changed settings afterward.
 8. During a pending subtitle action, toggle playback or disable its row. A late response must not seek or resume playback; re-enabling the row must not revive that request.
 
 Document Picture-in-Picture remains unsupported in Firefox; the PiP-close cancellation scenario belongs to the [Chrome regression checklist](chrome-real-browser-test.md#11-subtitle-navigation-regression-checks).

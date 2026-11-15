@@ -12,6 +12,7 @@ type ShortcutConflictSwitchProps = {
   title: string
   consequence: string
   transferLabel: string
+  transferDisabled?: boolean
   copy: (typeof SHORTCUT_CONFLICT_COPY)['en']
   onOpenChange: (open: boolean) => void
   onCheckedChange: (checked: boolean) => void
@@ -19,7 +20,7 @@ type ShortcutConflictSwitchProps = {
   onTransfer: () => void
 }
 
-export function ShortcutConflictSwitch({ checked, disabled, label, open, title, consequence, transferLabel, copy, onOpenChange, onCheckedChange, onChangeKey, onTransfer }: ShortcutConflictSwitchProps) {
+export function ShortcutConflictSwitch({ checked, disabled, label, open, title, consequence, transferLabel, transferDisabled, copy, onOpenChange, onCheckedChange, onChangeKey, onTransfer }: ShortcutConflictSwitchProps) {
   const id = useId()
   const switchRef = useRef<HTMLButtonElement>(null)
   const restoreFocus = useRef(true)
@@ -42,7 +43,7 @@ export function ShortcutConflictSwitch({ checked, disabled, label, open, title, 
         <div className="flex flex-col gap-1.5">
           <Button variant="outline" className="h-auto min-h-8 justify-start whitespace-normal px-3 py-1.5 text-left"
             onClick={() => { restoreFocus.current = false; onChangeKey(switchRef.current) }}>{copy.changeKey}</Button>
-          <Button className="h-auto min-h-8 justify-start whitespace-normal px-3 py-1.5 text-left" onClick={onTransfer}>{transferLabel}</Button>
+          <Button className="h-auto min-h-8 justify-start whitespace-normal px-3 py-1.5 text-left" disabled={transferDisabled} onClick={onTransfer}>{transferLabel}</Button>
         </div>
       </PopoverContent>
     </Popover>

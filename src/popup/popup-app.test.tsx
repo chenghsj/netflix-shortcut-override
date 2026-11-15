@@ -4,9 +4,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { PopupApp } from '@/popup/popup-app'
 import { registerFeatureAnnouncements } from '@/background/feature-announcements'
 import { EXTERNAL_LINKS } from '@/shared/external-links'
+import { OPTIONS_PAGE_HASHES } from '@/shared/options-navigation'
 import { PLAYBACK_FOCUS_RESTORATION_MESSAGE_TYPE } from '@/shared/playback-focus-restoration'
 import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
-import { SUBTITLE_NAVIGATION_COPY } from '@/shared/subtitle-navigation'
+import { hideFeatures } from '@/shared/feature-management'
+import { getCopy } from '@/shared/i18n'
+import { getAudioFavoritesCopy } from '@/shared/audio-favorites-copy'
+import type { ShortcutSettings } from '@/shared/shortcut-types'
 import { getSettings, saveSettings } from '@/shared/storage'
 import { subtitleNavigationAnnouncement } from '@/shared/feature-announcements'
 
@@ -18,10 +22,13 @@ const openCompatibilityDiagnostics = async () => {
   fireEvent.click(await screen.findByRole('button', { name: 'Compatibility' }))
 }
 
-const openPopupSettings = async () => {
-  fireEvent.mouseDown(await screen.findByRole('tab', { name: 'Settings' }), { button: 0, ctrlKey: false })
-  const generalSettings = screen.getByRole('button', { name: 'General settings' })
-  if (generalSettings.getAttribute('aria-expanded') === 'false') fireEvent.click(generalSettings)
+const getPopupShortcuts = () => screen.findByRole('region', { name: 'Shortcuts' })
+
+const selectCategory = async (name: string) => {
+  fireEvent.click(await screen.findByRole('combobox', { name: 'Shortcut category' }))
+  const category = ['Subtitle language and size', 'Sentence jumps and replay'].includes(name) ? 'Subtitles' : name
+  fireEvent.click(await screen.findByRole('option', { name: category }))
+  return screen.findByRole('region', { name })
 }
 
 describe('PopupApp', () => {
@@ -29,6 +36,369 @@ describe('PopupApp', () => {
   afterEach(() => {
     for (const unsubscribe of subscriptions.splice(0)) unsubscribe()
     vi.restoreAllMocks()
+  })
+
+  it('moves frame, intro and episode shortcuts into the navigation category', async () => {
+    render(<PopupApp />)
+    const shortcuts = await getPopupShortcuts()
+    expect(within(shortcuts).getByText('Play / Pause')).toBeVisible()
+    expect(within(shortcuts).getByText('Fullscreen')).toBeVisible()
+    expect(within(shortcuts).queryByText('Previous frame')).not.toBeInTheDocument()
+    const navigation = await selectCategory('Seeking and navigation')
+    for (const label of ['Previous frame', 'Next frame', 'Skip intro', 'Previous episode', 'Next episode']) {
+      expect(within(navigation).getByText(label)).toBeVisible()
+    }
+    const pair = within(navigation).getByRole('group', { name: 'Forward / Rewind 10 seconds' })
+    expect(within(pair).getByText('10 s')).toBeVisible()
+    expect(within(pair).getAllByText(/^(Forward|Rewind)$/).map(label => label.textContent)).toEqual(['Forward', 'Rewind'])
+    expect(within(pair).getByRole('group', { name: 'Rewind 10 seconds' })).toBeVisible()
+    expect(within(pair).getByRole('group', { name: 'Forward 10 seconds' })).toBeVisible()
+    expect(within(navigation).queryByText('Play / Pause')).not.toBeInTheDocument()
+    expect(within(navigation).queryByText('Fullscreen')).not.toBeInTheDocument()
+  })
+
+  it('opens directly on shortcut reference and keeps preferences in Options', async () => {
+    render(<PopupApp />)
+    expect(await getPopupShortcuts()).toBeVisible()
+    expect(screen.getByRole('searchbox', { name: 'Search actions or keys…' })).toBeVisible()
+    expect(screen.getByText('Play / Pause')).toBeVisible()
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('switch')).toHaveLength(1)
+    expect(screen.getByRole('switch', { name: 'Enable extension' })).toBeEnabled()
+    await screen.findByRole('button', { name: 'Compatibility' })
+    expect(within(screen.getByRole('banner')).queryByRole('status')).not.toBeInTheDocument()
+    for (const name of ['Language', 'Theme', 'Interface style', 'Lowest speed', 'Highest speed', 'Speed adjustment amount', 'Preferred speed']) {
+      expect(screen.queryByLabelText(name)).not.toBeInTheDocument()
+    }
+    expect(screen.getByRole('combobox', { name: 'Other products' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'More' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Open GitHub repository' })).toHaveAttribute('href', EXTERNAL_LINKS.githubRepository)
+    expect(screen.getByRole('link', { name: 'Rate this extension in the extension store' })).toHaveAttribute('href', EXTERNAL_LINKS.shortcutOverrideChromeWebStore)
+  })
+
+  it('shows nested hold speed and keeps its parent when searching, while respecting disabled and hidden state', async () => {
+    const settings: ShortcutSettings = structuredClone(DEFAULT_SETTINGS)
+    settings.holdSpeed.speed = 2.75
+    settings.bindings.playPause.key = { ...settings.bindings.playPause.key!, code: 'KeyJ', key: 'j' }
+    await saveSettings(settings)
+    render(<PopupApp />)
+    const shortcuts = await getPopupShortcuts()
+    const label = 'Hold speed'
+    const hold = within(shortcuts).getByText(label).closest('div')!
+    expect(hold).toHaveTextContent('2.75×')
+    expect(within(hold).queryByText('J')).not.toBeInTheDocument()
+    expect(hold.querySelector('[data-slot="kbd"]')).toBeNull()
+
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: '長按 2.75' } })
+    expect(screen.getByText(label)).toBeVisible()
+    expect(screen.getByText('Play / Pause')).toBeVisible()
+
+    settings.holdSpeed.enabled = false
+    await act(async () => { await saveSettings(settings) })
+    expect(within(hold).getByText('Disabled')).toBeVisible()
+
+    settings.hiddenFeatures.push('holdSpeed')
+    await act(async () => { await saveSettings(settings) })
+    expect(screen.queryByText(label)).not.toBeInTheDocument()
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: '' } })
+    expect(screen.getByText('Play / Pause')).toBeVisible()
+  })
+
+  it('shows favorite subtitle languages and audio tracks with Options names and no shortcut fields', async () => {
+    const settings: ShortcutSettings = structuredClone(DEFAULT_SETTINGS)
+    settings.subtitleFavorites = [{ language: 'ja' }, { language: 'en' }]
+    settings.audioFavorites = [{ language: 'en', audioDescription: false }, { language: 'en', audioDescription: true }]
+    await saveSettings(settings)
+    render(<PopupApp />)
+    await getPopupShortcuts()
+    await selectCategory('Subtitles')
+    const subtitles = screen.getByRole('group', { name: getCopy('en').subtitleFavorites.title })
+    expect(within(subtitles).getAllByRole('listitem').map(item => item.textContent)).toEqual(['Japanese', 'English'])
+    expect(subtitles.querySelector('[data-slot="kbd"]')).toBeNull()
+    expect(within(subtitles).queryByText('Not set')).not.toBeInTheDocument()
+
+    await selectCategory('Volume and audio')
+    const audio = screen.getByRole('group', { name: getAudioFavoritesCopy('en').title })
+    expect(within(audio).getAllByRole('listitem').map(item => item.textContent)).toEqual(['English', 'English · Audio Description'])
+    expect(audio.querySelector('[data-slot="kbd"]')).toBeNull()
+
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Audio Description' } })
+    const matches = screen.getByRole('group', { name: getAudioFavoritesCopy('en').title })
+    expect(within(matches).getAllByRole('listitem').map(item => item.textContent)).toEqual(['English · Audio Description'])
+
+    settings.hiddenFeatures.push('subtitleFavorites', 'audioFavorites')
+    await act(async () => { await saveSettings(settings) })
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: '' } })
+    expect(screen.queryByRole('group', { name: getAudioFavoritesCopy('en').title })).not.toBeInTheDocument()
+    await selectCategory('Subtitles')
+    expect(screen.queryByRole('group', { name: getCopy('en').subtitleFavorites.title })).not.toBeInTheDocument()
+  })
+
+  it('shows unassigned keys in ordinary shortcuts, seeking and subtitle navigation', async () => {
+    const settings: ShortcutSettings = structuredClone(DEFAULT_SETTINGS)
+    settings.bindings.playPause.key = null
+    settings.bindings.seekBackward.key = null
+    settings.subtitleNavigation.bindings.previous.key = null
+    await saveSettings(settings)
+    render(<PopupApp />)
+    const shortcuts = await getPopupShortcuts()
+    expect(within(shortcuts).getByText('Play / Pause').closest('div')).toHaveTextContent('Not set')
+    const seeking = await selectCategory('Seeking and navigation')
+    expect(within(seeking).getByRole('group', { name: 'Rewind 10 seconds' })).toHaveTextContent('Not set')
+    const subtitles = await selectCategory('Sentence jumps and replay')
+    expect(within(subtitles).getByText('Previous subtitle').closest('div')).toHaveTextContent('Not set')
+    expect(within(subtitles).getAllByText('Disabled').length).toBeGreaterThan(0)
+  })
+
+  it('uses one category at a time and reflects custom seeking and external interval changes', async () => {
+    const settings = structuredClone(DEFAULT_SETTINGS)
+    const relativeId = 'seek:popup-relative' as const
+    const percentageId = 'seek:popup-percentage' as const
+    settings.seekShortcuts = [{ id: relativeId, kind: 'relative', value: 17 }, { id: percentageId, kind: 'percentage', value: 10 }]
+    settings.bindings[`${relativeId}-backward`] = { ...settings.bindings.seekBackward, enabled: false }
+    settings.bindings[`${relativeId}-forward`] = { ...settings.bindings.seekForward, key: { ...settings.bindings.seekForward.key!, code: 'KeyL', key: 'l' } }
+    settings.bindings[percentageId] = { ...settings.bindings.seekForward, key: { ...settings.bindings.seekForward.key!, code: 'Digit5', key: '5' } }
+    await saveSettings(settings)
+    render(<PopupApp />)
+    await getPopupShortcuts()
+    expect(screen.getByText('Play / Pause')).toBeVisible()
+    expect(screen.queryByText('Toggle subtitles')).not.toBeInTheDocument()
+    const seeking = await selectCategory('Seeking and navigation')
+    expect(screen.queryByText('Play / Pause')).not.toBeInTheDocument()
+    const pair = within(seeking).getByRole('group', { name: 'Forward / Rewind 17 seconds' })
+    expect(within(pair).getByRole('group', { name: 'Rewind 17 seconds' })).toHaveTextContent('Disabled')
+    expect(within(pair).getByRole('group', { name: 'Forward 17 seconds' })).toHaveTextContent('L')
+    expect(within(seeking).getByText('10%').closest('div')).toHaveTextContent('5')
+    await act(async () => { await saveSettings({ ...settings, seek: { ...settings.seek, seconds: 30 } }) })
+    expect(within(seeking).getByRole('group', { name: 'Forward / Rewind 30 seconds' })).toBeVisible()
+    expect(within(seeking).queryByRole('group', { name: 'Forward / Rewind 10 seconds' })).not.toBeInTheDocument()
+    await selectCategory('Subtitle language and size')
+    expect(screen.getByText('Cycle subtitle size · 80% → 100% → 125%')).toBeVisible()
+  })
+
+  it('groups nested seeking and speed shortcuts and keeps matching groups in search', async () => {
+    const settings: ShortcutSettings = structuredClone(DEFAULT_SETTINGS)
+    settings.seekShortcuts = [
+      { id: 'seek:popup-percentage', kind: 'percentage', value: 20 },
+      { id: 'seek:popup-relative', kind: 'relative', value: 17 },
+      { id: 'seek:popup-other-percentage', kind: 'percentage', value: 40 },
+    ]
+    for (const action of ['seek:popup-percentage', 'seek:popup-relative-backward', 'seek:popup-relative-forward', 'seek:popup-other-percentage'] as const) {
+      settings.bindings[action] = { enabled: true, key: null }
+    }
+    settings.preferredSpeedShortcuts = [{ id: 'preferred-speed:popup', speed: 2.5 }]
+    settings.bindings['preferred-speed:popup'] = { enabled: false, key: null }
+    await saveSettings(settings)
+    render(<PopupApp />)
+    await getPopupShortcuts()
+
+    const seeking = await selectCategory('Seeking and navigation')
+    const relative = within(seeking).getByRole('group', { name: 'Forward / Rewind' })
+    expect(within(relative).getByRole('group', { name: 'Rewind 10 seconds' })).toBeVisible()
+    expect(within(relative).getByRole('group', { name: 'Forward 17 seconds' })).toBeVisible()
+    expect(within(relative).queryByText('Next episode')).not.toBeInTheDocument()
+    const percentage = within(seeking).getByRole('group', { name: 'Jump to position' })
+    expect(within(percentage).getByText('20%')).toBeVisible()
+    expect(within(percentage).getByText('40%')).toBeVisible()
+
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: '17' } })
+    const matches = screen.getByRole('group', { name: 'Forward / Rewind' })
+    expect(within(matches).getByRole('group', { name: 'Rewind 17 seconds' })).toBeVisible()
+    expect(within(matches).getByRole('group', { name: 'Forward 17 seconds' })).toBeVisible()
+    expect(within(matches).queryByRole('group', { name: 'Rewind 10 seconds' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Jump to position' })).not.toBeInTheDocument()
+
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: '' } })
+    const speed = await selectCategory('Playback speed')
+    const preferred = within(speed).getByRole('group', { name: 'Preferred speed' })
+    expect(within(preferred).getByText(/1\.5×/)).toBeVisible()
+    expect(within(preferred).getByText(/2\.5×/)).toBeVisible()
+  })
+
+  it('collapses nested shortcut groups independently, retains them across categories, and resets them on reopening', async () => {
+    const settings: ShortcutSettings = structuredClone(DEFAULT_SETTINGS)
+    settings.seekShortcuts = [{ id: 'seek:popup-collapse', kind: 'percentage', value: 20 }]
+    settings.bindings['seek:popup-collapse'] = { enabled: true, key: null }
+    await saveSettings(settings)
+    const saved = await getSettings()
+    const popup = render(<PopupApp />)
+    await getPopupShortcuts()
+    await selectCategory('Seeking and navigation')
+    const relative = screen.getByRole('button', { name: 'Forward / Rewind' })
+    const percentage = screen.getByRole('button', { name: 'Jump to position' })
+    expect(relative).toHaveAttribute('aria-expanded', 'true')
+    expect(percentage).toHaveAttribute('aria-expanded', 'true')
+    fireEvent.click(relative)
+    expect(relative).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('group', { name: 'Forward / Rewind 10 seconds' })).not.toBeInTheDocument()
+    expect(screen.getByText('20%')).toBeVisible()
+    fireEvent.click(percentage)
+    expect(screen.getByText('20%')).not.toBeVisible()
+
+    await selectCategory('Playback speed')
+    const preferred = screen.getByRole('button', { name: 'Preferred speed' })
+    expect(preferred).toHaveAttribute('aria-expanded', 'true')
+    fireEvent.click(preferred)
+    expect(screen.getByText(/1\.5×/)).not.toBeVisible()
+    await selectCategory('Seeking and navigation')
+    expect(screen.getByRole('button', { name: 'Forward / Rewind' })).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.getByRole('button', { name: 'Jump to position' })).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(screen.getByRole('button', { name: 'Forward / Rewind' }))
+    expect(screen.getByRole('group', { name: 'Forward / Rewind 10 seconds' })).toBeVisible()
+    await selectCategory('Playback speed')
+    expect(screen.getByRole('button', { name: 'Preferred speed' })).toHaveAttribute('aria-expanded', 'false')
+    expect(await getSettings()).toEqual(saved)
+
+    popup.unmount()
+    render(<PopupApp />)
+    await getPopupShortcuts()
+    await selectCategory('Seeking and navigation')
+    expect(screen.getByRole('button', { name: 'Jump to position' })).toHaveAttribute('aria-expanded', 'true')
+    await selectCategory('Playback speed')
+    expect(screen.getByRole('button', { name: 'Preferred speed' })).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('collapses hold speed and favorite languages, temporarily expanding search results without losing disclosure state', async () => {
+    const settings: ShortcutSettings = structuredClone(DEFAULT_SETTINGS)
+    settings.subtitleFavorites = [{ language: 'ja' }]
+    settings.audioFavorites = [{ language: 'en', audioDescription: true }]
+    await saveSettings(settings)
+    render(<PopupApp />)
+    await getPopupShortcuts()
+    const playPause = screen.getByRole('button', { name: 'Play / Pause' })
+    expect(playPause).toHaveAttribute('aria-expanded', 'true')
+    fireEvent.click(playPause)
+    expect(screen.getByText('Hold speed')).not.toBeVisible()
+    expect(within(playPause).getByText('Space')).toBeVisible()
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: '長按' } })
+    expect(screen.getByText('Hold speed')).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Play / Pause' })).toBeDisabled()
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: '' } })
+    expect(screen.getByText('Hold speed')).not.toBeVisible()
+
+    await selectCategory('Subtitles')
+    fireEvent.click(screen.getByRole('button', { name: getCopy('en').subtitleFavorites.title }))
+    expect(screen.getByText('Japanese')).not.toBeVisible()
+    await selectCategory('Volume and audio')
+    fireEvent.click(screen.getByRole('button', { name: getAudioFavoritesCopy('en').title }))
+    expect(screen.getByText('English · Audio Description')).not.toBeVisible()
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Japanese' } })
+    expect(screen.getByText('Japanese')).toBeVisible()
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: '' } })
+    expect(screen.getByText('English · Audio Description')).not.toBeVisible()
+    await selectCategory('Subtitles')
+    expect(screen.getByText('Japanese')).not.toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: getCopy('en').subtitleFavorites.title }))
+    expect(screen.getByText('Japanese')).toBeVisible()
+  })
+
+  it('keeps a seek pair together when one key matches search without restoring hidden directions', async () => {
+    const settings: ShortcutSettings = structuredClone(DEFAULT_SETTINGS)
+    settings.bindings.seekBackward.key = null
+    await saveSettings(settings)
+    render(<PopupApp />)
+    await getPopupShortcuts()
+    await selectCategory('Seeking and navigation')
+
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'ArrowRight' } })
+    const pair = screen.getByRole('group', { name: 'Forward / Rewind 10 seconds' })
+    expect(within(pair).getAllByText('10 s')).toHaveLength(1)
+    expect(within(pair).getByRole('group', { name: 'Rewind 10 seconds' })).toHaveTextContent('Not set')
+    expect(within(pair).getByRole('group', { name: 'Forward 10 seconds' })).toHaveTextContent('→')
+
+    await act(async () => { await saveSettings(hideFeatures(settings, [{ group: 'general', action: 'seekBackward' }])) })
+    expect(within(pair).queryByRole('group', { name: 'Rewind 10 seconds' })).not.toBeInTheDocument()
+    expect(within(pair).getByRole('group', { name: 'Forward 10 seconds' })).toBeVisible()
+  })
+
+  it('searches all categories by action and physical key without persisting temporary navigation', async () => {
+    const popup = render(<PopupApp />)
+    await getPopupShortcuts()
+    await selectCategory('Subtitle language and size')
+    vi.mocked(chrome.storage.sync.set).mockClear()
+    const search = screen.getByRole('searchbox')
+    fireEvent.change(search, { target: { value: 'SHIFT + keyd' } })
+    expect(screen.getByText('Next audio language')).toBeVisible()
+    expect(screen.queryByText('Toggle subtitles')).not.toBeInTheDocument()
+    expect(screen.getByRole('searchbox')).toHaveValue('SHIFT + keyd')
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'no-such-action' } })
+    expect(screen.getByText('No shortcuts found. Try another action or key.')).toBeVisible()
+    fireEvent.keyDown(screen.getByRole('searchbox'), { key: 'Escape' })
+    expect(screen.getByRole('combobox', { name: 'Shortcut category' })).toHaveTextContent('Subtitles')
+    expect(chrome.storage.sync.set).not.toHaveBeenCalled()
+    popup.unmount()
+    render(<PopupApp />)
+    await getPopupShortcuts()
+    expect(screen.getByRole('searchbox')).toHaveValue('')
+    expect(screen.getByRole('combobox', { name: 'Shortcut category' })).toHaveTextContent('Playback')
+  })
+
+  it('finds translated categories and actions while keeping the current interface language', async () => {
+    await saveSettings({ ...DEFAULT_SETTINGS, locale: 'en' })
+    render(<PopupApp />)
+    await getPopupShortcuts()
+    const search = screen.getByRole('searchbox')
+    for (const query of ['字幕', '자막']) {
+      fireEvent.change(search, { target: { value: query } })
+      expect(screen.getByText('Toggle subtitles')).toBeVisible()
+      expect(screen.getByText('Previous subtitle')).toBeVisible()
+      expect(screen.queryByText('Mute')).not.toBeInTheDocument()
+    }
+    fireEvent.change(search, { target: { value: '画面' } })
+    expect(screen.getByText('Fullscreen')).toBeVisible()
+    fireEvent.change(search, { target: { value: '音軌 SHIFT＋KeyD' } })
+    expect(screen.getByText('Next audio language')).toBeVisible()
+    expect(screen.queryByText('Previous audio language')).not.toBeInTheDocument()
+    fireEvent.change(search, { target: { value: '앞으로' } })
+    expect(screen.getByRole('group', { name: 'Forward 10 seconds' })).toBeVisible()
+  })
+
+  it('uses shared language and function aliases to find shortcuts', async () => {
+    await saveSettings({ ...DEFAULT_SETTINGS, locale: 'en' })
+    render(<PopupApp />)
+    await getPopupShortcuts()
+    const search = screen.getByRole('searchbox')
+    for (const query of ['日語', '일어', 'US English', '불어']) {
+      fireEvent.change(search, { target: { value: query } })
+      expect(screen.getByText('Next subtitle language')).toBeVisible()
+      expect(screen.getByText('Previous subtitle language')).toBeVisible()
+      expect(screen.getByText('Next audio language')).toBeVisible()
+      expect(screen.getByText('Previous audio language')).toBeVisible()
+      expect(screen.queryByText('Toggle subtitles')).not.toBeInTheDocument()
+      expect(screen.queryByText('Mute')).not.toBeInTheDocument()
+    }
+    fireEvent.change(search, { target: { value: '日語 shift+KeyD' } })
+    expect(screen.getByText('Next audio language')).toBeVisible()
+    expect(screen.queryByText('Previous audio language')).not.toBeInTheDocument()
+    for (const query of ['pause', '暫停', 'resume']) {
+      fireEvent.change(search, { target: { value: query } })
+      expect(screen.getByText('Play / Pause')).toBeVisible()
+    }
+    fireEvent.change(search, { target: { value: 'floating player' } })
+    expect(screen.getByText('Picture-in-Picture')).toBeVisible()
+    expect(screen.queryByText('Fullscreen')).not.toBeInTheDocument()
+    fireEvent.change(search, { target: { value: 'repeat sentence' } })
+    expect(screen.getByText('Replay current subtitle')).toBeVisible()
+  })
+
+  it.each([
+    ['Seeking and navigation', 'seeking'], ['Subtitles', 'subtitles'], ['Playback speed', 'speed'],
+  ] as const)('opens the matching Options category for %s without restoring playback focus', async (label, category) => {
+    render(<PopupApp />)
+    await getPopupShortcuts()
+    await selectCategory(label)
+    fireEvent.click(screen.getByRole('button', { name: `Open settings: ${label}` }))
+    expect(chrome.tabs.create).toHaveBeenCalledWith({ url: `chrome-extension://test-extension-id/options.html${OPTIONS_PAGE_HASHES[category]}` })
+    act(() => window.dispatchEvent(new Event('pagehide')))
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalled()
+  })
+
+  it('reports Firefox Picture-in-Picture support in its category', async () => {
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Firefox/156.0')
+    render(<PopupApp />)
+    await getPopupShortcuts()
+    const display = await selectCategory('Playback')
+    expect(within(display).getByText('Picture-in-Picture').closest('div')).toHaveTextContent('Unsupported')
   })
 
   it('clears NEW on viewing and does not show the introduction again while the feature remains disabled', async () => {
@@ -46,9 +416,9 @@ describe('PopupApp', () => {
     expect(chrome.permissions.request).not.toHaveBeenCalled()
     popup.unmount()
     render(<PopupApp />)
-    const subtitleSection = await screen.findByRole('region', { name: 'Subtitle navigation' })
+    await getPopupShortcuts()
     expect(screen.queryByRole('region', { name: 'New: Subtitle navigation' })).not.toBeInTheDocument()
-    expect(within(subtitleSection).getByRole('switch', { name: 'Enable subtitle navigation shortcuts' })).toHaveAttribute('aria-checked', 'false')
+    expect((await getSettings()).subtitleNavigation.enabled).toBe(false)
   })
 
   it('does not mark the introduction as seen while settings are still loading', async () => {
@@ -120,128 +490,25 @@ describe('PopupApp', () => {
     expect(chrome.storage.sync.set).not.toHaveBeenCalled()
     await waitFor(() => expect(announcement).not.toBeInTheDocument())
     expect((await subtitleNavigationAnnouncement.getState()).pending).toBe(false)
-    const subtitleSection = screen.getByRole('region', { name: 'Subtitle navigation' })
-    expect(within(subtitleSection).getByRole('switch', { name: 'Enable subtitle navigation shortcuts' })).toHaveAttribute('aria-checked', 'false')
-  })
-
-  it.each([true, false])('explains subtitle navigation in a dismissible tooltip when global enabled is %s', async enabled => {
-    const saved = await saveSettings({ ...structuredClone(DEFAULT_SETTINGS), enabled })
-    render(<PopupApp />)
-    const section = await screen.findByRole('region', { name: 'Subtitle navigation' })
-    const info = within(section).getByRole('button', { name: 'Subtitle navigation info' })
-    expect(info).toBeEnabled()
-    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
-    const matches = info.matches.bind(info)
-    vi.spyOn(info, 'matches').mockImplementation(selector => selector === ':focus-visible' ? true : matches(selector))
-    act(() => info.focus())
-    const tooltip = await screen.findByRole('tooltip')
-    for (const paragraph of SUBTITLE_NAVIGATION_COPY.en.description.split('\n\n')) {
-      expect(within(tooltip).getByText(paragraph)).toBeInTheDocument()
-    }
-    fireEvent.keyDown(info, { key: 'Escape' })
-    await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument())
-    expect(chrome.permissions.request).not.toHaveBeenCalled()
-    expect(await getSettings()).toEqual(saved)
-  })
-
-  it.each(['Chrome/140.0', 'Chrome/140.0 Edg/140.0', 'Firefox/156.0'])('toggles subtitle navigation directly in %s', async browser => {
-    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(`Mozilla/5.0 ${browser}`)
-    await recordEligibleUpgrade()
-    await subtitleNavigationAnnouncement.markSeen()
-    render(<PopupApp />)
-    const section = await screen.findByRole('region', { name: 'Subtitle navigation' })
-    const toggle = within(section).getByRole('switch', { name: 'Enable subtitle navigation shortcuts' })
-    fireEvent.click(toggle)
-    expect(chrome.permissions.request).toHaveBeenCalledExactlyOnceWith({ origins: [
-      '*://*.netflix.com/*', 'https://*.nflxvideo.net/*',
-    ] })
-    await waitFor(async () => expect((await getSettings()).subtitleNavigation.enabled).toBe(true))
-    expect(within(section).getByText('Previous subtitle')).toBeInTheDocument()
-    expect(screen.queryByText('Subtitle priority')).not.toBeInTheDocument()
-    expect(chrome.tabs.create).not.toHaveBeenCalled()
-    fireEvent.click(toggle)
-    await waitFor(async () => expect((await getSettings()).subtitleNavigation.enabled).toBe(false))
-    expect(within(section).queryByText('Previous subtitle')).not.toBeInTheDocument()
-    expect(screen.queryByText('Subtitle priority')).not.toBeInTheDocument()
-    expect(chrome.permissions.request).toHaveBeenCalledTimes(1)
-  })
-
-  it('keeps settings unchanged after denied subtitle access and allows retry', async () => {
-    const settings = structuredClone(DEFAULT_SETTINGS)
-    settings.subtitleNavigation.bindings.next.enabled = false
-    const saved = await saveSettings(settings)
-    vi.mocked(chrome.permissions.request).mockImplementationOnce(() => Promise.resolve(false) as never)
-    render(<PopupApp />)
-    const toggle = await screen.findByRole('switch', { name: 'Enable subtitle navigation shortcuts' })
-    fireEvent.click(toggle)
-    expect(await screen.findByRole('alert')).toHaveTextContent('Subtitle navigation stays off')
-    expect(toggle).toHaveAttribute('aria-checked', 'false')
-    expect(toggle).toHaveAccessibleDescription(/Subtitle navigation stays off/)
-    expect(toggle).toBeEnabled()
-    expect(await getSettings()).toEqual(saved)
-    fireEvent.click(toggle)
-    await waitFor(async () => expect((await getSettings()).subtitleNavigation).toEqual({ ...saved.subtitleNavigation, enabled: true }))
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-  })
-
-  it.each(['throw', 'reject'])('recovers when requesting subtitle access fails by %s', async failure => {
-    vi.mocked(chrome.permissions.request).mockImplementationOnce(() => {
-      if (failure === 'throw') throw new Error('API unavailable')
-      return Promise.reject(new Error('API unavailable')) as never
-    })
-    render(<PopupApp />)
-    const toggle = await screen.findByRole('switch', { name: 'Enable subtitle navigation shortcuts' })
-    fireEvent.click(toggle)
-    expect(await screen.findByRole('alert')).toHaveTextContent('Could not request website access')
-    expect(toggle).toHaveAttribute('aria-checked', 'false')
-    expect(toggle).toBeEnabled()
-    expect((await getSettings()).subtitleNavigation.enabled).toBe(false)
-  })
-
-  it('cancels pending subtitle activation when the global switch is turned off', async () => {
-    let approve!: (granted: boolean) => void
-    vi.mocked(chrome.permissions.request).mockImplementationOnce(() => new Promise<boolean>(resolve => { approve = resolve }) as never)
-    render(<PopupApp />)
-    const toggle = await screen.findByRole('switch', { name: 'Enable subtitle navigation shortcuts' })
-    fireEvent.click(toggle)
-    expect(toggle).toBeDisabled()
-    expect(toggle).toHaveAttribute('aria-busy', 'true')
-    fireEvent.click(toggle)
-    expect(chrome.permissions.request).toHaveBeenCalledTimes(1)
-    fireEvent.click(screen.getByRole('switch', { name: 'Enable extension' }))
-    await waitFor(async () => expect((await getSettings()).enabled).toBe(false))
-    await act(async () => { approve(true) })
-    expect((await getSettings()).subtitleNavigation.enabled).toBe(false)
-    expect(toggle).toBeDisabled()
-    expect(toggle).toHaveAttribute('aria-busy', 'false')
-    expect(toggle).toHaveAccessibleDescription(/Enable extension.*above/)
-  })
-
-  it('ignores a subtitle permission response after the popup closes', async () => {
-    let approve!: (granted: boolean) => void
-    vi.mocked(chrome.permissions.request).mockImplementationOnce(() => new Promise<boolean>(resolve => { approve = resolve }) as never)
-    const popup = render(<PopupApp />)
-    fireEvent.click(await screen.findByRole('switch', { name: 'Enable subtitle navigation shortcuts' }))
-    popup.unmount()
-    await act(async () => { approve(true) })
     expect((await getSettings()).subtitleNavigation.enabled).toBe(false)
   })
 
   it('preserves the subtitle preference when toggling the global switch', async () => {
     await saveSettings({ ...structuredClone(DEFAULT_SETTINGS), subtitleNavigation: { ...structuredClone(DEFAULT_SETTINGS.subtitleNavigation), enabled: true } })
     render(<PopupApp />)
-    const toggle = await screen.findByRole('switch', { name: 'Enable subtitle navigation shortcuts' })
+    await getPopupShortcuts()
+    const section = await selectCategory('Sentence jumps and replay')
+    const saved = await getSettings()
     const globalToggle = screen.getByRole('switch', { name: 'Enable extension' })
     fireEvent.click(globalToggle)
-    await waitFor(async () => expect((await getSettings()).enabled).toBe(false))
-    expect(toggle).toBeDisabled()
-    expect(toggle).toHaveAttribute('aria-checked', 'true')
-    expect((await getSettings()).subtitleNavigation.enabled).toBe(true)
-    expect(screen.queryByText('Previous subtitle')).not.toBeInTheDocument()
+    await waitFor(async () => expect(await getSettings()).toEqual({ ...saved, enabled: false }))
+    expect(globalToggle).not.toBeChecked()
+    expect(within(section).getByText('Previous subtitle')).toBeVisible()
+    expect(within(section).queryByRole('switch')).not.toBeInTheDocument()
     fireEvent.click(globalToggle)
-    await waitFor(async () => expect((await getSettings()).enabled).toBe(true))
-    expect(toggle).toBeEnabled()
-    expect(screen.getByText('Previous subtitle')).toBeInTheDocument()
+    await waitFor(async () => expect(await getSettings()).toEqual(saved))
+    expect(globalToggle).toBeChecked()
+    expect(within(section).getByText('Previous subtitle')).toBeVisible()
     expect(chrome.permissions.request).not.toHaveBeenCalled()
   })
 
@@ -252,7 +519,7 @@ describe('PopupApp', () => {
     await waitFor(() => expect(screen.queryByRole('region', { name: 'New: Subtitle navigation' })).not.toBeInTheDocument())
     first.unmount()
     render(<PopupApp />)
-    await screen.findByRole('region', { name: 'Subtitle navigation' })
+    await getPopupShortcuts()
     expect((await subtitleNavigationAnnouncement.getState()).pending).toBe(false)
     expect(chrome.storage.sync.set).not.toHaveBeenCalled()
     expect(screen.queryByRole('region', { name: 'New: Subtitle navigation' })).not.toBeInTheDocument()
@@ -314,37 +581,18 @@ describe('PopupApp', () => {
   it('hides the announcement after a fresh install and reacts to upgrade eligibility from the background', async () => {
     await subtitleNavigationAnnouncement.recordInstall({ reason: 'install' } as chrome.runtime.InstalledDetails, '0.6.3')
     render(<PopupApp />)
-    await screen.findByRole('region', { name: 'Subtitle navigation' })
+    await getPopupShortcuts()
     expect((await subtitleNavigationAnnouncement.getState()).pending).toBe(false)
     expect(screen.queryByRole('region', { name: 'New: Subtitle navigation' })).not.toBeInTheDocument()
     await act(async () => { await recordEligibleUpgrade() })
     expect(await screen.findByRole('region', { name: 'New: Subtitle navigation' })).toBeInTheDocument()
   })
 
-  it.each(['subtitle master', 'global override'])('collapses subtitle navigation when the %s is off', async master => {
-    const settings = structuredClone(DEFAULT_SETTINGS)
-    settings.subtitleNavigation.enabled = master === 'global override'
-    settings.enabled = master !== 'global override'
-    await saveSettings(settings)
-    render(<PopupApp />)
-
-    const section = await screen.findByRole('region', { name: 'Subtitle navigation' })
-    const toggle = within(section).getByRole('switch', { name: 'Enable subtitle navigation shortcuts' })
-    expect(toggle).toHaveAttribute('aria-checked', String(settings.subtitleNavigation.enabled))
-    if (settings.enabled) expect(toggle).toBeEnabled()
-    else expect(toggle).toBeDisabled()
-    expect(within(section).queryByText('Previous subtitle')).not.toBeInTheDocument()
-    const skipIntro = screen.getByText('Skip intro').closest('div') as HTMLElement
-    expect(within(skipIntro).getByText('S')).toBeInTheDocument()
-    expect(screen.queryByText('Subtitle priority')).not.toBeInTheDocument()
-    expect(chrome.permissions.request).not.toHaveBeenCalled()
-  })
-
   it.each(['Chrome/140.0', 'Firefox/156.0'])('shows configured subtitle keys and precedence in %s', async browser => {
     vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(`Mozilla/5.0 ${browser}`)
     const settings = structuredClone(DEFAULT_SETTINGS)
     settings.subtitleNavigation.enabled = true
-    settings.subtitleNavigation.bindings.replay.enabled = true
+    settings.subtitleNavigation.bindings.replay = { enabled: true, key: { ...DEFAULT_SETTINGS.bindings.skipIntro.key } }
     settings.subtitleNavigation.bindings.previous.key = {
       code: 'KeyZ', key: 'z', ctrl: true, alt: false, shift: false, meta: false,
     }
@@ -353,7 +601,8 @@ describe('PopupApp', () => {
     await saveSettings(settings)
     render(<PopupApp />)
 
-    const section = await screen.findByRole('region', { name: 'Subtitle navigation' })
+    await getPopupShortcuts()
+    const section = await selectCategory('Sentence jumps and replay')
     const previous = within(section).getByText('Previous subtitle').closest('div') as HTMLElement
     expect(within(previous).getByText('Ctrl')).toBeInTheDocument()
     expect(within(previous).getByText('Z')).toBeInTheDocument()
@@ -364,68 +613,45 @@ describe('PopupApp', () => {
     expect(within(replay).getByText('S')).toBeInTheDocument()
     const playback = within(section).getByText('Play / pause').closest('div') as HTMLElement
     expect(within(playback).getByText('W')).toBeInTheDocument()
-    const skipIntro = screen.getByText('Skip intro').closest('div') as HTMLElement
-    expect(within(skipIntro).getByText('Subtitle priority')).toHaveAttribute(
-      'aria-label', 'This key is used by Replay current subtitle in Subtitle navigation.'
-    )
-    expect(within(skipIntro).getByText('S')).toBeInTheDocument()
-    const volumeUp = screen.getByText('Volume up').closest('div') as HTMLElement
-    expect(within(volumeUp).getByText('Ctrl')).toBeInTheDocument()
-    expect(within(volumeUp).getByText('Z')).toBeInTheDocument()
-    expect(within(volumeUp).getByText('Subtitle priority')).toHaveAttribute(
-      'aria-label', 'This key is used by Previous subtitle in Subtitle navigation.'
-    )
-    expect(within(section).getByRole('button', { name: 'Subtitle navigation info' })).toBeInTheDocument()
-    expect(within(section).getByRole('switch', { name: 'Enable subtitle navigation shortcuts' })).toHaveAttribute('aria-checked', 'true')
+    expect(within(replay).getByText('Shortcut priority')).toHaveAttribute('aria-label', 'This key is used by Skip intro. Choose another key for subtitle navigation.')
+    expect(within(previous).getByText('Shortcut priority')).toHaveAttribute('aria-label', 'This key is used by Volume up. Choose another key for subtitle navigation.')
     expect(chrome.permissions.request).not.toHaveBeenCalled()
   })
 
-  it('updates subtitle precedence when a row or the master is disabled in Options', async () => {
+  it('updates legacy subtitle conflict status when a row or master is disabled in Options', async () => {
     const settings = structuredClone(DEFAULT_SETTINGS)
     settings.subtitleNavigation.enabled = true
-    settings.subtitleNavigation.bindings.replay.enabled = true
+    settings.subtitleNavigation.bindings.replay = { enabled: true, key: { ...DEFAULT_SETTINGS.bindings.skipIntro.key } }
     await saveSettings(settings)
     render(<PopupApp />)
-    await screen.findByText('Subtitle priority')
+    await getPopupShortcuts()
+    await selectCategory('Sentence jumps and replay')
+    await screen.findByText('Shortcut priority')
 
     settings.subtitleNavigation.bindings.replay.enabled = false
     await act(async () => { await saveSettings(settings) })
-    const skipIntro = screen.getByText('Skip intro').closest('div') as HTMLElement
-    expect(within(skipIntro).getByText('S')).toBeInTheDocument()
-    expect(screen.queryByText('Subtitle priority')).not.toBeInTheDocument()
-    const section = screen.getByRole('region', { name: 'Subtitle navigation' })
+    expect(screen.queryByText('Shortcut priority')).not.toBeInTheDocument()
+    const section = screen.getByRole('region', { name: 'Sentence jumps and replay' })
     const replay = within(section).getByText('Replay current subtitle').closest('div') as HTMLElement
     expect(within(replay).getByText('Disabled')).toBeInTheDocument()
 
     settings.subtitleNavigation.enabled = false
     await act(async () => { await saveSettings(settings) })
-    expect(within(section).getByRole('switch', { name: 'Enable subtitle navigation shortcuts' })).toHaveAttribute('aria-checked', 'false')
-    expect(within(section).queryByText('Replay current subtitle')).not.toBeInTheDocument()
+    expect(within(section).getByText('Replay current subtitle')).toBeVisible()
+    expect(screen.queryByText('Shortcut priority')).not.toBeInTheDocument()
   })
 
   it('uses physical keys and modifiers for localized custom subtitle precedence', async () => {
     const settings = structuredClone(DEFAULT_SETTINGS)
     settings.locale = 'zh-TW'
     settings.subtitleNavigation.enabled = true
-    settings.subtitleNavigation.bindings.replay.key.shift = true
+    settings.subtitleNavigation.bindings.previous.key = { ...settings.bindings.seekForward.key!, key: 'custom label' }
     await saveSettings(settings)
     render(<PopupApp />)
-    const section = await screen.findByRole('region', { name: '字幕導航' })
-    const skipIntro = screen.getByText('略過片頭').closest('div') as HTMLElement
-    expect(within(skipIntro).getByText('S')).toBeInTheDocument()
-    expect(screen.queryByText('字幕導航優先')).not.toBeInTheDocument()
-
-    // Match the actual shortcut router: physical code and modifiers, not key text.
-    settings.subtitleNavigation.bindings.previous.key = {
-      ...settings.bindings.seekForward.key, key: 'custom label',
-    }
-    await act(async () => { await saveSettings(settings) })
-    const seekForward = screen.getByText('快轉').closest('div') as HTMLElement
-    expect(within(seekForward).getByText('字幕導航優先')).toHaveAttribute(
-      'aria-label', '這個按鍵由字幕導航的「上一句」使用。'
-    )
-    expect(within(seekForward).getByText('→')).toBeInTheDocument()
-    expect(within(skipIntro).getByText('S')).toBeInTheDocument()
+    fireEvent.click(await screen.findByRole('combobox', { name: '快捷鍵分類' }))
+    fireEvent.click(screen.getByRole('option', { name: '字幕' }))
+    const section = await screen.findByRole('region', { name: '逐句跳轉與重播' })
+    expect(within(section).getByText('一般快捷鍵優先')).toHaveAttribute('aria-label', '這個按鍵由「快轉」使用，請為字幕導航設定其他按鍵。')
     expect(within(section).getByText('→')).toBeInTheDocument()
   })
 
@@ -472,309 +698,13 @@ describe('PopupApp', () => {
     }
   })
 
-  it('separates shortcut summary from settings while keeping global controls available', async () => {
-    render(<PopupApp />)
-
-    expect(await screen.findByText('Shortcut Override')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Open GitHub repository' })).toHaveAttribute(
-      'href',
-      EXTERNAL_LINKS.githubRepository
-    )
-    expect(
-      screen.getByRole('link', { name: 'Rate this extension in the extension store' })
-    ).toHaveAttribute('href', EXTERNAL_LINKS.shortcutOverrideChromeWebStore)
-    expect(screen.getByRole('combobox', { name: 'Other products' })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Shortcuts' })).toHaveAttribute('aria-selected', 'true')
-    expect(screen.queryByRole('heading', { name: 'General settings' })).not.toBeInTheDocument()
-    expect(screen.queryByText('Netflix playback features are ready.')).not.toBeInTheDocument()
-    await waitFor(() => expect(chrome.tabs.sendMessage).toHaveBeenCalledTimes(1))
-    expect(screen.queryByText('Open a Netflix title to use shortcuts.')).not.toBeInTheDocument()
-    expect(
-      screen.queryByText('Shortcuts only run in Netflix playback contexts.')
-    ).not.toBeInTheDocument()
-    expect(screen.getByText('Space')).toBeInTheDocument()
-    expect(screen.getByText('Play / Pause (hold for speed)')).toBeInTheDocument()
-    expect(screen.getByText('Space').closest('[data-slot="kbd"]')).toBeInTheDocument()
-    const subtitleShortcut = screen.getByText('Toggle subtitles').closest('div')
-    expect(subtitleShortcut).not.toBeNull()
-    expect(within(subtitleShortcut as HTMLElement).getByText('C')).toBeInTheDocument()
-    await openPopupSettings()
-    const localeCombobox = screen.getByRole('combobox', { name: 'Language' })
-    const themeCombobox = screen.getByRole('combobox', { name: 'Theme' })
-    const enabledSwitch = screen.getByRole('switch', { name: 'Enable extension' })
-    const generalSettings = screen.getByRole('heading', { name: 'General settings' }).closest('section')
-    expect(generalSettings).toContainElement(localeCombobox)
-    expect(generalSettings).toContainElement(themeCombobox)
-    expect(generalSettings).not.toContainElement(enabledSwitch)
-    expect(screen.queryByRole('navigation', { name: 'General settings' })).not.toBeInTheDocument()
-    expect(screen.getByRole('banner')).not.toContainElement(localeCombobox)
-    expect(screen.getByLabelText('Lowest speed')).toHaveValue(0.25)
-    expect(screen.getByLabelText('Highest speed')).toHaveValue(3)
-    expect(screen.getByLabelText('Speed adjustment amount')).toHaveValue(0.25)
-    expect(screen.getByLabelText('Preferred speed')).toHaveValue(1.5)
-    expect(screen.getByLabelText('Hold speed')).toHaveValue(2)
-    expect(screen.getByRole('switch', { name: 'Play / Pause hold speed: Enabled' })).toHaveAttribute(
-      'aria-checked',
-      'true'
-    )
-    expect(
-      screen.getByRole('switch', { name: 'Play / Pause hold speed: Show speed hint' })
-    ).toHaveAttribute('aria-checked', 'true')
-    expect(screen.queryByRole('button', { name: 'Enabled info' })).not.toBeInTheDocument()
-    const seekInput = screen.getByLabelText('Seconds per seek')
-    expect(seekInput).toHaveValue(10)
-    expect(seekInput).toHaveAttribute('max', '60')
-    const speedSection = screen.getByText('Playback speed').closest('section')
-    expect(speedSection).not.toBeNull()
-    expect(within(speedSection as HTMLElement).queryByLabelText('Seconds per seek')).not.toBeInTheDocument()
-    const seekSection = screen.getByText('Seek shortcuts').closest('section')
-    expect(seekSection).not.toBeNull()
-    expect(within(seekSection as HTMLElement).getByLabelText('Seconds per seek')).toBe(
-      seekInput
-    )
-    expect(screen.getByRole('button', { name: 'Enable extension info' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Lowest speed info' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Highest speed info' })).toBeInTheDocument()
-    expect(
-      screen.getByRole('button', { name: 'Speed adjustment amount info' })
-    ).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Hold speed info' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Seconds per seek info' })).toBeInTheDocument()
-    expect(localeCombobox).toHaveTextContent('Auto')
-    expect(screen.getByRole('combobox', { name: 'Theme' })).toHaveTextContent('Auto')
-
-    await openCompatibilityDiagnostics()
-    expect(await screen.findByText('Netflix playback features are ready.')).toBeInTheDocument()
-    const diagnosticsRegion = screen.getByRole('region', { name: 'Compatibility' })
-    expect(diagnosticsRegion).toHaveClass('p-3')
-    expect(diagnosticsRegion).not.toHaveClass('pr-10')
-    expect(screen.getByText('Netflix player API')).toBeInTheDocument()
-    expect(screen.getAllByText('Found')).toHaveLength(2)
-  })
-
-  it('starts general settings collapsed, remembers it across tabs, and resets on reopening', async () => {
-    const popup = render(<PopupApp />)
-    fireEvent.mouseDown(await screen.findByRole('tab', { name: 'Settings' }), { button: 0, ctrlKey: false })
-    const generalSettings = screen.getByRole('button', { name: 'General settings' })
-    expect(generalSettings).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByRole('combobox', { name: 'Language' })).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Preferred speed')).toBeInTheDocument()
-    expect(screen.getByRole('switch', { name: 'Enable extension' })).toBeEnabled()
-    fireEvent.click(generalSettings)
-    expect(generalSettings).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByRole('combobox', { name: 'Language' })).toBeInTheDocument()
-    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Shortcuts' }), { button: 0, ctrlKey: false })
-    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Settings' }), { button: 0, ctrlKey: false })
-    expect(screen.getByRole('button', { name: 'General settings' })).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByRole('combobox', { name: 'Language' })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'General settings' }))
-    expect(screen.queryByRole('combobox', { name: 'Language' })).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'General settings' }))
-    popup.unmount()
-    render(<PopupApp />)
-    fireEvent.mouseDown(await screen.findByRole('tab', { name: 'Settings' }), { button: 0, ctrlKey: false })
-    expect(screen.getByRole('button', { name: 'General settings' })).toHaveAttribute('aria-expanded', 'false')
-    expect(chrome.storage.sync.set).not.toHaveBeenCalled()
-  })
-
-  it('supports keyboard tabs and keeps the global switch and form drafts across panels', async () => {
-    render(<PopupApp />)
-    const shortcutsTab = await screen.findByRole('tab', { name: 'Shortcuts' })
-    shortcutsTab.focus()
-    fireEvent.keyDown(shortcutsTab, { key: 'ArrowRight' })
-    await waitFor(() => expect(screen.getByRole('tab', { name: 'Settings' })).toHaveAttribute('aria-selected', 'true'))
-    expect(screen.getByRole('tabpanel', { name: 'Settings' })).toBeInTheDocument()
-    expect(screen.queryByRole('tabpanel', { name: 'Shortcuts' })).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('switch', { name: 'Enable extension' }))
-    await waitFor(async () => expect((await getSettings()).enabled).toBe(false))
-    fireEvent.change(screen.getByLabelText('Preferred speed'), { target: { value: '2.25' } })
-    fireEvent.keyDown(screen.getByRole('tab', { name: 'Settings' }), { key: 'Home' })
-    await waitFor(() => expect(shortcutsTab).toHaveAttribute('aria-selected', 'true'))
-    expect(screen.getByRole('switch', { name: 'Enable extension' })).toHaveAttribute('aria-checked', 'false')
-    expect(screen.queryByLabelText('Preferred speed')).not.toBeInTheDocument()
-    await openPopupSettings()
-    expect(screen.getByLabelText('Preferred speed')).toHaveValue(2.25)
-  })
-
-  it('saves a focused numeric edit when clicking another tab', async () => {
-    render(<PopupApp />)
-    await openPopupSettings()
-    const preferredInput = screen.getByLabelText('Preferred speed')
-    act(() => { preferredInput.focus() })
-    fireEvent.change(preferredInput, { target: { value: '1.75' } })
-    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Shortcuts' }), { button: 0, ctrlKey: false })
-    await waitFor(async () => expect((await getSettings()).speed.preferred).toBe(1.75))
-    expect(screen.getByRole('tabpanel', { name: 'Shortcuts' })).toBeInTheDocument()
-    await openPopupSettings()
-    expect(screen.getByLabelText('Preferred speed')).toHaveValue(1.75)
-  })
-
-  it('persists quick setting toggles', async () => {
-    render(<PopupApp />)
-
-    const enabledSwitch = await screen.findByRole('switch', {
-      name: 'Enable extension',
-    })
-    fireEvent.click(enabledSwitch)
-
-    await waitFor(() => {
-      expect(enabledSwitch).toHaveAttribute('aria-checked', 'false')
-    })
-  })
-
-  it('persists popup theme changes and restores the automatic system theme', async () => {
-    const view = render(<PopupApp />)
-    await openPopupSettings()
-    expect((await getSettings()).theme).toBe('auto')
-    expect(await screen.findByRole('combobox', { name: 'Theme' })).toHaveTextContent('Auto')
-    fireEvent.click(screen.getByRole('combobox', { name: 'Theme' }))
-    fireEvent.click(await screen.findByRole('option', { name: 'Dark' }))
-    await waitFor(async () => {
-      expect((await getSettings()).theme).toBe('dark')
-      expect(screen.getByRole('combobox', { name: 'Theme' })).toHaveTextContent('Dark')
-      expect(document.documentElement).toHaveClass('dark')
-    })
-    view.unmount()
-    const restored = render(<PopupApp />)
-    await openPopupSettings()
-    fireEvent.click(await screen.findByRole('combobox', { name: 'Theme' }))
-    fireEvent.click(await screen.findByRole('option', { name: 'Light' }))
-    await waitFor(async () => {
-      expect((await getSettings()).theme).toBe('light')
-      expect(screen.getByRole('combobox', { name: 'Theme' })).toHaveTextContent('Light')
-      expect(document.documentElement).not.toHaveClass('dark')
-    })
-    fireEvent.click(screen.getByRole('combobox', { name: 'Theme' }))
-    fireEvent.click(await screen.findByRole('option', { name: 'Auto' }))
-    await waitFor(async () => {
-      expect((await getSettings()).theme).toBe('auto')
-      expect(screen.getByRole('combobox', { name: 'Theme' })).toHaveTextContent('Auto')
-      expect(document.documentElement).not.toHaveClass('dark')
-    })
-    restored.unmount()
-    render(<PopupApp />)
-    await openPopupSettings()
-    expect(await screen.findByRole('combobox', { name: 'Theme' })).toHaveTextContent('Auto')
-    expect(document.documentElement).not.toHaveClass('dark')
-  })
-
-  it('resumes following the system theme after restoring Auto from a saved light choice', async () => {
-    const originalMatchMedia = window.matchMedia
-    let dark = true
-    const listeners = new Set<(event: MediaQueryListEvent) => void>()
-    const mediaQuery = {
-      get matches() { return dark },
-      addEventListener: vi.fn((_event: string, listener: (event: MediaQueryListEvent) => void) => { listeners.add(listener) }),
-      removeEventListener: vi.fn((_event: string, listener: (event: MediaQueryListEvent) => void) => { listeners.delete(listener) }),
-    }
-    Object.defineProperty(window, 'matchMedia', { configurable: true, value: vi.fn(() => mediaQuery) })
-    try {
-      const view = render(<PopupApp />)
-      await openPopupSettings()
-      expect(await screen.findByRole('combobox', { name: 'Theme' })).toHaveTextContent('Auto')
-      expect((await getSettings()).theme).toBe('auto')
-      expect(document.documentElement).toHaveClass('dark')
-      fireEvent.click(screen.getByRole('switch', { name: 'Enable extension' }))
-      await waitFor(async () => expect((await getSettings()).enabled).toBe(false))
-      expect((await getSettings()).theme).toBe('auto')
-      fireEvent.click(screen.getByRole('combobox', { name: 'Theme' }))
-      fireEvent.click(await screen.findByRole('option', { name: 'Light' }))
-      await waitFor(async () => {
-        expect((await getSettings()).theme).toBe('light')
-        expect(screen.getByRole('combobox', { name: 'Theme' })).toHaveTextContent('Light')
-        expect(document.documentElement).not.toHaveClass('dark')
-      })
-      expect(listeners.size).toBe(0)
-      expect(mediaQuery.removeEventListener).toHaveBeenCalledOnce()
-      act(() => {
-        dark = false
-        for (const listener of listeners) listener({ matches: dark } as MediaQueryListEvent)
-        dark = true
-        for (const listener of listeners) listener({ matches: dark } as MediaQueryListEvent)
-      })
-      expect(document.documentElement).not.toHaveClass('dark')
-      view.unmount()
-      render(<PopupApp />)
-      await openPopupSettings()
-      expect(await screen.findByRole('combobox', { name: 'Theme' })).toHaveTextContent('Light')
-      expect(document.documentElement).not.toHaveClass('dark')
-      expect((await getSettings()).theme).toBe('light')
-      fireEvent.click(screen.getByRole('combobox', { name: 'Theme' }))
-      fireEvent.click(await screen.findByRole('option', { name: 'Auto' }))
-      await waitFor(async () => {
-        expect((await getSettings()).theme).toBe('auto')
-        expect(screen.getByRole('combobox', { name: 'Theme' })).toHaveTextContent('Auto')
-        expect(document.documentElement).toHaveClass('dark')
-      })
-      expect(listeners.size).toBe(1)
-      act(() => {
-        dark = false
-        for (const listener of listeners) listener({ matches: dark } as MediaQueryListEvent)
-      })
-      expect(document.documentElement).not.toHaveClass('dark')
-      expect(screen.getByRole('combobox', { name: 'Theme' })).toHaveTextContent('Auto')
-      act(() => {
-        dark = true
-        for (const listener of listeners) listener({ matches: dark } as MediaQueryListEvent)
-      })
-      expect(document.documentElement).toHaveClass('dark')
-    } finally {
-      Object.defineProperty(window, 'matchMedia', { configurable: true, value: originalMatchMedia })
-    }
-  })
-
-  it('persists popup language changes', async () => {
-    render(<PopupApp />)
-    await openPopupSettings()
-
-    const localeCombobox = await screen.findByRole('combobox', { name: 'Language' })
-    fireEvent.click(localeCombobox)
-    fireEvent.click(await screen.findByText('繁中'))
-
-    await waitFor(() => {
-      expect(screen.getByRole('combobox', { name: '語言' })).toHaveTextContent('繁中')
-    })
-  })
-
-  it('persists popup speed changes', async () => {
-    render(<PopupApp />)
-    await openPopupSettings()
-
-    const stepInput = await screen.findByLabelText('Speed adjustment amount')
-    fireEvent.change(stepInput, { target: { value: '0.35' } })
-    fireEvent.blur(stepInput)
-
-    await waitFor(() => expect(stepInput).toHaveValue(0.35))
-  })
-
-  it('persists the popup preferred speed', async () => {
-    render(<PopupApp />)
-    await openPopupSettings()
-
-    const preferredInput = await screen.findByLabelText('Preferred speed')
-    fireEvent.change(preferredInput, { target: { value: '2.25' } })
-    fireEvent.blur(preferredInput)
-
-    await waitFor(() => expect(preferredInput).toHaveValue(2.25))
-  })
-
-  it('persists popup seek second changes', async () => {
-    render(<PopupApp />)
-    await openPopupSettings()
-
-    const seekInput = await screen.findByLabelText('Seconds per seek')
-    fireEvent.change(seekInput, { target: { value: '20' } })
-    fireEvent.blur(seekInput)
-
-    await waitFor(() => expect(seekInput).toHaveValue(20))
-  })
-
   it('opens the full options page', async () => {
     render(<PopupApp />)
 
     const openOptionsButton = await screen.findByRole('button', { name: 'Open options' })
     expect(openOptionsButton).toHaveAttribute('data-variant', 'ghost')
     expect(openOptionsButton).toHaveAttribute('title', 'Open options')
+    expect(screen.getByRole('banner')).toContainElement(openOptionsButton)
     expect(openOptionsButton).toHaveTextContent('')
     expect(openOptionsButton.querySelector('svg')).toBeInTheDocument()
 
@@ -881,6 +811,42 @@ describe('PopupApp', () => {
     expect(screen.queryByText('Compatibility')).not.toBeInTheDocument()
   })
 
+  it.each([false, true])('clears the pending header after readiness recovers (visit diagnostics: %s)', async visitDiagnostics => {
+    vi.useFakeTimers()
+    let requests = 0
+    vi.mocked(chrome.tabs.sendMessage).mockImplementation(
+      (_tabId, _message, optionsOrCallback, maybeCallback) => {
+        const callback = typeof optionsOrCallback === 'function' ? optionsOrCallback : maybeCallback
+        requests += 1
+        callback?.({
+          contentScriptReady: true, settingsLoaded: true, enabled: true, videoFound: true,
+          bridgeReady: true, playerApiFound: true, playerFound: requests > (visitDiagnostics ? 3 : 1), pipSupported: true, pipActive: false,
+        })
+      },
+    )
+    try {
+      render(<PopupApp />)
+      await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+      const header = screen.getByRole('banner')
+      expect(within(header).getByRole('status')).toHaveTextContent('The Netflix player is not ready yet. Retrying automatically…')
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      if (visitDiagnostics) {
+        fireEvent.click(screen.getByRole('button', { name: 'Compatibility' }))
+        await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+        fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' })
+        await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      }
+      await act(async () => { await vi.advanceTimersByTimeAsync(2_000) })
+      expect(within(header).queryByRole('status')).not.toBeInTheDocument()
+      expect(chrome.tabs.sendMessage).toHaveBeenCalledTimes(visitDiagnostics ? 4 : 2)
+      await act(async () => { await vi.advanceTimersByTimeAsync(4_000) })
+      expect(chrome.tabs.sendMessage).toHaveBeenCalledTimes(visitDiagnostics ? 4 : 2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('shows compatibility warnings returned by the Netflix content script', async () => {
     vi.mocked(chrome.tabs.sendMessage).mockImplementation(
       (_tabId, _message, _optionsOrCallback, maybeCallback) => {
@@ -904,7 +870,7 @@ describe('PopupApp', () => {
     render(<PopupApp />)
 
     await openCompatibilityDiagnostics()
-    const retryingStatus = await screen.findByText(
+    const retryingStatus = await within(screen.getByRole('dialog')).findByText(
       'The Netflix player is not ready yet. Retrying automatically…'
     )
     expect(retryingStatus.closest('div')?.querySelector('svg')).toHaveClass('animate-spin')
@@ -933,7 +899,7 @@ describe('PopupApp', () => {
     render(<PopupApp />)
 
     await openCompatibilityDiagnostics()
-    const warningStatus = await screen.findByText('Some playback features may be unavailable.')
+    const warningStatus = await within(screen.getByRole('dialog')).findByText('Some playback features may be unavailable.')
     expect(warningStatus.closest('div')?.querySelector('svg')).not.toHaveClass('animate-spin')
     expect(screen.queryByText(/Retrying automatically/)).not.toBeInTheDocument()
   })
@@ -985,6 +951,7 @@ describe('PopupApp', () => {
     })
     expect(checkingButton).toBeDisabled()
     expect(checkingButton.querySelector('svg')).toHaveClass('animate-spin')
+    expect(within(screen.getByRole('banner')).getByRole('status')).toHaveTextContent('Checking compatibility…')
 
     act(() => {
       resolveDiagnostics?.({
@@ -1001,6 +968,7 @@ describe('PopupApp', () => {
     })
 
     expect(await screen.findByRole('button', { name: 'Compatibility' })).toBeEnabled()
+    expect(within(screen.getByRole('banner')).queryByRole('status')).not.toBeInTheDocument()
   })
 
   it('offers to reload Netflix when the content script is missing', async () => {

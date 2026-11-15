@@ -5,6 +5,8 @@ import {
   type NetflixApiMessage,
 } from '@/shared/netflix-api'
 import { executeNetflixPageApi } from '@/shared/netflix-page-api-executor'
+import { normalizeSubtitleFavorites } from '@/shared/subtitle-favorites'
+import { normalizeAudioFavorites } from '@/shared/audio-favorites'
 import { requestPlaybackFocusRestoration } from '@/background/playback-focus-restoration'
 import { isPlaybackFocusRestorationRequest } from '@/shared/playback-focus-restoration'
 import { registerFeatureAnnouncements } from '@/background/feature-announcements'
@@ -66,7 +68,11 @@ chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse) =>
       target: { tabId },
       world: 'MAIN',
       func: executeNetflixPageApi,
-      args: [apiMessage.action, apiMessage.value],
+      args: apiMessage.action === 'cycleSubtitleTrack'
+        ? [apiMessage.action, apiMessage.value, normalizeSubtitleFavorites(apiMessage.subtitleFavorites)]
+        : apiMessage.action === 'cycleAudioTrack'
+          ? [apiMessage.action, apiMessage.value, [], normalizeAudioFavorites(apiMessage.audioFavorites)]
+          : [apiMessage.action, apiMessage.value],
     })
     .then(injectionResults => sendResponse({ success: true, result: injectionResults[0]?.result }))
     .catch(error =>

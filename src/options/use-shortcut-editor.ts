@@ -1,32 +1,25 @@
 import { useEffect, useRef, useState } from 'react'
 
-import { findSubtitleNavigationConflict } from '@/shared/subtitle-navigation'
+import { applyShortcutAssignment, inspectShortcutAssignment } from '@/shared/shortcut-assignment'
+import { captureShortcutEdit, evaluateShortcutEdit, type ShortcutEditDraft, type ShortcutEditSnapshot } from '@/shared/shortcut-edit'
 import {
-  findBindingConflict,
-  findEnabledBindingConflicts,
   getReplacedNetflixNativeKeyBindings,
+  isShortcutAction,
   keyBindingsEqual,
 } from '@/shared/shortcut-bindings'
-import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
+import { DEFAULT_SETTINGS, normalizeSpeedSettings } from '@/shared/shortcut-settings'
+import { getPreferredSpeed } from '@/shared/preferred-speed-shortcuts'
+import type { ShortcutTarget } from '@/shared/shortcut-routing'
 import {
-  SHORTCUT_ACTIONS,
-  SUBTITLE_NAVIGATION_ACTIONS,
   type KeyBinding,
-  type ShortcutAction,
-  type ShortcutBinding,
   type ShortcutSettings,
-  type SubtitleNavigationAction,
 } from '@/shared/shortcut-types'
 import { subscribeSettings } from '@/shared/storage'
 import type { useShortcutSettingsForm } from '@/shared/use-shortcut-settings-form'
 
-export type ShortcutTarget =
-  | { group: 'general'; action: ShortcutAction }
-  | { group: 'subtitleNavigation'; action: SubtitleNavigationAction }
-
 type BindingRequest = ShortcutTarget & {
-  savedKey: KeyBinding
-  key: KeyBinding
+  savedKey: KeyBinding | null
+  key: KeyBinding | null
   reason: 'enable' | 'reset'
 }
 type RecordingIntent =
@@ -34,8 +27,11 @@ type RecordingIntent =
   | { kind: 'enable'; reason: BindingRequest['reason'] }
 type Recorder = ShortcutTarget & {
   draft: KeyBinding | null
-  savedKey: KeyBinding
+  savedKey: KeyBinding | null
   intent: RecordingIntent
+  snapshot: ShortcutEditSnapshot
+  preferredSpeed?: { saved: number; draft: string }
+  isNewPreferredSpeed?: boolean
 }
 type Editing =
   | { kind: 'idle' }
@@ -43,59 +39,38 @@ type Editing =
   | { kind: 'record'; recorder: Recorder }
 type SettingsForm = ReturnType<typeof useShortcutSettingsForm>
 
+const recorderDraft = (recorder: Recorder): ShortcutEditDraft => ({
+  snapshot: recorder.snapshot,
+  keys: { [recorder.action]: recorder.draft },
+  enabled: recorder.intent.kind === 'enable' ? true : 'preserve',
+  value: recorder.preferredSpeed?.draft,
+  allowSubtitleEnable: recorder.intent.kind === 'enable' && recorder.intent.reason === 'reset',
+})
+
 function applyBindingRequest(
   settings: ShortcutSettings,
   request: BindingRequest,
   enabled: boolean,
-  replaceConflicts: boolean,
-  ignoredActions: readonly ShortcutAction[],
+  transfer: boolean,
+  supportsSubtitlePreservingPip: boolean,
 ): ShortcutSettings {
   if (
     request.group === 'subtitleNavigation' && request.reason === 'enable' && enabled &&
     !settings.subtitleNavigation.bindings[request.action].enabled &&
     (!settings.enabled || !settings.subtitleNavigation.enabled)
   ) return settings
-
-  const update = <Action extends string>(
-    bindings: Record<Action, ShortcutBinding>,
-    actions: readonly Action[],
-    action: Action,
-    ignored: readonly Action[] = [],
-  ) => {
-    if (!keyBindingsEqual(bindings[action].key, request.savedKey)) return bindings
-    const conflicts = findEnabledBindingConflicts(bindings, actions, action, request.key, ignored)
-    if (enabled && conflicts.length && !replaceConflicts) return bindings
-    const next = { ...bindings }
-    if (enabled && replaceConflicts) {
-      for (const conflict of conflicts) {
-        next[conflict] = { ...bindings[conflict], enabled: false }
-      }
-    }
-    next[action] = { key: request.key, enabled }
-    return next
-  }
-
-  if (request.group === 'subtitleNavigation') {
-    return {
-      ...settings,
-      subtitleNavigation: {
-        ...settings.subtitleNavigation,
-        bindings: update(settings.subtitleNavigation.bindings, SUBTITLE_NAVIGATION_ACTIONS, request.action),
-      },
-    }
-  }
-  return {
-    ...settings,
-    bindings: update(settings.bindings, SHORTCUT_ACTIONS, request.action, ignoredActions),
-  }
+  const next = applyShortcutAssignment(settings, [request], { enabled, transfer, supportsSubtitlePreservingPip })
+  return next !== settings && request.reason === 'reset' && request.action === 'setPreferredSpeed'
+    ? { ...next, speed: { ...next.speed, preferred: DEFAULT_SETTINGS.speed.preferred } }
+    : next
 }
 
 export function useShortcutEditor({
   settings,
   updateSettings,
-  ignoredGeneralActions,
+  supportsSubtitlePreservingPip,
 }: Pick<SettingsForm, 'settings' | 'updateSettings'> & {
-  ignoredGeneralActions: readonly ShortcutAction[]
+  supportsSubtitlePreservingPip: boolean
 }) {
   const [editing, setEditing] = useState<Editing>({ kind: 'idle' })
   const recorderReturnFocus = useRef<HTMLButtonElement | null>(null)
@@ -106,9 +81,8 @@ export function useShortcutEditor({
   const bindingFor = (target: ShortcutTarget) => target.group === 'subtitleNavigation'
     ? settings.subtitleNavigation.bindings[target.action]
     : settings.bindings[target.action]
-  const conflictsFor = (target: ShortcutTarget, key: KeyBinding) => target.group === 'subtitleNavigation'
-    ? findEnabledBindingConflicts(settings.subtitleNavigation.bindings, SUBTITLE_NAVIGATION_ACTIONS, target.action, key)
-    : findEnabledBindingConflicts(settings.bindings, SHORTCUT_ACTIONS, target.action, key, ignoredGeneralActions)
+  const conflictsFor = (target: ShortcutTarget, key: KeyBinding | null) =>
+    inspectShortcutAssignment(settings, [{ ...target, key }], { enabled: true, supportsSubtitlePreservingPip })
   const requestEnabled = (
     target: ShortcutTarget,
     enabled: boolean,
@@ -116,44 +90,51 @@ export function useShortcutEditor({
     reason: BindingRequest['reason'] = 'enable',
   ) => {
     const request: BindingRequest = { ...target, savedKey: bindingFor(target).key, key, reason }
-    if (enabled && conflictsFor(target, key).length) {
+    if (enabled && conflictsFor(target, key).conflicts.length) {
       setEditing({ kind: 'confirm', request })
       return
     }
     setEditing({ kind: 'idle' })
-    updateSettings(current => applyBindingRequest(current, request, enabled, false, ignoredGeneralActions))
+    updateSettings(current => applyBindingRequest(current, request, enabled, false, supportsSubtitlePreservingPip))
   }
 
   const request = editing.kind === 'confirm' ? editing.request : null
   const validRequest = request &&
-    keyBindingsEqual(request.savedKey, bindingFor(request).key) &&
+    bindingFor(request) && keyBindingsEqual(request.savedKey, bindingFor(request).key) &&
     (request.group === 'general' || (settings.enabled && (request.reason === 'reset' || settings.subtitleNavigation.enabled)))
     ? request : null
-  const conflict = validRequest ? {
+  const conflictAnalysis = validRequest ? conflictsFor(validRequest, validRequest.key) : null
+  const conflict = validRequest && conflictAnalysis ? {
     group: validRequest.group,
     action: validRequest.action,
     key: validRequest.key,
-    actions: conflictsFor(validRequest, validRequest.key),
+    actions: conflictAnalysis.conflicts,
+    affectedActions: conflictAnalysis.affectedActions,
   } : null
 
-  const recorder = editing.kind === 'record' ? editing.recorder : null
-  const activeConflict = recorder?.draft && (recorder.intent.kind === 'enable' || bindingFor(recorder).enabled)
-    ? recorder.group === 'subtitleNavigation'
-      ? findSubtitleNavigationConflict(settings, recorder.action, recorder.draft)
-      : findBindingConflict(settings, recorder.action, recorder.draft, { ignoredActions: ignoredGeneralActions })
+  const recorder = editing.kind === 'record' && (editing.recorder.isNewPreferredSpeed || bindingFor(editing.recorder)) ? editing.recorder : null
+  const evaluation = recorder ? evaluateShortcutEdit(settings, recorderDraft(recorder), supportsSubtitlePreservingPip) : null
+  const preferredSpeedStale = Boolean(recorder?.preferredSpeed && evaluation?.stale)
+  const activeConflict = recorder?.draft && (recorder.isNewPreferredSpeed || recorder.intent.kind === 'enable' || bindingFor(recorder)?.enabled)
+    ? conflictsFor(recorder, recorder.draft).conflicts[0] ?? null
     : null
-  const canSaveDraft = Boolean(
-    recorder?.draft && !activeConflict && (
-      recorder.group === 'general' || (settings.enabled && (
+  const validDraft = Boolean(
+    recorder && !activeConflict && !preferredSpeedStale && (
+      recorder?.group === 'general' || (settings.enabled && recorder && (
         recorder.intent.kind === 'preserve-enabled' ||
         recorder.intent.reason === 'reset' ||
         settings.subtitleNavigation.enabled
       ))
     )
   )
-  const canRestoreDraft = Boolean(recorder?.draft && !keyBindingsEqual(recorder.draft, recorder.savedKey))
+  const storageFull = validDraft && (evaluation?.storageFull ?? false)
+  const canSaveDraft = validDraft && Boolean(evaluation?.canSave)
+  const canRestoreDraft = Boolean(recorder && (
+    !keyBindingsEqual(recorder.draft, recorder.savedKey) ||
+    (recorder.preferredSpeed && recorder.preferredSpeed.draft !== String(recorder.preferredSpeed.saved))
+  ))
   const replacedNetflixKeys = recorder?.draft && !activeConflict && recorder.group === 'general'
-    ? getReplacedNetflixNativeKeyBindings(recorder.action, { ...settings.bindings[recorder.action], key: recorder.draft })
+    ? getReplacedNetflixNativeKeyBindings(recorder.action, { enabled: settings.bindings[recorder.action]?.enabled ?? true, key: recorder.draft })
     : []
 
   return {
@@ -165,49 +146,83 @@ export function useShortcutEditor({
       canSaveDraft,
       canRestoreDraft,
       replacedNetflixKeys,
+      preferredSpeed: recorder.preferredSpeed?.draft,
+      preferredSpeedStale,
+      storageFull,
     },
     setBindingEnabled: (target: ShortcutTarget, enabled: boolean) => requestEnabled(target, enabled),
     resetBinding: (target: ShortcutTarget) => {
+      if (target.group === 'general' && !isShortcutAction(target.action)) return
       const binding = target.group === 'subtitleNavigation'
         ? DEFAULT_SETTINGS.subtitleNavigation.bindings[target.action] : DEFAULT_SETTINGS.bindings[target.action]
       requestEnabled(target, binding.enabled, binding.key, 'reset')
     },
-    edit: (target: ShortcutTarget) => {
+    edit: (target: ShortcutTarget, returnFocus?: HTMLButtonElement) => {
       const savedKey = bindingFor(target).key
+      const speed = target.group === 'general' ? getPreferredSpeed(settings, target.action) : undefined
+      recorderReturnFocus.current = returnFocus ?? null
       setEditing({
         kind: 'record',
-        recorder: { ...target, savedKey, draft: savedKey, intent: { kind: 'preserve-enabled' } },
+        recorder: { ...target, savedKey, draft: savedKey, intent: { kind: 'preserve-enabled' },
+          snapshot: captureShortcutEdit(settings, speed !== undefined && target.group === 'general'
+            ? { kind: 'preferredSpeed', action: target.action as 'setPreferredSpeed' | `preferred-speed:${string}` }
+            : { kind: 'binding', target }),
+          ...(speed !== undefined ? { preferredSpeed: { saved: speed, draft: String(speed) } } : {}) },
       })
+    },
+    addPreferredSpeed: (returnFocus: HTMLButtonElement) => {
+      recorderReturnFocus.current = returnFocus
+      const action = `preferred-speed:${crypto.randomUUID()}` as const
+      setEditing({ kind: 'record', recorder: { group: 'general', action,
+        snapshot: captureShortcutEdit(settings, { kind: 'preferredSpeed', action, isNew: true }),
+        savedKey: null, draft: null, intent: { kind: 'enable', reason: 'enable' }, isNewPreferredSpeed: true,
+        preferredSpeed: { saved: DEFAULT_SETTINGS.speed.preferred, draft: String(DEFAULT_SETTINGS.speed.preferred) } } })
     },
     dismissConflict: () => setEditing(current => current.kind === 'confirm' ? { kind: 'idle' } : current),
     changeConflictKey: (returnFocus: HTMLButtonElement | null) => {
       if (!validRequest) return
       const { key, reason, ...target } = validRequest
+      const speed = target.group === 'general' ? getPreferredSpeed(settings, target.action) : undefined
       recorderReturnFocus.current = returnFocus
       setEditing({
         kind: 'record',
-        recorder: { ...target, draft: key, intent: { kind: 'enable', reason } },
+        recorder: { ...target, draft: key, intent: { kind: 'enable', reason },
+          snapshot: captureShortcutEdit(settings, speed !== undefined && target.group === 'general'
+            ? { kind: 'preferredSpeed', action: target.action as 'setPreferredSpeed' | `preferred-speed:${string}` }
+            : { kind: 'binding', target }),
+          ...(speed !== undefined ? { preferredSpeed: { saved: speed,
+            draft: String(reason === 'reset' ? DEFAULT_SETTINGS.speed.preferred : speed) } } : {}) },
       })
     },
     confirmTransfer: () => {
       if (!validRequest) return
       setEditing({ kind: 'idle' })
-      updateSettings(current => applyBindingRequest(current, validRequest, true, true, ignoredGeneralActions))
+      updateSettings(current => applyBindingRequest(current, validRequest, true, true, supportsSubtitlePreservingPip))
     },
-    capture: (draft: KeyBinding) => setEditing(current => current.kind === 'record'
-      ? { ...current, recorder: { ...current.recorder, draft } } : current),
-    restoreSavedDraft: () => setEditing(current => current.kind === 'record'
-      ? { ...current, recorder: { ...current.recorder, draft: current.recorder.savedKey } } : current),
+    capture: (draft: KeyBinding | null) => setEditing(current => {
+      if (current.kind === 'record') return { ...current, recorder: { ...current.recorder, draft } }
+      return current
+    }),
+    setPreferredSpeed: (draft: string) => setEditing(current => {
+      if (current.kind !== 'record' || !current.recorder.preferredSpeed) return current
+      return { ...current, recorder: { ...current.recorder, preferredSpeed: { ...current.recorder.preferredSpeed, draft } } }
+    }),
+    normalizePreferredSpeed: () => setEditing(current => {
+      if (current.kind !== 'record' || !current.recorder.preferredSpeed) return current
+      const { saved, draft } = current.recorder.preferredSpeed
+      const value = draft.trim() && Number.isFinite(Number(draft)) ? Number(draft) : saved
+      return { ...current, recorder: { ...current.recorder, preferredSpeed: {
+        ...current.recorder.preferredSpeed, draft: String(normalizeSpeedSettings({ ...settings.speed, preferred: value }).preferred),
+      } } }
+    }),
+    restoreSavedDraft: () => setEditing(current => {
+      if (current.kind === 'record') return { ...current, recorder: { ...current.recorder, draft: current.recorder.savedKey,
+        ...(current.recorder.preferredSpeed ? { preferredSpeed: { ...current.recorder.preferredSpeed, draft: String(current.recorder.preferredSpeed.saved) } } : {}) } }
+      return current
+    }),
     saveDraft: () => {
-      if (!recorder?.draft || !canSaveDraft) return
-      const { draft, intent, ...target } = recorder
-      const request: BindingRequest = {
-        ...target,
-        key: draft,
-        reason: intent.kind === 'enable' ? intent.reason : 'enable',
-      }
-      const enabled = intent.kind === 'enable' || bindingFor(recorder).enabled
-      updateSettings(current => applyBindingRequest(current, request, enabled, false, ignoredGeneralActions))
+      if (!recorder || !canSaveDraft) return
+      updateSettings(current => evaluateShortcutEdit(current, recorderDraft(recorder), supportsSubtitlePreservingPip).settings)
       setEditing({ kind: 'idle' })
     },
     closeRecorder: () => setEditing(current => current.kind === 'record' ? { kind: 'idle' } : current),
@@ -217,6 +232,7 @@ export function useShortcutEditor({
       if (!target) return
       event.preventDefault()
       if (target.isConnected && !target.disabled) target.focus()
+      else document.getElementById('shortcut-search')?.focus()
     },
   }
 }

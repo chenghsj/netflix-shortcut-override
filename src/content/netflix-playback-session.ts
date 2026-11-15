@@ -1,4 +1,6 @@
 import type { NetflixApiAction, NetflixApiResponse } from '@/shared/netflix-api'
+import type { SubtitleFavorite } from '@/shared/subtitle-favorites'
+import type { AudioFavorite } from '@/shared/audio-favorites'
 import {
   clampNetflixVolume,
   DEFAULT_NETFLIX_VOLUME,
@@ -9,12 +11,29 @@ import { sendNetflixApi } from './netflix-api-client'
 
 export type NetflixPlaybackTransport = (
   action: NetflixApiAction,
-  value?: number
+  value?: number,
+  subtitleFavorites?: readonly SubtitleFavorite[],
+  audioFavorites?: readonly AudioFavorite[]
 ) => Promise<NetflixApiResponse>
 
 export type PlaybackCommandResult = {
   response: NetflixApiResponse
   failureLabel: string | null
+}
+
+// A null state carries no confirmation (failure or a read superseded by a
+// successful subtitle command). Callers never need to inspect transport payloads.
+export type PlaybackSubtitleResult = {
+  subtitlesEnabled: boolean | null
+  failureLabel: string | null
+  track: { name?: string; language?: string; isClosedCaption: boolean }
+  noTracksAvailable: boolean
+}
+
+export type PlaybackAudioResult = {
+  failureLabel: string | null
+  track: { name?: string; language?: string; isAudioDescription?: boolean }
+  noTracksAvailable: boolean
 }
 
 export type PlaybackVolumeState = {
@@ -27,16 +46,23 @@ export type PlaybackVolumeCommand = PlaybackVolumeState & {
 }
 
 export type NetflixPlaybackSession = {
+  cancelPendingPlayback: () => void
   togglePlayback: (video: HTMLVideoElement) => Promise<PlaybackCommandResult>
   play: (video: HTMLVideoElement) => Promise<PlaybackCommandResult>
   pause: (video: HTMLVideoElement) => Promise<PlaybackCommandResult>
   seekBy: (milliseconds: number) => Promise<PlaybackCommandResult>
-  seekTo: (milliseconds: number) => Promise<PlaybackCommandResult>
+  stepFrame: (direction: -1 | 1) => Promise<PlaybackCommandResult>
+  cycleAudioTrack: (direction: -1 | 1, isAvailable?: () => boolean, favorites?: readonly AudioFavorite[]) => Promise<PlaybackAudioResult>
+  seekTo: (milliseconds: number, playback?: {
+    video: HTMLVideoElement
+    isCurrent: () => boolean
+  }) => Promise<PlaybackCommandResult>
   setVolume: (video: HTMLVideoElement, volume: number) => PlaybackVolumeCommand
   adjustVolume: (video: HTMLVideoElement, delta: number) => PlaybackVolumeCommand
   toggleMute: (video: HTMLVideoElement) => PlaybackVolumeCommand
-  getSubtitleState: () => Promise<PlaybackCommandResult>
-  toggleSubtitles: () => Promise<PlaybackCommandResult>
+  getSubtitleState: () => Promise<PlaybackSubtitleResult>
+  toggleSubtitles: () => Promise<PlaybackSubtitleResult>
+  cycleSubtitleTrack: (favorites?: readonly SubtitleFavorite[], direction?: -1 | 1, isAvailable?: () => boolean) => Promise<PlaybackSubtitleResult>
   setPlaybackRate: (
     video: HTMLVideoElement,
     rate: number
@@ -81,9 +107,15 @@ const getCommandFailureLabel = (
   action: NetflixApiAction,
   response: NetflixApiResponse
 ): string | null => {
-  if (action === 'seek' || action === 'seekTo') return getSeekFailureLabel(response)
+  if (action === 'seek' || action === 'seekTo' || action === 'stepFrame') return getSeekFailureLabel(response)
   if (!response.success) return `${action} failed: ${response.error ?? 'background error'}`
   if (response.result?.error) return `${action} failed: ${response.result.error}`
+  if (action === 'cycleAudioTrack' && !response.result?.audioTrackSwitchCalled && !response.result?.audioCycleOutcome) {
+    return 'cycleAudioTrack failed: no audio track selection'
+  }
+  if (action === 'cycleSubtitleTrack' && response.result?.subtitleCycleOutcome === 'no-tracks-available') {
+    return null
+  }
   if (action === 'setPlaybackRate') {
     if (response.result?.playerApiFound === false) {
       return 'setPlaybackRate failed: no Netflix API'
@@ -93,12 +125,12 @@ const getCommandFailureLabel = (
     }
   }
   if (
-    action === 'getSubtitleState' &&
+    (action === 'getSubtitleState' || action === 'cycleSubtitleTrack') &&
     typeof response.result?.subtitlesEnabled !== 'boolean'
   ) {
-    if (response.result?.playerApiFound === false) return 'getSubtitleState failed: no Netflix API'
-    if (response.result?.playerFound === false) return 'getSubtitleState failed: no Netflix player'
-    return 'getSubtitleState failed: no subtitle state'
+    if (response.result?.playerApiFound === false) return `${action} failed: no Netflix API`
+    if (response.result?.playerFound === false) return `${action} failed: no Netflix player`
+    return `${action} failed: no subtitle state`
   }
   if (action === 'toggleSubtitles' && response.result?.subtitleToggleCalled !== true) {
     if (response.result?.playerApiFound === false) return 'toggleSubtitles failed: no Netflix API'
@@ -124,18 +156,22 @@ const combineCommandResults = (
 export const createNetflixPlaybackSession = (
   transport: NetflixPlaybackTransport = sendNetflixApi
 ): NetflixPlaybackSession => {
-  let subtitleToggleQueue: Promise<PlaybackCommandResult> | null = null
+  let subtitleCommandQueue: Promise<PlaybackSubtitleResult> | null = null
+  let audioCommandQueue: Promise<PlaybackAudioResult> | null = null
+  let subtitleConfirmation = 0
+  let playbackIntent = 0
 
   const execute = async (
     action: NetflixApiAction,
-    value?: number
+    value?: number,
+    subtitleFavorites?: readonly SubtitleFavorite[],
+    audioFavorites?: readonly AudioFavorite[]
   ): Promise<PlaybackCommandResult> => {
     let response: NetflixApiResponse
     try {
-      response =
-        value === undefined
-          ? await transport(action)
-          : await transport(action, value)
+      if (audioFavorites?.length) response = await transport(action, value, undefined, audioFavorites)
+      else if (subtitleFavorites?.length) response = await transport(action, value, subtitleFavorites)
+      else response = value === undefined ? await transport(action) : await transport(action, value)
     } catch (error) {
       response = {
         success: false,
@@ -149,27 +185,53 @@ export const createNetflixPlaybackSession = (
     }
   }
 
-  const toggleSubtitles = (): Promise<PlaybackCommandResult> => {
-    const request = subtitleToggleQueue
-      ? subtitleToggleQueue.then(
-          () => execute('toggleSubtitles'),
-          () => execute('toggleSubtitles')
-        )
-      : execute('toggleSubtitles')
-    subtitleToggleQueue = request
+  const executeSubtitle = async (
+    action: 'getSubtitleState' | 'toggleSubtitles' | 'cycleSubtitleTrack',
+    value?: number,
+    favorites?: readonly SubtitleFavorite[],
+  ): Promise<PlaybackSubtitleResult> => {
+    const { response, failureLabel } = await execute(action, value, favorites)
+    const result = response.result
+    const enabled = result?.subtitlesEnabled
+    const confirmed = !failureLabel && typeof enabled === 'boolean'
+    const noTracksAvailable = result?.subtitleCycleOutcome === 'no-tracks-available'
+    return {
+      subtitlesEnabled: confirmed ? enabled : null,
+      failureLabel: failureLabel ?? (confirmed || noTracksAvailable ? null : 'Unable to toggle subtitles'),
+      track: {
+        name: result?.subtitleTrack,
+        language: result?.subtitleTrackLanguage,
+        isClosedCaption: result?.subtitleTrackIsClosedCaption === true,
+      },
+      noTracksAvailable,
+    }
+  }
+
+  const queueSubtitleCommand = (
+    run: () => Promise<PlaybackSubtitleResult>
+  ): Promise<PlaybackSubtitleResult> => {
+    const confirm = async () => {
+      const result = await run()
+      if (result.subtitlesEnabled !== null) subtitleConfirmation += 1
+      return result
+    }
+    const request = subtitleCommandQueue ? subtitleCommandQueue.then(confirm, confirm) : confirm()
+    subtitleCommandQueue = request
     const clearCompletedRequest = () => {
-      if (subtitleToggleQueue === request) subtitleToggleQueue = null
+      if (subtitleCommandQueue === request) subtitleCommandQueue = null
     }
     void request.then(clearCompletedRequest, clearCompletedRequest)
     return request
   }
 
   const play = (video: HTMLVideoElement): Promise<PlaybackCommandResult> => {
+    playbackIntent += 1
     void video.play().catch(() => undefined)
     return execute('play')
   }
 
   const pause = (video: HTMLVideoElement): Promise<PlaybackCommandResult> => {
+    playbackIntent += 1
     video.pause()
     return execute('pause')
   }
@@ -201,11 +263,48 @@ export const createNetflixPlaybackSession = (
   }
 
   return {
+    cancelPendingPlayback: () => { playbackIntent += 1 },
     togglePlayback: video => (video.paused ? play(video) : pause(video)),
     play,
     pause,
-    seekBy: milliseconds => execute('seek', milliseconds),
-    seekTo: milliseconds => execute('seekTo', milliseconds),
+    seekBy: milliseconds => {
+      playbackIntent += 1
+      return execute('seek', milliseconds)
+    },
+    stepFrame: direction => {
+      playbackIntent += 1
+      return execute('stepFrame', direction)
+    },
+    cycleAudioTrack: (direction, isAvailable = () => true, favorites) => {
+      const run = async (): Promise<PlaybackAudioResult> => {
+        if (!isAvailable()) return { failureLabel: null, track: {}, noTracksAvailable: false }
+        const { response, failureLabel } = await execute('cycleAudioTrack', direction, undefined, favorites)
+        return {
+          failureLabel,
+          track: {
+            name: response.result?.audioTrack,
+            language: response.result?.audioTrackLanguage,
+            isAudioDescription: response.result?.audioTrackIsAudioDescription === true,
+          },
+          noTracksAvailable: response.result?.audioCycleOutcome === 'no-tracks-available',
+        }
+      }
+      const request = audioCommandQueue ? audioCommandQueue.then(run, run) : run()
+      audioCommandQueue = request
+      void request.then(() => { if (audioCommandQueue === request) audioCommandQueue = null })
+      return request
+    },
+    seekTo: async (milliseconds, playback) => {
+      const intent = ++playbackIntent
+      const shouldResume = playback && (playback.video.ended || !playback.video.paused)
+      const result = await execute('seekTo', milliseconds)
+      // The session owns transport intent across keyboard and PiP entry points.
+      // A view only supplies its lifetime; it never decides when to send play.
+      if (!result.failureLabel && shouldResume && intent === playbackIntent && playback.isCurrent()) {
+        return play(playback.video)
+      }
+      return result
+    },
     setVolume: (video, volume) => {
       const nextVolume = clampNetflixVolume(volume)
       const previousVolume = clampNetflixVolume(video.volume)
@@ -258,8 +357,18 @@ export const createNetflixPlaybackSession = (
       mirrorAudioState(video, { muted: true })
       return { volume: clampNetflixVolume(video.volume), muted: true, completion }
     },
-    getSubtitleState: () => execute('getSubtitleState'),
-    toggleSubtitles,
+    getSubtitleState: async () => {
+      const confirmation = subtitleConfirmation
+      const result = await executeSubtitle('getSubtitleState')
+      // Confirmation belongs to the playback session, not a PiP view. A late
+      // initial read cannot replace a newer toggle or track-switch result.
+      return confirmation === subtitleConfirmation ? result : { ...result, subtitlesEnabled: null }
+    },
+    toggleSubtitles: () => queueSubtitleCommand(() => executeSubtitle('toggleSubtitles')),
+    cycleSubtitleTrack: (favorites, direction = 1, isAvailable = () => true) =>
+      queueSubtitleCommand(async () => isAvailable()
+        ? executeSubtitle('cycleSubtitleTrack', direction === -1 ? -1 : undefined, favorites)
+        : { subtitlesEnabled: null, failureLabel: null, track: { isClosedCaption: false }, noTracksAvailable: false }),
     setPlaybackRate: (video, rate) => {
       video.playbackRate = rate
       video.defaultPlaybackRate = rate

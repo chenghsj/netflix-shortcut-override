@@ -1,3 +1,5 @@
+import type { AutoSkipSettings } from '@/shared/shortcut-types'
+
 export const interceptShortcutEvent = (event: KeyboardEvent) => {
   event.preventDefault()
   event.stopPropagation()
@@ -66,32 +68,31 @@ export const findVideo = (targetDoc: Document): HTMLVideoElement | null => {
   return targetDoc === document ? null : findVisiblePlaybackVideo(document)
 }
 
-const skipIntroSelector = [
-  '[data-uia*="skip-intro" i]',
-  '[data-uia*="skip-recap" i]',
-  '[data-uia*="skip-credits" i]',
-  '[aria-label*="skip intro" i]',
-  '[aria-label*="skip recap" i]',
-  '[aria-label*="skip credits" i]',
-  '[aria-label*="略過片頭"]',
-  '[aria-label*="跳過片頭"]',
-  '[aria-label*="跳过片头"]',
-  '[aria-label*="略過介紹"]',
-  '[aria-label*="跳過介紹"]',
-  '[aria-label*="跳过介绍"]',
-  '[aria-label*="略過前情提要"]',
-  '[aria-label*="跳過前情提要"]',
-  '[aria-label*="跳过前情提要"]',
-  '[aria-label*="前回までのあらすじをスキップ"]',
-  '[aria-label*="あらすじをスキップ"]',
-  '[aria-label*="オープニングをスキップ"]',
-  '[aria-label*="イントロをスキップ"]',
-  '[aria-label*="줄거리 건너뛰기"]',
-  '[aria-label*="인트로 건너뛰기"]',
-].join(', ')
-
-const skipIntroText =
-  /skip\s+(intro|recap|opening|credits)|略過片頭|跳過片頭|跳过片头|略過介紹|跳過介紹|跳过介绍|略過前情提要|跳過前情提要|跳过前情提要|前回までのあらすじをスキップ|あらすじをスキップ|オープニングをスキップ|イントロをスキップ|줄거리 건너뛰기|건너뛰기|인트로 건너뛰기/i
+// A recap can use the intro marker. A more specific label wins.
+const skipButtonKinds = ['credits', 'recap', 'intro'] as const
+const skipButtonLabels = {
+  intro: [
+    'skip intro', '略過片頭', '跳過片頭', '跳过片头', '略過介紹', '跳過介紹', '跳过介绍',
+    'オープニングをスキップ', 'イントロをスキップ', '인트로 건너뛰기',
+  ],
+  recap: [
+    'skip recap', '略過前情提要', '跳過前情提要', '跳过前情提要',
+    '前回までのあらすじをスキップ', 'あらすじをスキップ', '줄거리 건너뛰기',
+  ],
+  credits: ['skip credits'],
+}
+const skipButtonMarker = (kind: typeof skipButtonKinds[number]) => `skip-${kind}`
+const skipButtonSelector = skipButtonKinds.flatMap(kind => [
+  `[data-uia*="${skipButtonMarker(kind)}" i]`,
+  ...skipButtonLabels[kind].map(label => `[aria-label*="${label}" i]`),
+]).join(', ')
+const skipButtonText = new RegExp(
+  [...Object.values(skipButtonLabels).flat(), 'skip opening', '건너뛰기']
+    .map(label => label.startsWith('skip ') ? label.replace(' ', '\\s+') : label)
+    .join('|'),
+  'i'
+)
+const buttonSelector = 'button, [role="button"]'
 
 const isVisibleElement = (element: HTMLElement): boolean => {
   const rect = element.getBoundingClientRect()
@@ -129,18 +130,51 @@ export const canHandlePlaybackShortcut = (targetDoc: Document): boolean =>
 export const findSkipIntroButton = (targetDoc: Document): HTMLElement | null => {
   const docs = targetDoc === document ? [targetDoc] : [targetDoc, document]
   for (const doc of docs) {
-    const selectorMatch = Array.from(doc.querySelectorAll<HTMLElement>(skipIntroSelector)).find(
+    const selectorMatch = Array.from(doc.querySelectorAll<HTMLElement>(skipButtonSelector)).find(
       isVisibleElement
     )
     if (selectorMatch) return selectorMatch
 
-    const textMatch = Array.from(doc.querySelectorAll<HTMLElement>('button, [role="button"]')).find(
-      element => isVisibleElement(element) && skipIntroText.test(element.textContent ?? '')
+    const textMatch = Array.from(doc.querySelectorAll<HTMLElement>(buttonSelector)).find(
+      element => isVisibleElement(element) && skipButtonText.test(element.textContent ?? '')
     )
     if (textMatch) return textMatch
   }
   return null
 }
+
+export const findAutoSkipButton = (
+  targetDoc: Document,
+  enabled: AutoSkipSettings
+): { button: HTMLElement; kind: keyof AutoSkipSettings } | null => {
+  for (const button of targetDoc.querySelectorAll<HTMLElement>(buttonSelector)) {
+    const marker = button.getAttribute('data-uia')?.toLowerCase() ?? ''
+    const labels = [button.getAttribute('aria-label'), button.textContent].map(
+      label => label?.trim().replace(/\s+/g, ' ').toLowerCase() ?? ''
+    )
+    const kind = skipButtonKinds.find(kind =>
+      marker.includes(skipButtonMarker(kind)) || labels.some(label => skipButtonLabels[kind].includes(label))
+    )
+    if (!kind || kind === 'credits' || !enabled[kind]) continue
+    if (
+      button.matches(':disabled, [aria-disabled="true"]') ||
+      button.closest('[hidden], [aria-hidden="true"], [inert]') ||
+      !isVisibleElement(button)
+    ) continue
+
+    return { button, kind }
+  }
+  return null
+}
+
+export const findAutoNextEpisodeButton = (targetDoc: Document): HTMLElement | null =>
+  Array.from(targetDoc.querySelectorAll<HTMLElement>(
+    '[data-uia="next-episode-seamless-button"], [data-uia="next-episode-seamless-button-draining"]'
+  )).find(button =>
+    !button.matches(':disabled, [aria-disabled="true"]') &&
+    !button.closest('[hidden], [aria-hidden="true"], [inert]') &&
+    isVisibleElement(button)
+  ) ?? null
 
 export const toggleFullscreen = (targetDoc: Document) => {
   if (targetDoc.fullscreenElement) {

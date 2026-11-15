@@ -1,3 +1,4 @@
+import { subtitleSizeFromPercent, subtitleSizePercent } from '@/shared/subtitle-size-shortcuts'
 import type { PipControlsCopy } from '@/shared/i18n'
 import type { PipSettings } from '@/shared/shortcut-types'
 
@@ -94,7 +95,7 @@ const createMenuElement = (doc: Document): HTMLElement => {
   mainPanel.append(headingRow, navList)
   menu.append(
     mainPanel,
-    createOptionsPanel(doc, 'size', ['small', 'medium', 'large'], 'pipSubtitleSize'),
+    createOptionsPanel(doc, 'size', ['small', 'medium', 'large', 'custom'], 'pipSubtitleSize'),
     createOptionsPanel(
       doc,
       'background',
@@ -152,7 +153,7 @@ class PipSubtitleMenu {
       '[data-pip-subtitle-size]'
     )) {
       this.listen(radio, 'change', () => {
-        if (!radio.checked) return
+        if (!radio.checked || radio.value === 'custom') return
         this.emitSettings({
           ...this.settings,
           subtitleSize: radio.value as PipSettings['subtitleSize'],
@@ -234,6 +235,8 @@ class PipSubtitleMenu {
       medium: copy.subtitleMedium,
       large: copy.subtitleLarge,
     }
+    const sizeLabel = typeof settings.subtitleSize === 'number' ? `${settings.subtitleSize}%` : sizeLabels[settings.subtitleSize]
+    const customSize = typeof settings.subtitleSize === 'number' && ![80, 100, 125].includes(settings.subtitleSize)
     const backgroundLabels = {
       none: copy.subtitleBackgroundNone,
       translucent: copy.subtitleBackgroundTranslucent,
@@ -252,12 +255,12 @@ class PipSubtitleMenu {
       '[data-pip-subtitle-nav-value="background"]'
     )
     if (sizeNavLabel) sizeNavLabel.textContent = copy.subtitleFontSize
-    if (sizeNavValue) sizeNavValue.textContent = sizeLabels[settings.subtitleSize]
+    if (sizeNavValue) sizeNavValue.textContent = sizeLabel
     if (backgroundNavLabel) backgroundNavLabel.textContent = copy.subtitleBackground
     if (backgroundNavValue) {
       backgroundNavValue.textContent = backgroundLabels[settings.subtitleBackground]
     }
-    sizeNav?.setAttribute('aria-label', `${copy.subtitleFontSize}: ${sizeLabels[settings.subtitleSize]}`)
+    sizeNav?.setAttribute('aria-label', `${copy.subtitleFontSize}: ${sizeLabel}`)
     backgroundNav?.setAttribute(
       'aria-label',
       `${copy.subtitleBackground}: ${backgroundLabels[settings.subtitleBackground]}`
@@ -281,10 +284,18 @@ class PipSubtitleMenu {
       const radio = menu.querySelector<HTMLInputElement>(`[data-pip-subtitle-size="${size}"]`)
       if (label) label.textContent = sizeLabels[size]
       if (radio) {
-        radio.checked = settings.subtitleSize === size
+        radio.checked = subtitleSizePercent(settings.subtitleSize) === subtitleSizePercent(size)
         radio.setAttribute('aria-label', sizeLabels[size])
       }
     }
+    const customRadio = menu.querySelector<HTMLInputElement>('[data-pip-subtitle-size="custom"]')
+    const customLabel = menu.querySelector<HTMLElement>('[data-pip-subtitle-size-label="custom"]')
+    if (customRadio) {
+      customRadio.checked = customSize
+      customRadio.setAttribute('aria-label', sizeLabel)
+      customRadio.closest('label')!.hidden = !customSize
+    }
+    if (customLabel) customLabel.textContent = sizeLabel
     for (const background of ['none', 'translucent', 'dark'] as const) {
       const label = menu.querySelector<HTMLElement>(
         `[data-pip-subtitle-background-label="${background}"]`
@@ -323,6 +334,7 @@ class PipSubtitleMenu {
       ).toString()
     }
     if (!restoreFocus) return
+    const sizePreset = subtitleSizeFromPercent(subtitleSizePercent(this.settings.subtitleSize))
     const focusTarget =
       panel === 'main'
         ? this.element.querySelector<HTMLButtonElement>(
@@ -330,7 +342,7 @@ class PipSubtitleMenu {
           )
         : this.element.querySelector<HTMLInputElement>(
             panel === 'size'
-              ? `[data-pip-subtitle-size="${this.settings.subtitleSize}"]`
+              ? `[data-pip-subtitle-size="${typeof sizePreset === 'number' ? 'custom' : sizePreset}"]`
               : `[data-pip-subtitle-background="${this.settings.subtitleBackground}"]`
           )
     focusTarget?.focus({ preventScroll: true })

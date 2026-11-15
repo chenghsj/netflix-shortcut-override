@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 
 import {
   findActionForKey,
-  findBindingConflict,
   findRemappedNetflixNativeActionForKey,
   formatKeyBinding,
   getKeyBindingLabels,
@@ -11,46 +10,6 @@ import {
 import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
 
 describe('shortcut bindings', () => {
-  it('detects duplicate keybindings', () => {
-    const conflict = findBindingConflict(
-      DEFAULT_SETTINGS,
-      'seekForward',
-      DEFAULT_SETTINGS.bindings.seekBackward.key
-    )
-
-    expect(conflict).toBe('seekBackward')
-  })
-
-  it('releases keys belonging to disabled bindings', () => {
-    const conflict = findBindingConflict(
-      {
-        ...DEFAULT_SETTINGS,
-        bindings: {
-          ...DEFAULT_SETTINGS.bindings,
-          playPause: {
-            ...DEFAULT_SETTINGS.bindings.playPause,
-            enabled: false,
-          },
-        },
-      },
-      'seekForward',
-      DEFAULT_SETTINGS.bindings.playPause.key
-    )
-
-    expect(conflict).toBeNull()
-  })
-
-  it('can ignore browser-unsupported actions when checking conflicts', () => {
-    const conflict = findBindingConflict(
-      DEFAULT_SETTINGS,
-      'playPause',
-      DEFAULT_SETTINGS.bindings.pictureInPicture.key,
-      { ignoredActions: ['pictureInPicture'] }
-    )
-
-    expect(conflict).toBeNull()
-  })
-
   it('identifies original Netflix keys for enabled actions that have been remapped', () => {
     const settings = {
       ...DEFAULT_SETTINGS,

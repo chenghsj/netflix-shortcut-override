@@ -54,8 +54,7 @@ export type PipControlsOptions = {
   pipWindow: Window
   video: HTMLVideoElement
   videoArea: HTMLElement
-  seekTo: (milliseconds: number) => Promise<PlaybackCommandResult>
-  resumeAfterSeek?: () => Promise<PlaybackCommandResult>
+  seekTo: (milliseconds: number, isCurrent: () => boolean) => Promise<PlaybackCommandResult>
   onVisibilityChange?: (visible: boolean) => void
   settings?: PipControlsSettings
   onAction?: (action: PipControlAction) => void
@@ -397,6 +396,7 @@ const STYLE_TEXT = `
   padding: 4px;
   cursor: pointer;
 }
+[data-pip-control="subtitle-option"][hidden] { display: none; }
 [data-pip-control="subtitle-option"] input {
   appearance: none;
   display: grid;
@@ -453,7 +453,6 @@ export class PipControls {
   private readonly video: HTMLVideoElement
   private readonly videoArea: HTMLElement
   private readonly seekTo: PipControlsOptions['seekTo']
-  private readonly resumeAfterSeek: PipControlsOptions['resumeAfterSeek']
   private readonly onVisibilityChange: PipControlsOptions['onVisibilityChange']
   private readonly onAction: PipControlsOptions['onAction']
   private readonly onVolumeChange: PipControlsOptions['onVolumeChange']
@@ -482,7 +481,6 @@ export class PipControls {
     this.video = options.video
     this.videoArea = options.videoArea
     this.seekTo = options.seekTo
-    this.resumeAfterSeek = options.resumeAfterSeek
     this.onVisibilityChange = options.onVisibilityChange
     this.onAction = options.onAction
     this.onVolumeChange = options.onVolumeChange
@@ -596,7 +594,6 @@ export class PipControls {
       currentTimeLabel,
       durationLabel,
       seekTo: this.seekTo,
-      resumeAfterSeek: this.resumeAfterSeek,
       onReveal: () => this.revealControls(),
       onError: message => this.showError(message),
     })

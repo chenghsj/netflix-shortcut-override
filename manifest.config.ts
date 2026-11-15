@@ -13,6 +13,7 @@ export default defineManifest(({ command, mode }) => {
     name: `__MSG_extensionName__${isDev ? devSuffix : ''}`,
     short_name: `Shortcut NF${isDev ? devSuffix : ''}`,
     version: packageJson.version,
+    ...(!isFirefox ? { minimum_chrome_version: '111' } : {}),
     default_locale: 'en',
     description: '__MSG_extensionDescription__',
     icons: {
@@ -65,6 +66,7 @@ export default defineManifest(({ command, mode }) => {
           browser_specific_settings: {
             gecko: {
               id: 'shortcut-override-for-netflix@chengjj',
+              strict_min_version: '128.0',
               data_collection_permissions: {
                 required: ['none'] as ['none'],
               },

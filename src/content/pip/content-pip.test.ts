@@ -37,6 +37,77 @@ const createDocumentPipFixture = () => {
 describe('content PiP shortcuts', () => {
   setupContentIndexTests()
 
+  it('cycles PiP sizes in the saved custom order without changing regular playback', async () => {
+    const { pipWindow, cleanup } = createDocumentPipFixture()
+    try {
+      await saveSettings({ ...DEFAULT_SETTINGS, subtitleSize: 175, subtitleSizeCycle: [150, 100, 200] })
+      document.body.append(document.createElement('video'))
+      window.dispatchEvent(new KeyboardEvent('keydown', {
+        code: 'KeyP', key: 'P', shiftKey: true, bubbles: true, cancelable: true,
+      }))
+      await vi.waitFor(() => expect(pipWindow.document.querySelector('[data-pip-control="subtitles-button"]')).not.toBeNull())
+      for (const size of [200, 150, 'medium', 200] as const) {
+        pipWindow.document.body.dispatchEvent(new KeyboardEvent('keydown', {
+          code: 'KeyV', key: 'V', shiftKey: true, bubbles: true, cancelable: true,
+        }))
+        await vi.waitFor(async () => expect((await getSettings()).pip.subtitleSize).toBe(size))
+        expect((await getSettings()).subtitleSize).toBe(175)
+      }
+    } finally { cleanup() }
+  })
+
+  it('cycles PiP caption size independently and keeps its subtitle menu synchronized', async () => {
+    const { pipWindow, cleanup } = createDocumentPipFixture()
+    try {
+      await saveSettings({ ...DEFAULT_SETTINGS, subtitleSize: 'small' })
+      document.body.append(document.createElement('video'))
+      window.dispatchEvent(new KeyboardEvent('keydown', {
+        code: 'KeyP', key: 'P', shiftKey: true, bubbles: true, cancelable: true,
+      }))
+      await vi.waitFor(() => expect(pipWindow.document.querySelector('[data-pip-control="subtitles-button"]')).not.toBeNull())
+      for (const size of ['large', 'small', 'medium'] as const) {
+        pipWindow.document.body.dispatchEvent(new KeyboardEvent('keydown', {
+          code: 'KeyV', key: 'V', shiftKey: true, bubbles: true, cancelable: true,
+        }))
+        await vi.waitFor(async () => expect((await getSettings()).pip.subtitleSize).toBe(size))
+        expect((await getSettings()).subtitleSize).toBe('small')
+      }
+      pipWindow.document.querySelector<HTMLButtonElement>('[data-pip-control="subtitles-button"]')?.click()
+      pipWindow.document.querySelector<HTMLButtonElement>('[data-pip-subtitle-nav="size"]')?.click()
+      expect(pipWindow.document.querySelector('[data-pip-subtitle-size="medium"]')).toBeChecked()
+    } finally { cleanup() }
+  })
+
+  it('saves a custom PiP percentage independently and exposes it as the current menu choice', async () => {
+    const { pipWindow, cleanup } = createDocumentPipFixture()
+    try {
+      const settings = structuredClone(DEFAULT_SETTINGS)
+      settings.subtitleSize = 150
+      settings.subtitleSizeShortcuts = [{ id: 'subtitle-size:fixed', kind: 'fixed', sizes: [175] }]
+      settings.bindings['subtitle-size:fixed'] = { enabled: true, key: { code: 'KeyB', key: 'b', ctrl: false, alt: false, shift: false, meta: false } }
+      await saveSettings(settings)
+      document.body.append(document.createElement('video'))
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyP', key: 'P', shiftKey: true, bubbles: true, cancelable: true }))
+      await vi.waitFor(() => expect(pipWindow.document.querySelector('[data-pip-control="subtitles-button"]')).not.toBeNull())
+      pipWindow.document.body.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyB', key: 'b', bubbles: true, cancelable: true }))
+      await vi.waitFor(async () => expect((await getSettings()).pip.subtitleSize).toBe(175))
+      expect((await getSettings()).subtitleSize).toBe(150)
+      const sizeNav = pipWindow.document.querySelector<HTMLButtonElement>('[data-pip-subtitle-nav="size"]')!
+      expect(sizeNav).toHaveTextContent('175%')
+      pipWindow.document.querySelector<HTMLButtonElement>('[data-pip-control="subtitles-button"]')!.click()
+      sizeNav.click()
+      const current = pipWindow.document.querySelector<HTMLInputElement>('[data-pip-subtitle-size="custom"]')!
+      expect(current).toBeChecked()
+      expect(current).toHaveAccessibleName('175%')
+      expect(pipWindow.document.activeElement).toBe(current)
+      pipWindow.document.querySelector<HTMLInputElement>('[data-pip-subtitle-size="medium"]')!.click()
+      await vi.waitFor(async () => expect((await getSettings()).pip.subtitleSize).toBe('medium'))
+      expect((await getSettings()).subtitleSize).toBe(150)
+      expect(current.closest('label')).not.toBeVisible()
+      expect(pipWindow.getComputedStyle(current.closest('label')!).display).toBe('none')
+    } finally { cleanup() }
+  })
+
   it('lets the first Space press resume playback after an automatic episode transition', async () => {
     const { pipWindow, cleanup } = createDocumentPipFixture()
 
@@ -380,7 +451,7 @@ describe('content PiP shortcuts', () => {
     }) }))
     window.addEventListener('shortcut-override:caption-request', respond)
     try {
-      await saveSettings({ ...DEFAULT_SETTINGS, subtitleNavigation: { ...DEFAULT_SETTINGS.subtitleNavigation, enabled: true, bindings: { ...DEFAULT_SETTINGS.subtitleNavigation.bindings, replay: { ...DEFAULT_SETTINGS.subtitleNavigation.bindings.replay, enabled: true } } } })
+      await saveSettings({ ...DEFAULT_SETTINGS, bindings: { ...DEFAULT_SETTINGS.bindings, skipIntro: { ...DEFAULT_SETTINGS.bindings.skipIntro, enabled: false } }, subtitleNavigation: { ...DEFAULT_SETTINGS.subtitleNavigation, enabled: true, bindings: { ...DEFAULT_SETTINGS.subtitleNavigation.bindings, replay: { enabled: true, key: { ...DEFAULT_SETTINGS.bindings.skipIntro.key } } } } })
       const video = document.createElement('video')
       let paused = false
       const play = vi.fn(() => { paused = false; return Promise.resolve() })

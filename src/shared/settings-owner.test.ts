@@ -3,8 +3,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
 import {
   getSettings, initializeUiStyleDefault, observeSettings, saveSettings, subscribeSettings,
-  updateSettings, SETTINGS_STORAGE_KEY, UI_STYLE_STORAGE_KEY,
+  updateSettings, SETTINGS_STORAGE_KEY, SETTINGS_COMPATIBILITY_KEY, UI_STYLE_STORAGE_KEY,
 } from '@/shared/storage'
+import legacy from './fixtures/settings-v0.6.8.json'
 
 const setSync = (values: Record<string, unknown>) =>
   new Promise<void>(resolve => chrome.storage.sync.set(values, () => resolve()))
@@ -29,6 +30,39 @@ const deferNextRead = () => {
 afterEach(() => vi.restoreAllMocks())
 
 describe('settings owner', () => {
+  it('invalidates a pending mutation when compatibility data changes', async () => {
+    await saveSettings(DEFAULT_SETTINGS)
+    await setSync({ [SETTINGS_STORAGE_KEY]: legacy.settings })
+    const read = deferNextRead()
+    const saving = updateSettings(current => ({ ...current, locale: 'ko' }))
+    try {
+      await read.wait()
+      await setSync({ [SETTINGS_COMPATIBILITY_KEY]: { ...DEFAULT_SETTINGS, autoNextEpisode: true } })
+      read.release()
+      expect(await saving).toMatchObject({ locale: 'ko', autoNextEpisode: true })
+    } finally {
+      read.release()
+    }
+  })
+
+  it('reconciles compatibility after cold live events even when appearance is already known', async () => {
+    await saveSettings({ ...DEFAULT_SETTINGS, autoNextEpisode: true })
+    await setSync({ [SETTINGS_STORAGE_KEY]: legacy.settings })
+    const hydration = deferNextRead()
+    const receive = vi.fn()
+    const unsubscribe = subscribeSettings(receive)
+    try {
+      await setSync({ [UI_STYLE_STORAGE_KEY]: DEFAULT_SETTINGS.uiStyle })
+      await setSync({ [SETTINGS_STORAGE_KEY]: { ...legacy.settings, enabled: false } })
+      expect(receive).toHaveBeenLastCalledWith(expect.objectContaining({ enabled: false, autoNextEpisode: false, uiStyle: DEFAULT_SETTINGS.uiStyle }))
+      hydration.release()
+      await vi.waitFor(() => expect(receive).toHaveBeenLastCalledWith(expect.objectContaining({ enabled: false, autoNextEpisode: true })))
+    } finally {
+      hydration.release()
+      unsubscribe()
+    }
+  })
+
   it('invalidates a read on a raw appearance event even when UI delivery is deferred', async () => {
     await saveSettings({ ...DEFAULT_SETTINGS, uiStyle: 'markdown' })
     const hydration = deferNextRead()

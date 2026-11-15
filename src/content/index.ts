@@ -1,5 +1,9 @@
 import { createSubtitleNavigation } from './subtitle-navigation'
-import { findSubtitleNavigationActionForKey } from '@/shared/subtitle-navigation'
+import { applySubtitleSize } from './subtitle-size'
+import { applyPauseOverlayVisibility } from './pause-overlay'
+import { createAutoSkip } from './auto-skip'
+import { createAutoNextEpisode } from './auto-next-episode'
+import { resolvePlaybackShortcut } from '@/shared/shortcut-routing'
 import {
   canHandlePlaybackShortcut,
   findVideo,
@@ -11,10 +15,7 @@ import { PipManager } from '@/content/pip/pip-manager'
 import { isPipDocument } from '@/content/pip/pip-document'
 import { createNetflixPlaybackSession } from '@/content/netflix-playback-session'
 import { createShortcutCommandController } from '@/content/shortcuts/shortcut-command-controller'
-import {
-  findActionForKey,
-  findRemappedNetflixNativeActionForKey,
-} from '@/shared/shortcut-bindings'
+import { findRemappedNetflixNativeActionForKey } from '@/shared/shortcut-bindings'
 import { DEFAULT_SETTINGS, normalizeSettings } from '@/shared/shortcut-settings'
 import type { ShortcutSettings } from '@/shared/shortcut-types'
 import { observeSettings, updateSettings } from '@/shared/storage'
@@ -37,12 +38,28 @@ const persistPipSettings = (patch: PipSettingsPatch) => updateSettings(current =
 
 const playbackSession = createNetflixPlaybackSession()
 const subtitleNavigation = createSubtitleNavigation(() => settings, playbackSession, () => pipManager?.recordUserSeek())
+const autoSkip = createAutoSkip(document, () => {
+  subtitleNavigation.cancel()
+  pipManager?.recordUserSeek()
+}, () => pipManager?.currentVideo ?? findVideo(document))
+const autoNextEpisode = createAutoNextEpisode(document, () => {
+  subtitleNavigation.cancel()
+}, () => pipManager?.currentVideo ?? findVideo(document))
 const commandController = createShortcutCommandController(
   () => settings,
   playbackSession,
   {
     onPlaybackToggleRequested: () => subtitleNavigation.cancel(),
     onSeekRequested: () => pipManager?.recordUserSeek(),
+    onSubtitleSizeChanged: (subtitleSize, targetDoc) => {
+      if (isPipDocument(targetDoc)) {
+        applySettings(normalizeSettings({ ...settings, pip: { ...settings.pip, subtitleSize } }))
+        void persistPipSettings({ subtitleSize }).catch(() => undefined)
+      } else {
+        applySettings(normalizeSettings({ ...settings, subtitleSize }))
+        void updateSettings(current => ({ ...current, subtitleSize })).catch(() => undefined)
+      }
+    },
     onSubtitlesToggled: (subtitlesEnabled, targetDoc) => {
       if (!isPipDocument(targetDoc)) return
 
@@ -50,7 +67,7 @@ const commandController = createShortcutCommandController(
         ...settings,
         pip: { ...settings.pip, subtitlesEnabled },
       })
-      applySettings(nextSettings, true)
+      applySettings(nextSettings)
       void persistPipSettings({ subtitlesEnabled }).catch(() => undefined)
     },
   }
@@ -70,7 +87,12 @@ const stopContentListeners = () => {
   window.removeEventListener('blur', clearHoldSpeedOnWindowBlur)
   document.removeEventListener('visibilitychange', clearHoldSpeedOnVisibilityChange)
   commandController.clearHoldSpeedInteraction()
+  commandController.cancelPendingAction()
   subtitleNavigation.cancel()
+  autoSkip.stop()
+  autoNextEpisode.stop()
+  applySubtitleSize(document, 'medium')
+  applyPauseOverlayVisibility(document, false)
   pipManager?.destroy()
 }
 
@@ -90,12 +112,16 @@ const handleKeydown = (event: KeyboardEvent, explicitTargetDoc?: Document) => {
     return
   }
 
-  const subtitleNavigationAction = settings.subtitleNavigation.enabled ? findSubtitleNavigationActionForKey(event, settings) : null
-  if (subtitleNavigationAction) {
+  const shortcut = resolvePlaybackShortcut(settings, event,
+    pipManager?.isActive === true || PipManager.isSupported(targetDoc.defaultView ?? window))
+  if (shortcut && !shortcut.supported) return
+  if (shortcut?.group === 'subtitleNavigation') {
+    const subtitleNavigationAction = shortcut.action
     if (!canHandlePlaybackShortcut(targetDoc) || !findVideo(targetDoc)) return
     interceptShortcutEvent(event)
     if (event.repeat) return
     commandController.clearHoldSpeedInteraction()
+    commandController.cancelPendingAction()
     if (subtitleNavigationAction === 'playback') {
       subtitleNavigation.cancel()
       commandController.execute('playPause', targetDoc)
@@ -105,7 +131,7 @@ const handleKeydown = (event: KeyboardEvent, explicitTargetDoc?: Document) => {
     return
   }
 
-  const action = findActionForKey(settings, event)
+  const action = shortcut?.group === 'general' ? shortcut.action : null
   const remappedNetflixNativeAction = findRemappedNetflixNativeActionForKey(settings, event)
 
   if (action === 'pictureInPicture') {
@@ -118,6 +144,7 @@ const handleKeydown = (event: KeyboardEvent, explicitTargetDoc?: Document) => {
     if (!canTogglePip) return
 
     interceptShortcutEvent(event)
+    commandController.cancelPendingAction()
     void pipManager?.toggle().catch(() => undefined)
     return
   }
@@ -148,7 +175,7 @@ const handleKeydown = (event: KeyboardEvent, explicitTargetDoc?: Document) => {
     return
   }
 
-  if (action === 'setPreferredSpeed' && event.repeat) {
+  if ((action === 'setPreferredSpeed' || settings.preferredSpeedShortcuts.some(shortcut => shortcut.id === action) || action === 'cycleSubtitleTrack' || action === 'previousSubtitleTrack' || action === 'previousAudioTrack' || action === 'nextAudioTrack' || action === 'cycleSubtitleSize' || settings.subtitleSizeShortcuts.some(shortcut => shortcut.id === action) || action === 'previousEpisode' || action === 'nextEpisode' || settings.seekShortcuts.some(shortcut => shortcut.id === action && shortcut.kind === 'percentage')) && event.repeat) {
     interceptShortcutEvent(event)
     return
   }
@@ -215,15 +242,16 @@ pipManager = new PipManager({
     void persistPipSettings(patch).catch(() => undefined)
   },
 })
-const applySettings = (
-  nextSettings: ShortcutSettings,
-  subtitleStateConfirmed = false
-) => {
+const applySettings = (nextSettings: ShortcutSettings) => {
+  if (settings.enabled && !nextSettings.enabled) commandController.cancelPendingAction()
   subtitleNavigation.updateSettings(nextSettings)
   settings = nextSettings
   settingsLoaded = true
-  if (subtitleStateConfirmed) pipManager?.confirmSubtitleState(nextSettings)
-  else pipManager?.updateSettings(nextSettings)
+  autoSkip.updateSettings(nextSettings)
+  autoNextEpisode.updateSettings(nextSettings)
+  applySubtitleSize(document, nextSettings.enabled ? nextSettings.subtitleSize : 'medium')
+  applyPauseOverlayVisibility(document, nextSettings.enabled && nextSettings.hidePauseOverlay)
+  pipManager?.updateSettings(nextSettings)
 }
 
 const settingsObservation = observeSettings(nextSettings => {

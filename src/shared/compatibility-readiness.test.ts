@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 
 import {
   createCompatibilityReadinessPolicy,
-  createCompatibilityRequestGeneration,
   INITIAL_COMPATIBILITY_DIAGNOSTICS_STATE,
 } from './compatibility-readiness'
 import type { CompatibilityDiagnostics } from './diagnostics'
@@ -58,19 +57,5 @@ describe('compatibility readiness policy', () => {
     expect(policy.shouldRefreshDiagnostics(pending)).toBe(true)
     expect(policy.shouldRefreshDiagnostics(reloadRequired)).toBe(false)
     expect(policy.shouldRefreshDiagnostics(INITIAL_COMPATIBILITY_DIAGNOSTICS_STATE)).toBe(true)
-  })
-
-  it('suppresses stale diagnostic responses without sharing live state', () => {
-    const first = createCompatibilityRequestGeneration()
-    const second = createCompatibilityRequestGeneration()
-    const firstGeneration = first.start()
-    const secondGeneration = second.start()
-
-    expect(first.isCurrent(firstGeneration)).toBe(true)
-    expect(second.isCurrent(secondGeneration)).toBe(true)
-
-    first.cancel()
-    expect(first.isCurrent(firstGeneration)).toBe(false)
-    expect(second.isCurrent(secondGeneration)).toBe(true)
   })
 })

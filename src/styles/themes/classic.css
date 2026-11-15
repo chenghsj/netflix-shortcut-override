@@ -11,7 +11,7 @@
   --secondary-foreground: oklch(0.4334 0.0177 98.6048);
   --muted: oklch(0.9341 0.0153 90.239);
   --muted-foreground: oklch(0.5341 0.0078 97.4503);
-  --accent: oklch(0.9245 0.0138 92.9892);
+  --accent: color-mix(in oklch, var(--secondary) 50%, var(--card));
   --accent-foreground: oklch(0.2671 0.0196 98.939);
   --destructive: oklch(0.6368 0.2078 25.3313);
   --destructive-foreground: oklch(1 0 0);
@@ -57,8 +57,8 @@
   --ui-dialog-title-weight: 500;
   --ui-key-radius: 9.6px;
   --ui-key-border-width: 0px;
-  --ui-key-bg: var(--muted);
-  --ui-key-fg: var(--muted-foreground);
+  --ui-key-bg: color-mix(in oklch, var(--muted) 97%, black);
+  --ui-key-fg: color-mix(in oklch, var(--muted-foreground) 85%, var(--foreground));
   --ui-key-font: var(--font-sans);
   --ui-key-weight: 500;
   --ui-key-shadow: none;
@@ -82,9 +82,9 @@
   --ui-dialog-close-radius: 12px;
   --ui-key-padding-x: 4px;
   --ui-outline-bg: var(--background);
-  --ui-outline-hover-bg: var(--muted);
+  --ui-outline-hover-bg: var(--accent);
   --ui-outline-expanded-bg: var(--muted);
-  --ui-ghost-hover-bg: var(--muted);
+  --ui-ghost-hover-bg: color-mix(in oklch, var(--accent) 50%, var(--muted));
 }
 
 :root[data-ui-style='classic'].dark {
@@ -101,7 +101,7 @@
   --secondary-foreground: oklch(0.3085 0.0035 106.6039);
   --muted: oklch(0.2213 0.0038 106.707);
   --muted-foreground: oklch(0.7713 0.0169 99.0657);
-  --accent: oklch(0.213 0.0078 95.4245);
+  --accent: color-mix(in oklch, var(--muted) 50%, var(--card));
   --accent-foreground: oklch(0.9663 0.008 98.8792);
   --destructive: oklch(0.6368 0.2078 25.3313);
   --destructive-foreground: oklch(1 0 0);
@@ -118,6 +118,9 @@
   --ui-input-bg: color-mix(in oklch, var(--input) 30%, transparent);
   --ui-switch-off-bg: color-mix(in oklch, var(--input) 80%, transparent);
   --ui-outline-bg: color-mix(in oklch, var(--input) 30%, transparent);
-  --ui-outline-hover-bg: color-mix(in oklch, var(--input) 50%, transparent);
-  --ui-ghost-hover-bg: color-mix(in oklch, var(--muted) 50%, transparent);
+  --ui-outline-hover-bg: var(--accent);
+}
+
+:root[data-ui-style='classic'] body[data-app-ui] [data-slot='table'] [data-variant='ghost']:is(:hover, :focus-visible) {
+  background-color: var(--ui-ghost-hover-bg);
 }

@@ -8,8 +8,9 @@ export const applyUiStyle = (uiStyle: UiStyle) => {
   document.documentElement.dataset.uiStyle = uiStyle
 }
 
-export const useUiStyle = (uiStyle: UiStyle) => {
+export const useUiStyle = (uiStyle: UiStyle, ready = true) => {
   useLayoutEffect(() => {
+    if (!ready) return
     applyUiStyle(uiStyle)
-  }, [uiStyle])
+  }, [uiStyle, ready])
 }

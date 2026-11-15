@@ -1,3 +1,8 @@
+import { isPipDocument } from '@/content/pip/pip-document'
+import { TRACK_HINT_VISIBLE_DURATION_MS } from '@/content/hints/hint-constants'
+import { navigateEpisode } from '@/content/episode-navigation'
+import { isShortcutAction } from '@/shared/shortcut-bindings'
+import { SEEK_SHORTCUT_COPY, resolveSeekShortcut } from '@/shared/seek-shortcuts'
 import { findSkipIntroButton, findVideo, toggleFullscreen } from '@/content/dom-utils'
 import {
   getHintManager,
@@ -7,7 +12,9 @@ import {
 } from '@/content/hints/hint-manager'
 import {
   createNetflixPlaybackSession,
+  type PlaybackAudioResult,
   type PlaybackCommandResult,
+  type PlaybackSubtitleResult,
   type NetflixPlaybackSession,
 } from '@/content/netflix-playback-session'
 import {
@@ -15,8 +22,13 @@ import {
   type HoldSpeedInteractionController,
 } from './hold-speed-interaction-controller'
 import type { CommandContext, ShortcutCommand } from './shortcut-command-types'
+import { resolveLocalePreference } from '@/shared/browser-locale'
+import { getAudioFavoritesCopy } from '@/shared/audio-favorites-copy'
+import { getActiveFavorites } from '@/shared/feature-management'
+import { getCopy } from '@/shared/i18n'
 import { formatPlaybackRate, resolveNextPlaybackRate } from '@/shared/playback-speed'
-import type { ShortcutAction, ShortcutSettings } from '@/shared/shortcut-types'
+import { nextSubtitleSize, subtitleSizeFromPercent, subtitleSizePercent } from '@/shared/subtitle-size-shortcuts'
+import { type SubtitleSize, type Locale, type ShortcutAction, type BuiltinShortcutAction, type ShortcutSettings } from '@/shared/shortcut-types'
 
 const SUBTITLES_OFF_HINT_COLOR = 'rgba(255, 255, 255, 0.62)'
 const EXPLICIT_SPEED_ACTIONS = new Set<ShortcutAction>([
@@ -27,6 +39,7 @@ const EXPLICIT_SPEED_ACTIONS = new Set<ShortcutAction>([
 ])
 
 export type ShortcutCommandController = HoldSpeedInteractionController & {
+  cancelPendingAction(): void
   execute(action: ShortcutAction, targetDoc: Document): boolean
   setVolume(volume: number, targetDoc: Document): boolean
 }
@@ -34,11 +47,42 @@ export type ShortcutCommandController = HoldSpeedInteractionController & {
 type ShortcutCommandControllerOptions = {
   onPlaybackToggleRequested?: () => void
   onSeekRequested?: () => void
+  onSubtitleSizeChanged?: (size: SubtitleSize, targetDoc: Document) => void
   onSubtitlesToggled?: (enabled: boolean, targetDoc: Document) => void
 }
 
 const showHintRequest = (context: CommandContext, request: HintRequest): void => {
   getHintManager(context.targetDoc).show(request)
+}
+
+const localizeTrackLanguage = (language: string | undefined, locale: Locale): string | undefined => {
+  if (!language) return undefined
+  try {
+    const languageNames = new Intl.DisplayNames(locale, { type: 'language', fallback: 'none' })
+    return languageNames.of(language.replaceAll('_', '-'))
+  } catch {
+    // Netflix may provide a language identifier that is not a valid language tag.
+    return undefined
+  }
+}
+
+const formatSubtitleTrackHint = (track: PlaybackSubtitleResult['track'], locale: Locale): string | undefined => {
+  const name = localizeTrackLanguage(track.language, locale)
+  return name ? (track.isClosedCaption ? `${name} (CC)` : name) : track.name
+}
+
+const formatAudioTrackHint = (track: PlaybackAudioResult['track'], locale: Locale): string | undefined => {
+  const language = track.language?.replaceAll('_', '-')
+  const name = locale === 'zh-TW' && language?.toLowerCase() === 'ja'
+    ? '日語'
+    : localizeTrackLanguage(language, locale)
+  if (name) return track.isAudioDescription ? `${name} (${getAudioFavoritesCopy(locale).audioDescription})` : name
+  // Keep Netflix's label when its language tag is unavailable, omitting the
+  // original-audio marker just as the localized language-only label does.
+  return track.name?.replace(
+    /\s*(?:\(|\[|（)\s*(?:original|原始|原音|原聲|原声|オリジナル|오리지널)\s*(?:\)|\]|）)/giu,
+    '',
+  ).trim() || track.language
 }
 
 const showVolume = (context: CommandContext, icon: HintIcon, label: string): void =>
@@ -82,20 +126,22 @@ const seekCommand =
   (
     playbackSession: NetflixPlaybackSession,
     direction: -1 | 1,
-    onSeekRequested?: () => void
+    onSeekRequested?: () => void,
+    secondsOverride?: number,
   ): ShortcutCommand =>
   context => {
+    const seconds = secondsOverride ?? context.settings.seek.seconds
     const failureIcon =
       direction === -1
-        ? icons.rewind(context.settings.seek.seconds)
-        : icons.forward(context.settings.seek.seconds)
+        ? icons.rewind(seconds)
+        : icons.forward(seconds)
     showHintRequest(context, {
       type: 'seek',
       direction,
-      seconds: context.settings.seek.seconds,
+      seconds,
     })
     onSeekRequested?.()
-    void playbackSession.seekBy(direction * context.settings.seek.seconds * 1000).then(result => {
+    void playbackSession.seekBy(direction * seconds * 1000).then(result => {
       if (!context.isCurrentAction()) return
 
       if (result.failureLabel) {
@@ -133,13 +179,13 @@ const toggleSubtitles = (
   onSubtitlesToggled?: ShortcutCommandControllerOptions['onSubtitlesToggled']
 ): void => {
   void playbackSession.toggleSubtitles().then(result => {
-    const enabled = result.response.result?.subtitlesEnabled
-    if (!result.failureLabel && typeof enabled === 'boolean') {
+    const enabled = result.subtitlesEnabled
+    if (enabled !== null) {
       onSubtitlesToggled?.(enabled, context.targetDoc)
     }
     if (!context.isCurrentAction()) return
 
-    if (result.failureLabel || typeof enabled !== 'boolean') {
+    if (enabled === null) {
       showHintRequest(context, {
         type: 'media',
         icon: icons.subtitles,
@@ -156,10 +202,114 @@ const toggleSubtitles = (
   })
 }
 
+const cycleSubtitleTrack =
+  (
+    playbackSession: NetflixPlaybackSession,
+    direction: -1 | 1,
+    getSettings: () => ShortcutSettings,
+    onSubtitlesToggled?: ShortcutCommandControllerOptions['onSubtitlesToggled'],
+  ): ShortcutCommand =>
+  context => {
+    const video = findVideo(context.targetDoc)
+    if (!video) return false
+    const watchPath = document.location.pathname
+    const action = direction === -1 ? 'previousSubtitleTrack' : 'cycleSubtitleTrack'
+    const isAvailable = () => !context.isCancelled() && getSettings().enabled && getSettings().bindings[action].enabled &&
+      document.location.pathname === watchPath && context.targetDoc.defaultView?.closed !== true &&
+      findVideo(context.targetDoc) === video
+    void playbackSession.cycleSubtitleTrack(getActiveFavorites(context.settings, 'subtitleFavorites'), direction, isAvailable).then(({ failureLabel, subtitlesEnabled, track, noTracksAvailable }) => {
+      if (subtitlesEnabled === true) {
+        onSubtitlesToggled?.(true, context.targetDoc)
+      }
+      if (!isAvailable() || !context.isCurrentAction()) return
+
+      const locale = resolveLocalePreference(context.settings.locale)
+      let label = formatSubtitleTrackHint(track, locale)
+      if (failureLabel) label = getCopy(locale).subtitleTrackSwitchFailed
+      else if (noTracksAvailable) {
+        label = getCopy(locale).subtitleFavorites.unavailable
+      }
+      showHintRequest(context, label
+        ? { type: 'media', icon: icons.subtitles, label, durationMs: TRACK_HINT_VISIBLE_DURATION_MS }
+        : { type: 'playback', icon: icons.subtitles })
+    })
+    return true
+  }
+
+const episodeCommand = (direction: -1 | 1): ShortcutCommand => context => {
+  void navigateEpisode(context.targetDoc, direction, context.isCurrentAction).then(success => {
+    if (success || !context.isCurrentAction()) return
+    const locale = resolveLocalePreference(context.settings.locale)
+    showHintRequest(context, { type: 'text', label: SEEK_SHORTCUT_COPY[locale].unavailable })
+  })
+  return true
+}
+
+const frameCommand = (
+  playbackSession: NetflixPlaybackSession, direction: -1 | 1,
+  onSeekRequested?: () => void,
+): ShortcutCommand => context => {
+  if (!findVideo(context.targetDoc)) return false
+  onSeekRequested?.()
+  void playbackSession.stepFrame(direction).then(({ failureLabel }) => {
+    if (!context.isCurrentAction()) return
+    const icon = direction === -1 ? icons.frameBackward : icons.frameForward
+    showHintRequest(context, failureLabel
+      ? { type: 'media', icon, label: getCopy(resolveLocalePreference(context.settings.locale)).frameStepFailed, compact: true }
+      : { type: 'playback', icon })
+  })
+  return true
+}
+
+const audioTrackCommand = (
+  playbackSession: NetflixPlaybackSession, direction: -1 | 1, getSettings: () => ShortcutSettings,
+): ShortcutCommand => context => {
+  const video = findVideo(context.targetDoc)
+  if (!video) return false
+  const watchPath = document.location.pathname
+  const action = direction === -1 ? 'previousAudioTrack' : 'nextAudioTrack'
+  const isAvailable = () => getSettings().enabled && getSettings().bindings[action].enabled &&
+    document.location.pathname === watchPath && findVideo(context.targetDoc) === video
+  const favorites = getActiveFavorites(context.settings, 'audioFavorites')
+  void playbackSession.cycleAudioTrack(direction, isAvailable, favorites).then(({ failureLabel, noTracksAvailable, track }) => {
+    if (!isAvailable() || !context.isCurrentAction()) return
+    const locale = resolveLocalePreference(context.settings.locale)
+    const copy = getCopy(locale)
+    let label = formatAudioTrackHint(track, locale) ?? copy.actions[action]
+    if (noTracksAvailable) label = favorites.length
+      ? getAudioFavoritesCopy(locale).unavailable
+      : copy.audioTracksUnavailable
+    if (failureLabel) label = copy.audioTrackSwitchFailed
+    showHintRequest(context, {
+      type: 'media', icon: icons.volume,
+      label, compact: true, durationMs: TRACK_HINT_VISIBLE_DURATION_MS,
+    })
+  })
+  return true
+}
+
+const changeSubtitleSize = (
+  context: CommandContext, sizes: readonly number[], cycle: boolean, options: ShortcutCommandControllerOptions,
+): boolean => {
+  if (!findVideo(context.targetDoc) || !options.onSubtitleSizeChanged) return false
+  const current = isPipDocument(context.targetDoc) ? context.settings.pip.subtitleSize : context.settings.subtitleSize
+  const size = cycle ? nextSubtitleSize(sizes, current) : subtitleSizeFromPercent(sizes[0])
+  options.onSubtitleSizeChanged(size, context.targetDoc)
+  showHintRequest(context, { type: 'media', icon: icons.subtitles, label: `${subtitleSizePercent(size)}%` })
+  return true
+}
+
 const createCommandMap = (
   playbackSession: NetflixPlaybackSession,
-  options: ShortcutCommandControllerOptions
-): Record<ShortcutAction, ShortcutCommand> => ({
+  options: ShortcutCommandControllerOptions,
+  getSettings: () => ShortcutSettings,
+): Record<BuiltinShortcutAction, ShortcutCommand> => ({
+  previousEpisode: episodeCommand(-1),
+  nextEpisode: episodeCommand(1),
+  previousFrame: frameCommand(playbackSession, -1, options.onSeekRequested),
+  nextFrame: frameCommand(playbackSession, 1, options.onSeekRequested),
+  previousAudioTrack: audioTrackCommand(playbackSession, -1, getSettings),
+  nextAudioTrack: audioTrackCommand(playbackSession, 1, getSettings),
   playPause: context => {
     const video = findVideo(context.targetDoc)
     if (!video) return false
@@ -201,6 +351,9 @@ const createCommandMap = (
     toggleSubtitles(playbackSession, context, options.onSubtitlesToggled)
     return true
   },
+  cycleSubtitleTrack: cycleSubtitleTrack(playbackSession, 1, getSettings, options.onSubtitlesToggled),
+  previousSubtitleTrack: cycleSubtitleTrack(playbackSession, -1, getSettings, options.onSubtitlesToggled),
+  cycleSubtitleSize: context => changeSubtitleSize(context, context.settings.subtitleSizeCycle, true, options),
   fullscreen: context => {
     toggleFullscreen(context.targetDoc)
     return true
@@ -273,14 +426,20 @@ export const createShortcutCommandController = (
   options: ShortcutCommandControllerOptions = {}
 ): ShortcutCommandController => {
   let currentActionToken = 0
-  const commands = createCommandMap(playbackSession, options)
+  let cancellationVersion = 0
+  const commands = createCommandMap(playbackSession, options, getSettings)
   let holdSpeedInteraction: HoldSpeedInteractionController | null = null
 
-  const createContext = (targetDoc: Document, actionToken = currentActionToken): CommandContext => ({
-    settings: getSettings(),
-    targetDoc,
-    isCurrentAction: () => actionToken === currentActionToken,
-  })
+  const createContext = (targetDoc: Document, actionToken = currentActionToken): CommandContext => {
+    // Consecutive presses share a lifetime while only the latest owns feedback.
+    const version = cancellationVersion
+    return {
+      settings: getSettings(),
+      targetDoc,
+      isCurrentAction: () => actionToken === currentActionToken && getSettings().enabled,
+      isCancelled: () => version !== cancellationVersion,
+    }
+  }
 
   const startAction = (): number => {
     currentActionToken += 1
@@ -288,11 +447,36 @@ export const createShortcutCommandController = (
   }
 
   const execute = (action: ShortcutAction, targetDoc: Document): boolean => {
-    if (EXPLICIT_SPEED_ACTIONS.has(action)) {
+    if (EXPLICIT_SPEED_ACTIONS.has(action) || getSettings().preferredSpeedShortcuts.some(shortcut => shortcut.id === action) || action === 'previousFrame' || action === 'nextFrame') {
       holdSpeedInteraction?.cancelHoldSpeedInteraction()
     }
     const actionToken = startAction()
-    return commands[action](createContext(targetDoc, actionToken))
+    const context = createContext(targetDoc, actionToken)
+    if (isShortcutAction(action)) return commands[action](context)
+    const speedShortcut = context.settings.preferredSpeedShortcuts.find(shortcut => shortcut.id === action)
+    if (speedShortcut) {
+      const video = findVideo(targetDoc)
+      if (!video || !context.settings.bindings[action]?.enabled) return false
+      showPlaybackRate(playbackSession, video, speedShortcut.speed, context, true, icons.speedUp)
+      return true
+    }
+    const sizeShortcut = context.settings.subtitleSizeShortcuts.find(shortcut => shortcut.id === action)
+    if (sizeShortcut) return context.settings.bindings[action]?.enabled
+      ? changeSubtitleSize(context, sizeShortcut.sizes, sizeShortcut.kind === 'cycle', options) : false
+    const shortcut = resolveSeekShortcut(context.settings, action)
+    if (!shortcut || !context.settings.bindings[action]?.enabled) return false
+    if (shortcut.kind === 'relative') {
+      return seekCommand(playbackSession, shortcut.value < 0 ? -1 : 1, options.onSeekRequested, Math.abs(shortcut.value))(context)
+    }
+    const video = findVideo(targetDoc)
+    if (!video || !Number.isFinite(video.duration) || video.duration <= 0) return false
+    const targetMilliseconds = Math.round(video.duration * 1000 * (shortcut.value / 100))
+    const icon = targetMilliseconds < video.currentTime * 1000 ? icons.positionBackward : icons.positionForward
+    options.onSeekRequested?.()
+    const completion = playbackSession.seekTo(targetMilliseconds)
+    showHintRequest(context, { type: 'position', icon, label: `${shortcut.value}%` })
+    showCommandFailure(context, completion, icon)
+    return true
   }
 
   const setVolume = (volume: number, targetDoc: Document): boolean => {
@@ -327,6 +511,7 @@ export const createShortcutCommandController = (
 
   return {
     ...holdSpeedInteraction,
+    cancelPendingAction: () => { cancellationVersion += 1; startAction() },
     execute,
     setVolume,
   }

@@ -1,6 +1,9 @@
-import { initializeUiStyleDefault } from '@/shared/storage'
+import { initializeSettingsCompatibility, initializeUiStyleDefault } from '@/shared/storage'
 
 export const registerSettingsMigration = () => {
+  void initializeSettingsCompatibility().catch(error => {
+    console.error('Unable to preserve settings compatibility', error)
+  })
   const initialize = (reason?: 'install' | 'update') => {
     void initializeUiStyleDefault(reason).catch(error => {
       console.error('Unable to initialize appearance preference', error)

@@ -243,6 +243,7 @@ Object.defineProperty(navigator, 'clipboard', {
 Element.prototype.scrollIntoView = vi.fn()
 
 beforeEach(() => {
+  window.history.replaceState(null, '', '/')
   for (const key of Object.keys(storageState)) delete storageState[key]
   for (const key of Object.keys(sessionStorageState)) delete sessionStorageState[key]
   for (const key of Object.keys(localStorageState)) delete localStorageState[key]

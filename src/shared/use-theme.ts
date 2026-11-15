@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
 
 import type { ThemeMode } from '@/shared/shortcut-types'
 
@@ -27,7 +27,7 @@ export const applyTheme = (theme: ResolvedTheme) => {
   root.style.colorScheme = theme
 }
 
-export const useTheme = (theme: ThemeMode) => {
+export const useTheme = (theme: ThemeMode, ready = true) => {
   const [systemTheme, setSystemTheme] = useState<ResolvedTheme>(getSystemTheme)
   const resolvedTheme = resolveTheme(theme, systemTheme)
 
@@ -46,9 +46,10 @@ export const useTheme = (theme: ThemeMode) => {
     return () => mediaQuery.removeEventListener?.('change', updateSystemTheme)
   }, [theme])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    if (!ready) return
     applyTheme(resolvedTheme)
-  }, [resolvedTheme])
+  }, [resolvedTheme, ready])
 
   return resolvedTheme
 }

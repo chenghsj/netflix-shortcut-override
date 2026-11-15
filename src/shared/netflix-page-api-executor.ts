@@ -1,8 +1,19 @@
 import type { NetflixApiAction, NetflixPageResult } from '@/shared/netflix-api'
+import type { SubtitleFavorite } from '@/shared/subtitle-favorites'
+import type { AudioFavorite } from '@/shared/audio-favorites'
 
 type NetflixAudioTrack = {
+  id?: string
+  trackId?: string
+  new_track_id?: string
   bcp47?: string
   language?: string
+  displayName?: string
+  isSelected?: boolean
+  selected?: boolean
+  rawTrackType?: string
+  trackType?: string
+  isAssistive?: boolean
 }
 
 type NetflixPlayer = {
@@ -10,10 +21,15 @@ type NetflixPlayer = {
   pause(): void
   seek(time: number): void
   getCurrentTime(): number
+  getDuration?(): number
+  getPaused?(): boolean
+  getDiagnostics?(): { getGroups?(): Record<string, unknown>[] }
   setVolume(value: number): void
   setMuted(value: boolean): void
   getAudioTrack?(): NetflixAudioTrack | null | undefined
   getTimedAudioTrack?(): NetflixAudioTrack | null | undefined
+  getAudioTrackList?(): NetflixAudioTrack[]
+  setAudioTrack?(track: NetflixAudioTrack): void
   getTextTrackList?(): NetflixTextTrack[]
   getTimedTextTrackList?(): NetflixTextTrack[]
   getTextTrack?(): NetflixTextTrack | null | undefined
@@ -50,6 +66,15 @@ type NetflixVideoPlayerApi = {
 }
 
 type NetflixWindow = typeof window & {
+  __shortcutOverrideFrameStep?: {
+    player: NetflixPlayer
+    video: HTMLVideoElement | null
+    watchPath: string
+    minTime: number
+    maxTime: number
+    targetTime: number
+    clear(): void
+  }
   documentPictureInPicture?: {
     window?: Window | null
   }
@@ -74,7 +99,9 @@ type NetflixWindow = typeof window & {
 
 export const executeNetflixPageApi = (
   action: NetflixApiAction,
-  value?: number
+  value?: number,
+  subtitleFavorites: readonly SubtitleFavorite[] = [],
+  audioFavorites: readonly AudioFavorite[] = []
 ): NetflixPageResult => {
   // chrome.scripting.executeScript serializes this function without its module
   // scope, so every runtime dependency must remain inside this function body.
@@ -552,6 +579,128 @@ export const executeNetflixPageApi = (
     pageWindow.__shortcutOverrideSubtitleState = state
     result.subtitleToggleCalled = true
   }
+  const isClosedCaption = (track: NetflixTextTrack): boolean => {
+    const closedCaptionType = /^(?:assistive|closed_?captions)$/i
+    return closedCaptionType.test(track.rawTrackType ?? '') ||
+      closedCaptionType.test(track.trackType ?? '') ||
+      /(?:\[CC\]|\(CC\)|（CC）)$/i.test(track.displayName?.trim() ?? '')
+  }
+
+  // Keep the matcher inside the executor because scripting.executeScript serializes it.
+  const getTrackLocale = (track: NetflixTextTrack): Intl.Locale | undefined => {
+    for (const language of [track.bcp47, track.language]) {
+      if (typeof language !== 'string' || !language.trim()) continue
+      try {
+        const locale = new Intl.Locale(language.trim().replaceAll('_', '-'))
+        if (locale.language !== 'und') return locale
+      } catch { /* Try the next language field if Netflix supplied a label. */ }
+    }
+    return undefined
+  }
+
+  const getTrackScript = (locale: Intl.Locale): string | undefined => {
+    if (locale.script || locale.language !== 'zh') return locale.script
+    if (locale.region === 'TW' || locale.region === 'HK' || locale.region === 'MO') return 'Hant'
+    if (locale.region === 'CN' || locale.region === 'SG') return 'Hans'
+    return undefined
+  }
+
+  const matchesFavoriteLocale = (candidate: Intl.Locale, favorite: Intl.Locale): boolean => {
+    if (candidate.language !== favorite.language) return false
+    if (favorite.script && getTrackScript(candidate) !== favorite.script) return false
+    if (favorite.region && candidate.region !== favorite.region) return false
+    return true
+  }
+
+  const orderFavoriteTracks = (selectable: NetflixTextTrack[]): NetflixTextTrack[] => {
+    const candidates = selectable.flatMap(track => {
+      const locale = getTrackLocale(track)
+      return locale ? [{ track, locale, closedCaption: isClosedCaption(track) }] : []
+    })
+    const used = new Set<NetflixTextTrack>()
+    const takeTrack = (closedCaption: boolean, matches: (locale: Intl.Locale) => boolean) => {
+      const match = candidates.find(candidate =>
+        candidate.closedCaption === closedCaption && !used.has(candidate.track) && matches(candidate.locale))
+      if (match) used.add(match.track)
+      return match?.track
+    }
+
+    const preferences = subtitleFavorites.map(({ language }) => new Intl.Locale(language))
+    const ordered: (NetflixTextTrack | undefined)[] = preferences.map(() => undefined)
+
+    const fillExactMatches = (closedCaption: boolean) => {
+      preferences.forEach((locale, index) => {
+        if (ordered[index]) return
+        ordered[index] = takeTrack(closedCaption, candidate => candidate.baseName === locale.baseName)
+      })
+    }
+
+    const fillLanguageMatches = (closedCaption: boolean, specificity: 'specific' | 'generic') => {
+      preferences.forEach((locale, index) => {
+        if (ordered[index]) return
+        const preferenceSpecificity = locale.script || locale.region ? 'specific' : 'generic'
+        if (preferenceSpecificity !== specificity) return
+        ordered[index] = takeTrack(closedCaption, candidate => matchesFavoriteLocale(candidate, locale))
+      })
+    }
+
+    // Exhaust regular matches before CC, reserving exact and specific choices in each pass.
+    for (const closedCaption of [false, true]) {
+      fillExactMatches(closedCaption)
+      fillLanguageMatches(closedCaption, 'specific')
+      fillLanguageMatches(closedCaption, 'generic')
+    }
+    return ordered.filter(track => track !== undefined)
+  }
+
+  const cycleSubtitleTrack = (
+    pageWindow: NetflixWindow,
+    player: NetflixPlayer,
+    result: NetflixPageResult,
+    direction: -1 | 1
+  ): void => {
+    const tracks = getTextTracks(player)
+    const selectable = tracks.filter(track => !isOffTextTrack(track))
+    const candidates = subtitleFavorites.length ? orderFavoriteTracks(selectable) : selectable
+    if (!candidates.length) {
+      result.subtitleCycleOutcome = 'no-tracks-available'
+      return
+    }
+
+    const setTextTrack = player.setTextTrack ?? player.setTimedTextTrack
+    if (typeof setTextTrack !== 'function') {
+      throw new Error('No selectable Netflix subtitle track is available.')
+    }
+
+    const state = pageWindow.__shortcutOverrideSubtitleState ?? {}
+    const current = getSelectedTextTrack(player, tracks)
+    const isVisible = current && !isOffTextTrack(current) &&
+      !shouldKeepDomSubtitleHide(state, current) && player.getTimedTextVisibility?.() !== false
+    let currentIndex = -1
+    if (isVisible) {
+      const currentIds = trackIds(current)
+      currentIndex = candidates.findIndex(track =>
+        track === current || matchesTrackIds(track, currentIds) ||
+        (currentIds.length === 0 && current.displayName !== undefined &&
+          track.displayName === current.displayName && sameTrackLanguage(track, current))
+      )
+    }
+    const startIndex = direction === -1 ? candidates.length - 1 : 0
+    const nextIndex = currentIndex < 0 ? startIndex : (currentIndex + direction + candidates.length) % candidates.length
+    const next = candidates[nextIndex]
+    if (nextIndex !== currentIndex) {
+      setTextTrack.call(player, next)
+      setFallbackSubtitleHidden(player, state, false)
+    }
+    state.lastTrack = rememberTextTrack(next)
+    state.subtitlesEnabled = true
+    pageWindow.__shortcutOverrideSubtitleState = state
+    result.subtitlesEnabled = true
+    result.subtitleTrack = getTextTrackLabel(next)
+    result.subtitleTrackLanguage = getTrackLocale(next)?.baseName
+    result.subtitleTrackIsClosedCaption = isClosedCaption(next)
+  }
+
   const selectPlayerSession = (
     videoPlayer: NetflixVideoPlayerApi,
     sessionIds: string[],
@@ -575,6 +724,133 @@ export const executeNetflixPageApi = (
         ? candidate
         : closest
     })
+  }
+  const stepFrame = (page: NetflixWindow, player: NetflixPlayer, video: HTMLVideoElement | null): void => {
+    if (!(player.getPaused?.() ?? video?.paused)) {
+      page.__shortcutOverrideFrameStep?.clear()
+      player.pause()
+    }
+    const previous = page.__shortcutOverrideFrameStep
+    const currentTime = player.getCurrentTime()
+    const duration = player.getDuration?.() ?? (video ? video.duration * 1_000 : NaN)
+    if (!Number.isFinite(currentTime) || !Number.isFinite(duration) || duration <= 0) {
+      throw new Error('No finite Netflix playback position or duration is available.')
+    }
+    let frameRate = 24
+    result.frameRateEstimated = true
+    try {
+      for (const group of player.getDiagnostics?.().getGroups?.() ?? []) {
+        const rate = typeof group.Framerate === 'number' ? group.Framerate : Number.parseFloat(String(group.Framerate))
+        if (Number.isFinite(rate) && rate > 0 && rate < 200) {
+          frameRate = rate
+          result.frameRateEstimated = false
+          break
+        }
+      }
+    } catch { /* Netflix does not expose diagnostics on every player. */ }
+    result.frameRate = frameRate
+    const frameDuration = 1_000 / frameRate
+    const tolerance = Math.max(2, frameDuration / 2)
+    // Tiny seeks may not update getCurrentTime immediately. Accumulate the
+    // intended position while it still belongs to the same paused playback.
+    const isBetween = (time: number, start: number, end: number): boolean =>
+      time >= Math.min(start, end) - tolerance && time <= Math.max(start, end) + tolerance
+    const canContinue = previous?.player === player && previous.video === video &&
+      previous.watchPath === location.pathname && isBetween(currentTime, previous.minTime, previous.maxTime)
+    const from = canContinue ? previous.targetTime : currentTime
+    const targetTime = Math.max(0, Math.min(duration, from + (value === -1 ? -1 : 1) * frameDuration))
+    previous?.clear()
+    player.seek(targetTime)
+    result.currentTime = currentTime
+    result.targetTime = targetTime
+    result.seekCalled = true
+    const state: NonNullable<NetflixWindow['__shortcutOverrideFrameStep']> = {
+      player, video, watchPath: location.pathname,
+      minTime: Math.min(canContinue ? previous.minTime : currentTime, targetTime),
+      maxTime: Math.max(canContinue ? previous.maxTime : currentTime, targetTime), targetTime,
+      clear: () => {
+        video?.removeEventListener('play', state.clear)
+        video?.removeEventListener('emptied', state.clear)
+        video?.removeEventListener('seeked', onSeeked)
+        if (page.__shortcutOverrideFrameStep === state) delete page.__shortcutOverrideFrameStep
+      },
+    }
+    const onSeeked = () => {
+      const observed = video ? video.currentTime * 1_000 : player.getCurrentTime()
+      if (!isBetween(observed, state.minTime, state.maxTime)) state.clear()
+      else if (Math.abs(observed - targetTime) <= tolerance) {
+        state.minTime = targetTime
+        state.maxTime = targetTime
+      }
+    }
+    page.__shortcutOverrideFrameStep = state
+    video?.addEventListener('play', state.clear)
+    video?.addEventListener('emptied', state.clear)
+    video?.addEventListener('seeked', onSeeked)
+  }
+  const isAudioDescription = (track: NetflixAudioTrack): boolean =>
+    track.isAssistive === true ||
+    /^(?:assistive|audio[ _-]?description)$/i.test(track.rawTrackType ?? '') ||
+    /^(?:assistive|audio[ _-]?description)$/i.test(track.trackType ?? '') ||
+    /audio[- ]?description|口述影像|視訊描述|视频描述|音声解説|音声ガイド|화면\s*해설/i.test(track.displayName ?? '')
+
+  const orderFavoriteAudioTracks = (tracks: NetflixAudioTrack[]): NetflixAudioTrack[] => {
+    const candidates = tracks.flatMap(track => {
+      const locale = getTrackLocale(track)
+      return locale ? [{ track, locale, audioDescription: isAudioDescription(track) }] : []
+    })
+    const preferences = audioFavorites.map(favorite => ({ ...favorite, locale: new Intl.Locale(favorite.language) }))
+    const used = new Set<NetflixAudioTrack>()
+    const ordered: (NetflixAudioTrack | undefined)[] = preferences.map(() => undefined)
+    const fillMatches = (matches: (candidate: Intl.Locale, preference: Intl.Locale) => boolean) => {
+      preferences.forEach((preference, index) => {
+        if (ordered[index]) return
+        const match = candidates.find(candidate => !used.has(candidate.track) &&
+          candidate.audioDescription === preference.audioDescription && matches(candidate.locale, preference.locale))
+        if (match) {
+          used.add(match.track)
+          ordered[index] = match.track
+        }
+      })
+    }
+    // Reserve exact and regional choices before generic language preferences.
+    fillMatches((candidate, preference) => candidate.baseName === preference.baseName)
+    fillMatches((candidate, preference) => Boolean(preference.script || preference.region) && matchesFavoriteLocale(candidate, preference))
+    fillMatches((candidate, preference) => !preference.script && !preference.region && matchesFavoriteLocale(candidate, preference))
+    return ordered.filter(track => track !== undefined)
+  }
+
+  const cycleAudioTrack = (player: NetflixPlayer): void => {
+    const available: NetflixAudioTrack[] = []
+    for (const track of player.getAudioTrackList?.() ?? []) {
+      if (track && !available.some(candidate => candidate === track || matchesTrackIds(candidate, trackIds(track)))) {
+        available.push(track)
+      }
+    }
+    const tracks = audioFavorites.length ? orderFavoriteAudioTracks(available) : available
+    if (!tracks.length) {
+      result.audioCycleOutcome = 'no-tracks-available'
+      return
+    }
+    const current = player.getAudioTrack?.() ?? player.getTimedAudioTrack?.() ??
+      tracks.find(track => track.isSelected || track.selected)
+    const currentIds = trackIds(current)
+    const currentIndex = tracks.findIndex(track => track === current || matchesTrackIds(track, currentIds) ||
+      (currentIds.length === 0 && current?.displayName !== undefined &&
+        current.displayName === track.displayName && sameTrackLanguage(current, track)))
+    const direction = value === -1 ? -1 : 1
+    const nextIndex = currentIndex < 0 ? (direction === 1 ? 0 : tracks.length - 1) :
+      (currentIndex + direction + tracks.length) % tracks.length
+    const next = tracks[nextIndex]
+    if (nextIndex === currentIndex) result.audioCycleOutcome = 'unchanged'
+    else {
+      if (!player.setAudioTrack) throw new Error('No Netflix audio track selection API is available.')
+      player.setAudioTrack(next)
+      result.audioTrackSwitchCalled = true
+    }
+    result.audioTrack = next.displayName
+    result.audioTrackLanguage = next.bcp47 ?? next.language
+    result.audioTrackIsAudioDescription = isAudioDescription(next)
   }
   const result: NetflixPageResult = {
     action,
@@ -601,6 +877,10 @@ export const executeNetflixPageApi = (
     result.sessionId = selected?.sessionId
     const player = selected?.player
     result.playerFound = Boolean(player)
+    const pageWindow = window as NetflixWindow
+    if (action === 'play' || action === 'pause' || action === 'seek' || action === 'seekTo') {
+      pageWindow.__shortcutOverrideFrameStep?.clear()
+    }
 
     if (action === 'getCaptionMetadata') {
       const watchId = location.pathname.match(/^\/watch\/(\d+)/)?.[1]
@@ -615,6 +895,8 @@ export const executeNetflixPageApi = (
         player.play()
       } else if (action === 'pause') {
         player.pause()
+      } else if (action === 'stepFrame') {
+        stepFrame(pageWindow, player, findSessionReferenceVideo(pageWindow))
       } else if ((action === 'seek' || action === 'seekTo') && value !== undefined) {
         const currentTime = player.getCurrentTime()
         result.currentTime = currentTime
@@ -634,6 +916,10 @@ export const executeNetflixPageApi = (
         readSubtitleState(window as NetflixWindow, player, result)
       } else if (action === 'toggleSubtitles') {
         toggleSubtitles(window as NetflixWindow, player, result)
+      } else if (action === 'cycleSubtitleTrack') {
+        cycleSubtitleTrack(window as NetflixWindow, player, result, value === -1 ? -1 : 1)
+      } else if (action === 'cycleAudioTrack') {
+        cycleAudioTrack(player)
       }
     }
   } catch (error) {

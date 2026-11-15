@@ -314,14 +314,15 @@ describe('useCompatibilitySession', () => {
     expect(chrome.tabs.sendMessage).not.toHaveBeenCalled()
   })
 
-  it('reports non-receiver messaging failures without retrying', async () => {
+  it('retries unavailable diagnostics on the next scheduled check and recovers', async () => {
     vi.useFakeTimers()
+    let attempts = 0
     vi.mocked(chrome.tabs.sendMessage).mockImplementation(
       (_tabId, _message, optionsOrCallback, maybeCallback) => {
-        replyWithRuntimeError(
-          getDiagnosticsCallback(optionsOrCallback, maybeCallback),
-          'The message port closed.'
-        )
+        const callback = getDiagnosticsCallback(optionsOrCallback, maybeCallback)
+        attempts += 1
+        if (attempts === 1) replyWithRuntimeError(callback, 'The message port closed.')
+        else callback?.(READY_DIAGNOSTICS)
       }
     )
 
@@ -338,13 +339,16 @@ describe('useCompatibilitySession', () => {
         await vi.advanceTimersByTimeAsync(1_000)
       })
       expect(chrome.tabs.sendMessage).toHaveBeenCalledOnce()
+      await act(async () => { await vi.advanceTimersByTimeAsync(1_000) })
+      expect(chrome.tabs.sendMessage).toHaveBeenCalledTimes(2)
+      expect(result.current.diagnosticsState).toEqual({ status: 'ready', diagnostics: READY_DIAGNOSTICS })
     } finally {
       unmount()
       vi.useRealTimers()
     }
   })
 
-  it('polls unresolved diagnostics while open and stops after closing', async () => {
+  it('continues unresolved checks after closing the dialog and stops when the popup unmounts', async () => {
     const { result, unmount } = renderHook(() => useCompatibilitySession())
     await waitFor(() => expect(result.current.diagnosticsState.status).toBe('ready'))
     vi.mocked(chrome.tabs.sendMessage).mockClear()
@@ -354,6 +358,7 @@ describe('useCompatibilitySession', () => {
       }
     )
     vi.useFakeTimers()
+    let unmounted = false
 
     try {
       act(() => result.current.setDiagnosticsOpen(true))
@@ -369,11 +374,15 @@ describe('useCompatibilitySession', () => {
 
       act(() => result.current.setDiagnosticsOpen(false))
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(4_000)
+        await vi.advanceTimersByTimeAsync(2_000)
       })
-      expect(chrome.tabs.sendMessage).toHaveBeenCalledTimes(2)
-    } finally {
+      expect(chrome.tabs.sendMessage).toHaveBeenCalledTimes(4)
       unmount()
+      unmounted = true
+      await vi.advanceTimersByTimeAsync(4_000)
+      expect(chrome.tabs.sendMessage).toHaveBeenCalledTimes(4)
+    } finally {
+      if (!unmounted) unmount()
       vi.useRealTimers()
     }
   })

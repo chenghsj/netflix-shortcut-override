@@ -3,18 +3,27 @@ import {
   type KeyBinding,
   type KeyEventLike,
   type ShortcutAction,
+  type BuiltinShortcutAction,
   type ShortcutBinding,
   type ShortcutSettings,
 } from './shortcut-types'
+import { getSeekShortcutActions } from './seek-shortcuts'
 
-export const DEFAULT_KEY_BINDINGS: Record<ShortcutAction, KeyBinding> = {
+export const DEFAULT_KEY_BINDINGS: Record<BuiltinShortcutAction, KeyBinding> = {
   playPause: { code: 'Space', key: ' ', ctrl: false, alt: false, shift: false, meta: false },
   seekBackward: { code: 'ArrowLeft', key: 'ArrowLeft', ctrl: false, alt: false, shift: false, meta: false },
   seekForward: { code: 'ArrowRight', key: 'ArrowRight', ctrl: false, alt: false, shift: false, meta: false },
+  previousFrame: { code: 'Comma', key: ',', ctrl: false, alt: false, shift: false, meta: false },
+  nextFrame: { code: 'Period', key: '.', ctrl: false, alt: false, shift: false, meta: false },
   volumeUp: { code: 'ArrowUp', key: 'ArrowUp', ctrl: false, alt: false, shift: false, meta: false },
   volumeDown: { code: 'ArrowDown', key: 'ArrowDown', ctrl: false, alt: false, shift: false, meta: false },
   mute: { code: 'KeyM', key: 'm', ctrl: false, alt: false, shift: false, meta: false },
   toggleSubtitles: { code: 'KeyC', key: 'c', ctrl: false, alt: false, shift: false, meta: false },
+  cycleSubtitleTrack: { code: 'KeyC', key: 'C', ctrl: false, alt: false, shift: true, meta: false },
+  previousSubtitleTrack: { code: 'KeyX', key: 'X', ctrl: false, alt: false, shift: true, meta: false },
+  previousAudioTrack: { code: 'KeyA', key: 'A', ctrl: false, alt: false, shift: true, meta: false },
+  nextAudioTrack: { code: 'KeyD', key: 'D', ctrl: false, alt: false, shift: true, meta: false },
+  cycleSubtitleSize: { code: 'KeyV', key: 'V', ctrl: false, alt: false, shift: true, meta: false },
   fullscreen: { code: 'KeyF', key: 'f', ctrl: false, alt: false, shift: false, meta: false },
   pictureInPicture: {
     code: 'KeyP',
@@ -25,6 +34,8 @@ export const DEFAULT_KEY_BINDINGS: Record<ShortcutAction, KeyBinding> = {
     meta: false,
   },
   skipIntro: { code: 'KeyS', key: 's', ctrl: false, alt: false, shift: false, meta: false },
+  previousEpisode: { code: 'KeyP', key: 'p', ctrl: true, alt: false, shift: false, meta: false },
+  nextEpisode: { code: 'KeyN', key: 'n', ctrl: true, alt: false, shift: false, meta: false },
   speedUp: { code: 'Period', key: '>', ctrl: false, alt: false, shift: true, meta: false },
   speedDown: { code: 'Comma', key: '<', ctrl: false, alt: false, shift: true, meta: false },
   setPreferredSpeed: {
@@ -63,8 +74,11 @@ const NETFLIX_NATIVE_KEY_BINDINGS: Record<
   skipIntro: [DEFAULT_KEY_BINDINGS.skipIntro],
 }
 
-export const isShortcutAction = (value: string): value is ShortcutAction =>
-  SHORTCUT_ACTIONS.includes(value as ShortcutAction)
+export const isShortcutAction = (value: string): value is BuiltinShortcutAction =>
+  SHORTCUT_ACTIONS.includes(value as BuiltinShortcutAction)
+
+export const getShortcutActions = (settings: ShortcutSettings): ShortcutAction[] =>
+  [...SHORTCUT_ACTIONS, ...settings.seekShortcuts.flatMap(getSeekShortcutActions), ...settings.subtitleSizeShortcuts.map(shortcut => shortcut.id), ...settings.preferredSpeedShortcuts.map(shortcut => shortcut.id)]
 
 export const isKeyBinding = (value: unknown): value is KeyBinding => {
   if (!value || typeof value !== 'object') return false
@@ -80,6 +94,9 @@ export const isKeyBinding = (value: unknown): value is KeyBinding => {
   )
 }
 
+export const isShortcutKey = (value: unknown): value is KeyBinding | null =>
+  value === null || isKeyBinding(value)
+
 export const keyBindingFromEvent = (event: KeyEventLike): KeyBinding => ({
   code: event.code,
   key: event.key,
@@ -89,8 +106,8 @@ export const keyBindingFromEvent = (event: KeyEventLike): KeyBinding => ({
   meta: event.metaKey,
 })
 
-export const keyBindingsEqual = (a: KeyBinding, b: KeyBinding): boolean =>
-  a.code === b.code &&
+export const keyBindingsEqual = (a: KeyBinding | null | undefined, b: KeyBinding | null | undefined): boolean =>
+  !a || !b ? a === b : a.code === b.code &&
   a.ctrl === b.ctrl &&
   a.alt === b.alt &&
   a.shift === b.shift &&
@@ -101,7 +118,7 @@ export const findActionForKey = (
   event: KeyEventLike
 ): ShortcutAction | null => {
   const pressed = keyBindingFromEvent(event)
-  const match = SHORTCUT_ACTIONS.find(action => {
+  const match = getShortcutActions(settings).find(action => {
     const binding = settings.bindings[action]
     return binding.enabled && keyBindingsEqual(binding.key, pressed)
   })
@@ -122,7 +139,7 @@ export const getReplacedNetflixNativeKeyBindings = (
   }
 
   const nativeAction = action as (typeof NETFLIX_NATIVE_SHORTCUT_ACTIONS)[number]
-  if (!binding.enabled || keyBindingsEqual(binding.key, DEFAULT_KEY_BINDINGS[nativeAction])) {
+  if (!binding.enabled || !binding.key || keyBindingsEqual(binding.key, DEFAULT_KEY_BINDINGS[nativeAction])) {
     return []
   }
 
@@ -143,25 +160,14 @@ export const findRemappedNetflixNativeActionForKey = (
   return action ?? null
 }
 
-export const findBindingConflict = (
-  settings: ShortcutSettings,
-  action: ShortcutAction,
-  key: KeyBinding,
-  options: { ignoredActions?: readonly ShortcutAction[] } = {}
-): ShortcutAction | null => {
-  return findEnabledBindingConflicts(settings.bindings, SHORTCUT_ACTIONS, action, key, options.ignoredActions)[0] ?? null
-}
+export const isApplePlatform = (platform: string = getRuntimePlatform()): boolean =>
+  /Mac|iPhone|iPad|iPod/i.test(platform)
 
-export const findEnabledBindingConflicts = <Action extends string>(
-  bindings: Record<Action, ShortcutBinding>,
-  actions: readonly Action[],
-  action: Action,
-  key: KeyBinding,
-  ignoredActions: readonly Action[] = [],
-): Action[] => actions.filter(candidate =>
-  candidate !== action && !ignoredActions.includes(candidate) &&
-  bindings[candidate].enabled && keyBindingsEqual(bindings[candidate].key, key)
-)
+export const getMetaKeyLabel = (platform: string = getRuntimePlatform()): string => {
+  if (isApplePlatform(platform)) return '⌘'
+  if (/Win/i.test(platform)) return 'Win'
+  return 'Meta'
+}
 
 const CODE_LABELS: Record<string, string> = {
   Space: 'Space',
@@ -202,16 +208,11 @@ const getRuntimePlatform = (): string => {
   return userAgentDataPlatform ?? navigator.platform
 }
 
-export const getMetaKeyLabel = (platform: string = getRuntimePlatform()): string => {
-  if (/Mac|iPhone|iPad|iPod/i.test(platform)) return '⌘'
-  if (/Win/i.test(platform)) return 'Win'
-  return 'Meta'
-}
-
 export const getKeyBindingLabels = (
-  binding: KeyBinding,
+  binding: KeyBinding | null,
   options: KeyBindingLabelOptions = {}
 ): string[] => {
+  if (!binding) return []
   const labels = [
     binding.ctrl ? 'Ctrl' : null,
     binding.alt ? 'Alt' : null,
@@ -224,6 +225,6 @@ export const getKeyBindingLabels = (
 }
 
 export const formatKeyBinding = (
-  binding: KeyBinding,
+  binding: KeyBinding | null,
   options: KeyBindingLabelOptions = {}
 ): string => getKeyBindingLabels(binding, options).join(' + ')

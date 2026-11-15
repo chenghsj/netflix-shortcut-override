@@ -1,3 +1,6 @@
+import type { SubtitleFavorite } from './subtitle-favorites'
+import type { AudioFavorite } from './audio-favorites'
+
 export const NETFLIX_API_MESSAGE_TYPE = 'EXECUTE_NETFLIX_API'
 
 export const NETFLIX_API_ACTIONS = [
@@ -6,6 +9,7 @@ export const NETFLIX_API_ACTIONS = [
   'pause',
   'seek',
   'seekTo',
+  'stepFrame',
   'setVolume',
   'setMuted',
   'unmuteWithVolume',
@@ -13,6 +17,8 @@ export const NETFLIX_API_ACTIONS = [
   'getSubtitleState',
   'getCaptionMetadata',
   'toggleSubtitles',
+  'cycleSubtitleTrack',
+  'cycleAudioTrack',
 ] as const
 
 export type NetflixApiAction = (typeof NETFLIX_API_ACTIONS)[number]
@@ -21,6 +27,8 @@ export type NetflixApiMessage = {
   type: typeof NETFLIX_API_MESSAGE_TYPE
   action: NetflixApiAction
   value?: number
+  subtitleFavorites?: readonly SubtitleFavorite[]
+  audioFavorites?: readonly AudioFavorite[]
 }
 
 export type NetflixApiRequest = {
@@ -28,6 +36,8 @@ export type NetflixApiRequest = {
   id: string
   action: NetflixApiAction
   value?: number
+  subtitleFavorites?: readonly SubtitleFavorite[]
+  audioFavorites?: readonly AudioFavorite[]
 }
 
 export type NetflixPageResult = {
@@ -38,9 +48,19 @@ export type NetflixPageResult = {
   sessionId?: string
   playerFound: boolean
   seekCalled: boolean
+  frameRate?: number
+  frameRateEstimated?: boolean
+  audioTrackSwitchCalled?: boolean
+  audioTrack?: string
+  audioTrackLanguage?: string
+  audioTrackIsAudioDescription?: boolean
+  audioCycleOutcome?: 'no-tracks-available' | 'unchanged'
   subtitleToggleCalled?: boolean
   subtitlesEnabled?: boolean
   subtitleTrack?: string
+  subtitleTrackLanguage?: string
+  subtitleTrackIsClosedCaption?: boolean
+  subtitleCycleOutcome?: 'no-tracks-available'
   subtitleDiagnostics?: string
   captionMetadata?: { key: string; watchId: string; url: string; currentMs: number }
   currentTime?: number

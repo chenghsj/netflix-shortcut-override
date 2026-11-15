@@ -18,7 +18,35 @@ describe('v0.6.4 upgrade compatibility', () => {
     await setSync({ [SETTINGS_STORAGE_KEY]: fixture.settings })
     await initializeUiStyleDefault('update')
     const oldSettings = Object.fromEntries(Object.entries(fixture.settings).filter(([key]) => key !== 'spaceHold' && key !== 'subtitlePractice'))
-    const expected = { ...oldSettings, subtitleNavigation: fixture.settings.subtitlePractice, version: SHORTCUT_SETTINGS_VERSION, uiStyle: 'classic' }
+    const expected = {
+      ...oldSettings,
+      bindings: {
+        ...fixture.settings.bindings,
+        cycleSubtitleTrack: DEFAULT_SETTINGS.bindings.cycleSubtitleTrack,
+        previousSubtitleTrack: DEFAULT_SETTINGS.bindings.previousSubtitleTrack,
+        cycleSubtitleSize: DEFAULT_SETTINGS.bindings.cycleSubtitleSize,
+        previousEpisode: DEFAULT_SETTINGS.bindings.previousEpisode,
+        nextEpisode: DEFAULT_SETTINGS.bindings.nextEpisode,
+        previousFrame: DEFAULT_SETTINGS.bindings.previousFrame,
+        nextFrame: DEFAULT_SETTINGS.bindings.nextFrame,
+        previousAudioTrack: DEFAULT_SETTINGS.bindings.previousAudioTrack,
+        nextAudioTrack: DEFAULT_SETTINGS.bindings.nextAudioTrack,
+      },
+      autoSkip: { intro: false, recap: false },
+      autoNextEpisode: false,
+      hidePauseOverlay: false,
+      seekShortcuts: [],
+      preferredSpeedShortcuts: [],
+      hiddenFeatures: [],
+      subtitleNavigation: fixture.settings.subtitlePractice,
+      subtitleFavorites: [],
+      audioFavorites: [],
+      subtitleSize: 'medium',
+      subtitleSizeCycle: [80, 100, 125],
+      subtitleSizeShortcuts: [],
+      version: SHORTCUT_SETTINGS_VERSION,
+      uiStyle: 'classic',
+    }
     expect(await getSettings()).toEqual(expected)
     expect((await readSync())[SETTINGS_STORAGE_KEY]).toEqual(fixture.settings)
     const restored = parseSettingsBackup(JSON.stringify(fixture.backup))

@@ -1,4 +1,5 @@
-import { useRef, type ComponentProps, type PointerEvent as ReactPointerEvent } from 'react'
+import type { ComponentProps } from 'react'
+import { useNumericLabelDrag } from '@/shared/use-numeric-label-drag'
 
 import { SettingLabelWithTooltip } from '@/components/setting-label-with-tooltip'
 import { Field } from '@/components/app-ui/field'
@@ -20,20 +21,6 @@ type NumericSettingFieldProps = Omit<
   onDragCommit?: () => void
 }
 
-const DRAG_PIXELS_PER_STEP = 8
-
-const toFiniteNumber = (value: string | number | undefined): number | undefined => {
-  if (value === undefined || value === 'any') return undefined
-  const parsed = typeof value === 'number' ? value : Number.parseFloat(value)
-  return Number.isFinite(parsed) ? parsed : undefined
-}
-
-const decimalPlaces = (value: number): number => {
-  const [, fraction = '', exponent = '0'] =
-    value.toString().match(/^\d+(?:\.(\d+))?(?:e-(\d+))?$/i) ?? []
-  return fraction.length + Number.parseInt(exponent, 10)
-}
-
 export function NumericSettingField({
   id,
   label,
@@ -48,64 +35,10 @@ export function NumericSettingField({
   onWheel,
   ...inputProps
 }: NumericSettingFieldProps) {
-  const dragRef = useRef<{
-    pointerId: number
-    startX: number
-    startValue: number
-    startValueText: string
-    changed: boolean
-  } | null>(null)
-
-  const handleLabelPointerDown = (event: ReactPointerEvent<HTMLLabelElement>) => {
-    if (event.button !== 0 || inputProps.disabled) return
-
-    const startValue = Number.parseFloat(value)
-    if (!Number.isFinite(startValue)) return
-
-    dragRef.current = {
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startValue,
-      startValueText: value,
-      changed: false,
-    }
-    event.currentTarget.setPointerCapture?.(event.pointerId)
-  }
-
-  const handleLabelPointerMove = (event: ReactPointerEvent<HTMLLabelElement>) => {
-    const drag = dragRef.current
-    if (!drag || drag.pointerId !== event.pointerId) return
-
-    const step = toFiniteNumber(inputProps.step) ?? 1
-    const stepCount = Math.round((event.clientX - drag.startX) / DRAG_PIXELS_PER_STEP)
-    const precision = Math.min(decimalPlaces(step), 10)
-    const factor = 10 ** precision
-    const unclampedValue = Math.round((drag.startValue + stepCount * step) * factor) / factor
-    const min = toFiniteNumber(inputProps.min) ?? Number.NEGATIVE_INFINITY
-    const max = toFiniteNumber(inputProps.max) ?? Number.POSITIVE_INFINITY
-    const nextValue = Math.min(max, Math.max(min, unclampedValue))
-
-    drag.changed = nextValue !== drag.startValue
-    onValueChange(nextValue.toString())
-    event.preventDefault()
-  }
-
-  const handleLabelPointerUp = (event: ReactPointerEvent<HTMLLabelElement>) => {
-    const drag = dragRef.current
-    if (!drag || drag.pointerId !== event.pointerId) return
-
-    dragRef.current = null
-    event.currentTarget.releasePointerCapture?.(event.pointerId)
-    if (drag.changed) onDragCommit?.()
-  }
-
-  const handleLabelPointerCancel = (event: ReactPointerEvent<HTMLLabelElement>) => {
-    const drag = dragRef.current
-    if (!drag || drag.pointerId !== event.pointerId) return
-
-    dragRef.current = null
-    if (drag.changed) onValueChange(drag.startValueText)
-  }
+  const dragLabelProps = useNumericLabelDrag({
+    value, onValueChange, min: inputProps.min, max: inputProps.max, step: inputProps.step,
+    disabled: inputProps.disabled, onDragCommit,
+  })
 
   return (
     <Field orientation={orientation} className={fieldClassName}>
@@ -119,10 +52,7 @@ export function NumericSettingField({
         labelProps={{
           'aria-disabled': inputProps.disabled,
           style: { cursor: inputProps.disabled ? 'not-allowed' : 'ew-resize' },
-          onPointerDown: handleLabelPointerDown,
-          onPointerMove: handleLabelPointerMove,
-          onPointerUp: handleLabelPointerUp,
-          onPointerCancel: handleLabelPointerCancel,
+          ...dragLabelProps,
         }}
       />
       <Input

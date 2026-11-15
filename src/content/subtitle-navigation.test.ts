@@ -22,7 +22,7 @@ it('explains missing subtitle host access and allows retry after granting it', a
   const settings = structuredClone(DEFAULT_SETTINGS)
   settings.locale = 'zh-TW'
   settings.subtitleNavigation.enabled = true
-  settings.subtitleNavigation.bindings.replay.enabled = true
+  settings.subtitleNavigation.bindings.replay = { enabled: true, key: { ...DEFAULT_SETTINGS.bindings.skipIntro.key } }
   const subtitleNavigation = createSubtitleNavigation(() => settings, session, vi.fn())
   await subtitleNavigation.execute('next', document)
   expect(document.getElementById('shortcut-override-text-hint-label')).toHaveTextContent('字幕來源未授權')
@@ -56,7 +56,7 @@ it('gets subtitle metadata in Firefox without a page bridge', async () => {
       const success = { response: { success: true }, failureLabel: null }
       const seek = vi.spyOn(session, 'seekTo').mockResolvedValue(success)
       const play = vi.spyOn(session, 'play').mockResolvedValue(success)
-      const subtitleNavigation = createSubtitleNavigation(() => ({ ...DEFAULT_SETTINGS, subtitleNavigation: { ...DEFAULT_SETTINGS.subtitleNavigation, enabled: true, bindings: { ...DEFAULT_SETTINGS.subtitleNavigation.bindings, replay: { ...DEFAULT_SETTINGS.subtitleNavigation.bindings.replay, enabled: true } } } }), session, vi.fn())
+      const subtitleNavigation = createSubtitleNavigation(() => ({ ...DEFAULT_SETTINGS, subtitleNavigation: { ...DEFAULT_SETTINGS.subtitleNavigation, enabled: true, bindings: { ...DEFAULT_SETTINGS.subtitleNavigation.bindings, replay: { enabled: true, key: { ...DEFAULT_SETTINGS.bindings.skipIntro.key } } } } }), session, vi.fn())
       await subtitleNavigation.execute('next', document)
       expect(seek).toHaveBeenLastCalledWith(6000)
       await subtitleNavigation.execute('previous', document)
@@ -102,7 +102,7 @@ it('fetches once per track, preserves navigation state, and explicitly plays onl
   }
   window.addEventListener('shortcut-override:caption-request', respond)
   try {
-    const subtitleNavigation = createSubtitleNavigation(() => ({ ...DEFAULT_SETTINGS, subtitleNavigation: { ...DEFAULT_SETTINGS.subtitleNavigation, enabled: true, bindings: { ...DEFAULT_SETTINGS.subtitleNavigation.bindings, replay: { ...DEFAULT_SETTINGS.subtitleNavigation.bindings.replay, enabled: true } } } }), session, onSeek)
+    const subtitleNavigation = createSubtitleNavigation(() => ({ ...DEFAULT_SETTINGS, subtitleNavigation: { ...DEFAULT_SETTINGS.subtitleNavigation, enabled: true, bindings: { ...DEFAULT_SETTINGS.subtitleNavigation.bindings, replay: { enabled: true, key: { ...DEFAULT_SETTINGS.bindings.skipIntro.key } } } } }), session, onSeek)
     await subtitleNavigation.execute('next', document)
     expect(seek).toHaveBeenLastCalledWith(6000)
     expect(play).not.toHaveBeenCalled()
@@ -124,7 +124,7 @@ it('does not seek when disabled while a subtitle download is pending', async () 
   const respond = (event: Event) => window.dispatchEvent(new CustomEvent('shortcut-override:caption-response', { detail: JSON.stringify({ source: 'shortcut-override', id: JSON.parse((event as CustomEvent<string>).detail).id, metadata }) }))
   window.addEventListener('shortcut-override:caption-request', respond)
   try {
-    const subtitleNavigation = createSubtitleNavigation(() => ({ ...DEFAULT_SETTINGS, subtitleNavigation: { ...DEFAULT_SETTINGS.subtitleNavigation, enabled: true, bindings: { ...DEFAULT_SETTINGS.subtitleNavigation.bindings, replay: { ...DEFAULT_SETTINGS.subtitleNavigation.bindings.replay, enabled: true } } } }), session, vi.fn())
+    const subtitleNavigation = createSubtitleNavigation(() => ({ ...DEFAULT_SETTINGS, subtitleNavigation: { ...DEFAULT_SETTINGS.subtitleNavigation, enabled: true, bindings: { ...DEFAULT_SETTINGS.subtitleNavigation.bindings, replay: { enabled: true, key: { ...DEFAULT_SETTINGS.bindings.skipIntro.key } } } } }), session, vi.fn())
     const request = subtitleNavigation.execute('next', document)
     await Promise.resolve()
     subtitleNavigation.cancel()
@@ -142,7 +142,7 @@ it('ends a stalled subtitle delivery with an actionable timeout and allows retry
   const respond = (event: Event) => window.dispatchEvent(new CustomEvent('shortcut-override:caption-response', { detail: JSON.stringify({ source: 'shortcut-override', id: JSON.parse((event as CustomEvent<string>).detail).id, metadata }) }))
   window.addEventListener('shortcut-override:caption-request', respond)
   try {
-    const subtitleNavigation = createSubtitleNavigation(() => ({ ...DEFAULT_SETTINGS, subtitleNavigation: { ...DEFAULT_SETTINGS.subtitleNavigation, enabled: true, bindings: { ...DEFAULT_SETTINGS.subtitleNavigation.bindings, replay: { ...DEFAULT_SETTINGS.subtitleNavigation.bindings.replay, enabled: true } } } }), session, vi.fn())
+    const subtitleNavigation = createSubtitleNavigation(() => ({ ...DEFAULT_SETTINGS, subtitleNavigation: { ...DEFAULT_SETTINGS.subtitleNavigation, enabled: true, bindings: { ...DEFAULT_SETTINGS.subtitleNavigation.bindings, replay: { enabled: true, key: { ...DEFAULT_SETTINGS.bindings.skipIntro.key } } } } }), session, vi.fn())
     void subtitleNavigation.execute('next', document)
     await vi.advanceTimersByTimeAsync(12500)
     expect(document.getElementById('shortcut-override-text-hint-label')).toHaveTextContent('Subtitle download timed out')
@@ -162,7 +162,7 @@ const captionText = 'WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nOne\n\n00:00:03.00
 function pendingSubtitleNavigation(currentMs = metadata.currentMs) {
   const settings = structuredClone(DEFAULT_SETTINGS)
   settings.subtitleNavigation.enabled = true
-  settings.subtitleNavigation.bindings.replay.enabled = true
+  settings.subtitleNavigation.bindings.replay = { enabled: true, key: { ...DEFAULT_SETTINGS.bindings.skipIntro.key } }
   const video = document.createElement('video')
   document.body.append(video)
   const session = createNetflixPlaybackSession()

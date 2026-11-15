@@ -1,4 +1,6 @@
 import type { UiStyle } from './ui-styles'
+import type { SubtitleFavorite } from './subtitle-favorites'
+import type { AudioFavorite } from './audio-favorites'
 
 export { UI_STYLES } from './ui-styles'
 export type { UiStyle } from './ui-styles'
@@ -7,20 +9,51 @@ export const SHORTCUT_ACTIONS = [
   'playPause',
   'seekBackward',
   'seekForward',
+  'previousFrame',
+  'nextFrame',
   'volumeUp',
   'volumeDown',
   'mute',
   'toggleSubtitles',
+  'cycleSubtitleTrack',
+  'previousSubtitleTrack',
+  'previousAudioTrack',
+  'nextAudioTrack',
+  'cycleSubtitleSize',
   'fullscreen',
   'pictureInPicture',
   'skipIntro',
+  'previousEpisode',
+  'nextEpisode',
   'speedUp',
   'speedDown',
   'setPreferredSpeed',
   'speedReset',
 ] as const
 
-export type ShortcutAction = (typeof SHORTCUT_ACTIONS)[number]
+export type BuiltinShortcutAction = (typeof SHORTCUT_ACTIONS)[number]
+export type SeekShortcutAction = `seek:${string}`
+export type SubtitleSizeShortcutAction = `subtitle-size:${string}`
+export type PreferredSpeedShortcutAction = `preferred-speed:${string}`
+export type ShortcutAction = BuiltinShortcutAction | SeekShortcutAction | SubtitleSizeShortcutAction | PreferredSpeedShortcutAction
+
+export type PreferredSpeedShortcut = {
+  id: PreferredSpeedShortcutAction
+  speed: number
+}
+
+export type SubtitleSizeShortcut = {
+  id: SubtitleSizeShortcutAction
+  kind: 'cycle' | 'fixed'
+  sizes: number[]
+}
+
+export type SeekShortcut = {
+  id: SeekShortcutAction
+  kind: 'relative' | 'percentage'
+  // A relative entry owns a positive shared interval and two derived key actions.
+  value: number
+}
 
 export const LOCALES = ['en', 'zh-TW', 'zh-CN', 'ja', 'ko'] as const
 export type Locale = (typeof LOCALES)[number]
@@ -51,7 +84,7 @@ export type KeyEventLike = {
 
 export type ShortcutBinding = {
   enabled: boolean
-  key: KeyBinding
+  key: KeyBinding | null
 }
 
 export type SpeedSettings = {
@@ -71,15 +104,21 @@ export type SeekSettings = {
   seconds: number
 }
 
+export type AutoSkipSettings = {
+  intro: boolean
+  recap: boolean
+}
+
 export const PIP_SUBTITLE_SIZES = ['small', 'medium', 'large'] as const
 export type PipSubtitleSize = (typeof PIP_SUBTITLE_SIZES)[number]
+export type SubtitleSize = PipSubtitleSize | number
 
 export const PIP_SUBTITLE_BACKGROUNDS = ['none', 'translucent', 'dark'] as const
 export type PipSubtitleBackground = (typeof PIP_SUBTITLE_BACKGROUNDS)[number]
 
 export type PipSettings = {
   subtitlesEnabled: boolean
-  subtitleSize: PipSubtitleSize
+  subtitleSize: SubtitleSize
   subtitleBackground: PipSubtitleBackground
 }
 
@@ -91,12 +130,23 @@ export type ShortcutSettings = {
   version: number
   enabled: boolean
   locale: LocalePreference
+  hiddenFeatures: string[]
   theme: ThemeMode
   uiStyle: UiStyle
   speed: SpeedSettings
+  preferredSpeedShortcuts: PreferredSpeedShortcut[]
   subtitleNavigation: SubtitleNavigationSettings
+  subtitleFavorites: SubtitleFavorite[]
+  audioFavorites: AudioFavorite[]
+  subtitleSize: SubtitleSize
+  subtitleSizeCycle: number[]
+  subtitleSizeShortcuts: SubtitleSizeShortcut[]
   holdSpeed: HoldSpeedSettings
   seek: SeekSettings
+  seekShortcuts: SeekShortcut[]
+  autoSkip: AutoSkipSettings
+  autoNextEpisode: boolean
+  hidePauseOverlay: boolean
   pip: PipSettings
   bindings: Record<ShortcutAction, ShortcutBinding>
 }

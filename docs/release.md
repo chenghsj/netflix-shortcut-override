@@ -51,6 +51,26 @@ No AMO credentials are required by the release workflow. To publish Firefox manu
 
 AMO requires every submitted version number to be new. A GitHub Release can replace an existing asset, but an AMO version such as `0.4.2` cannot be uploaded again; increment the extension version first.
 
+## Beta releases
+
+Keep the browser-compatible numeric version in `package.json`, such as `0.6.9`,
+and tag the tested commit with a prerelease suffix, such as `v0.6.9-beta.1`.
+The workflow checks the numeric version, includes the beta suffix in ZIP names,
+and publishes a GitHub prerelease without changing the latest stable release.
+The installed extension reports the numeric version; the GitHub tag identifies
+the beta build.
+
+Beta packages are installed manually. For Chrome or Edge, extract the Chromium ZIP
+and load the extracted directory through the browser's extensions page with
+Developer mode enabled. Disable the store installation while testing to avoid
+both installations handling the same shortcuts. The beta has separate settings;
+export a backup from the store installation if those settings are needed.
+
+For Firefox, extract the Firefox ZIP and load its `manifest.json` using
+`about:debugging#/runtime/this-firefox` and **Load Temporary Add-on**. This unsigned
+test installation is removed when Firefox restarts. A beta GitHub Release does
+not submit or update any browser store listing.
+
 ## Changelog
 
 Release notes are generated from commits since the previous `v*` tag.

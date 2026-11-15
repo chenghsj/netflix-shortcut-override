@@ -17,8 +17,16 @@ describe('Netflix API client', () => {
     document.documentElement.removeAttribute(NETFLIX_API_BRIDGE_READY_ATTR)
   })
 
-  it('does not replay a timed-out seek through the background API', async () => {
-    const responsePromise = sendNetflixApi('seek', 10_000)
+  it.each([
+    ['seek', 10_000],
+    ['stepFrame', 1],
+    ['stepFrame', -1],
+    ['cycleAudioTrack', 1],
+    ['cycleAudioTrack', -1],
+    ['cycleSubtitleTrack', undefined],
+    ['cycleSubtitleTrack', -1],
+  ] as const)('does not replay a timed-out %s through the background API', async (action, value) => {
+    const responsePromise = sendNetflixApi(action, value)
 
     await vi.advanceTimersByTimeAsync(160)
 
@@ -26,6 +34,17 @@ describe('Netflix API client', () => {
       success: false,
       error: 'No page bridge response.',
     })
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalled()
+  })
+
+  it('includes audio preferences in a page bridge request', async () => {
+    const favorites = [{ language: 'ja', audioDescription: false }]
+    const request = sendNetflixApi('cycleAudioTrack', -1, undefined, favorites)
+    expect(vi.mocked(window.dispatchEvent).mock.calls[0][0]).toMatchObject({
+      detail: { action: 'cycleAudioTrack', value: -1, audioFavorites: favorites },
+    })
+    await vi.advanceTimersByTimeAsync(160)
+    await request
     expect(chrome.runtime.sendMessage).not.toHaveBeenCalled()
   })
 

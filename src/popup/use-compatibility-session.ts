@@ -102,10 +102,11 @@ export const useCompatibilitySession = () => {
 
   const commitCompatibilityDiagnosticsState = useCallback(
     (nextState: CompatibilityDiagnosticsState) => {
+      initialDiagnosticsCompleteRef.current = !readinessPolicy.shouldRefreshDiagnostics(nextState)
       settledDiagnosticsStateRef.current = nextState
       setDiagnosticsState(nextState)
     },
-    []
+    [readinessPolicy]
   )
 
   useEffect(() => {
@@ -188,10 +189,7 @@ export const useCompatibilitySession = () => {
   const startDiagnosticsCycle = useCallback(
     (tabId: number, mode: 'initial' | 'refresh'): (() => void) => {
       if (mode === 'initial') {
-        return readinessObserverRef.current.observeInitial(tabId, nextState => {
-          initialDiagnosticsCompleteRef.current = true
-          commitCompatibilityDiagnosticsState(nextState)
-        })
+        return readinessObserverRef.current.observeInitial(tabId, commitCompatibilityDiagnosticsState)
       }
 
       const cancel = readinessObserverRef.current.observeRefresh(tabId, {

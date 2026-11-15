@@ -34,14 +34,14 @@ it('keeps the latest functional preferences and explicit appearance through init
     })
     expect(result.current.loaded).toBe(false)
     expect(result.current.settings).toMatchObject({ enabled: false, theme: 'dark', locale: 'zh-TW' })
-    expect(result.current.speed.draft.preferred).toBe('1.75')
-    expect(result.current.seek.draft.seconds).toBe('17')
+    expect(result.current.settings.speed.preferred).toBe(1.75)
+    expect(result.current.settings.seek.seconds).toBe(17)
 
     await act(async () => releaseInitialRead?.())
     await waitFor(() => expect(result.current.loaded).toBe(true))
     expect(result.current.settings).toMatchObject({ enabled: false, theme: 'dark', locale: 'zh-TW', uiStyle: 'neobrutalism' })
-    expect(result.current.speed.draft.preferred).toBe('1.75')
-    expect(result.current.seek.draft.seconds).toBe('17')
+    expect(result.current.settings.speed.preferred).toBe(1.75)
+    expect(result.current.settings.seek.seconds).toBe(17)
 
     await act(async () => {
       result.current.updateSettings(current => ({ ...current, theme: 'light' }))
@@ -82,7 +82,7 @@ it('shows the persisted shortcut when a failed edit makes the next queued edit a
   })
   const { result, unmount } = renderHook(() => {
     const form = useShortcutSettingsForm()
-    const editor = useShortcutEditor({ ...form, ignoredGeneralActions: [] })
+    const editor = useShortcutEditor({ ...form, supportsSubtitlePreservingPip: true })
     return { form, editor }
   })
   const target = { group: 'general', action: 'playPause' } as const
@@ -96,12 +96,12 @@ it('shows the persisted shortcut when a failed edit makes the next queued edit a
     edit('KeyJ', 'j')
     await waitFor(() => expect(rejectFirstWrite).toBeTypeOf('function'))
     edit('KeyK', 'k')
-    expect(result.current.form.settings.bindings.playPause.key.code).toBe('KeyK')
+    expect(result.current.form.settings.bindings.playPause.key?.code).toBe('KeyK')
     await act(async () => rejectFirstWrite?.())
     await waitFor(() => expect(writes).toBe(2))
     const stored = await getSettings()
-    expect(stored.bindings.playPause.key.code).toBe('Space')
-    expect(result.current.form.settings.bindings.playPause.key.code).toBe('Space')
+    expect(stored.bindings.playPause.key?.code).toBe('Space')
+    expect(result.current.form.settings.bindings.playPause.key?.code).toBe('Space')
   } finally {
     unmount()
     vi.restoreAllMocks()

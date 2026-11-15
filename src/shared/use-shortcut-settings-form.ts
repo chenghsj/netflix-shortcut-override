@@ -8,36 +8,21 @@ import {
 
 import {
   DEFAULT_SETTINGS,
-  normalizeSeekSettings,
   normalizeSettings,
-  normalizeHoldSpeedSettings,
   normalizeSpeedSettings,
 } from '@/shared/shortcut-settings'
 import type { ShortcutSettings } from '@/shared/shortcut-types'
 import { observeSettings, saveSettings, updateSettings as storageUpdateSettings } from '@/shared/storage'
 
-export type SpeedField = keyof ShortcutSettings['speed']
-export type SeekField = keyof ShortcutSettings['seek']
+export type SpeedField = 'min' | 'max' | 'step'
 export type SpeedDraft = Record<SpeedField, string>
-export type SeekDraft = Record<SeekField, string>
-export type HoldSpeedDraft = { speed: string }
 
 const formatSpeedValue = (value: number): string => value.toString()
-const formatSeekValue = (value: number): string => value.toString()
 
 const speedDraftFromSettings = (speed: ShortcutSettings['speed']): SpeedDraft => ({
   min: formatSpeedValue(speed.min),
   max: formatSpeedValue(speed.max),
   step: formatSpeedValue(speed.step),
-  preferred: formatSpeedValue(speed.preferred),
-})
-
-const holdSpeedDraftFromSettings = (
-  holdSpeed: ShortcutSettings['holdSpeed']
-): HoldSpeedDraft => ({ speed: formatSpeedValue(holdSpeed.speed) })
-
-const seekDraftFromSettings = (seek: ShortcutSettings['seek']): SeekDraft => ({
-  seconds: formatSeekValue(seek.seconds),
 })
 
 const reconcileDraftValue = (draft: string, previous: number, next: number): string =>
@@ -51,7 +36,6 @@ const reconcileSpeedDraft = (
   min: reconcileDraftValue(draft.min, previous.min, next.min),
   max: reconcileDraftValue(draft.max, previous.max, next.max),
   step: reconcileDraftValue(draft.step, previous.step, next.step),
-  preferred: reconcileDraftValue(draft.preferred, previous.preferred, next.preferred),
 })
 
 type SaveRequest = { id: number; observation: number }
@@ -63,12 +47,6 @@ export const useShortcutSettingsForm = () => {
   const [settings, setSettings] = useState<ShortcutSettings>(DEFAULT_SETTINGS)
   const [speedDraft, setSpeedDraft] = useState<SpeedDraft>(() =>
     speedDraftFromSettings(DEFAULT_SETTINGS.speed)
-  )
-  const [seekDraft, setSeekDraft] = useState<SeekDraft>(() =>
-    seekDraftFromSettings(DEFAULT_SETTINGS.seek)
-  )
-  const [holdSpeedDraft, setHoldSpeedDraft] = useState<HoldSpeedDraft>(() =>
-    holdSpeedDraftFromSettings(DEFAULT_SETTINGS.holdSpeed)
   )
   const [loaded, setLoaded] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -84,12 +62,6 @@ export const useShortcutSettingsForm = () => {
     latestSettingsRef.current = nextSettings
     setSettings(nextSettings)
     setSpeedDraft(draft => reconcileSpeedDraft(draft, previous.speed, nextSettings.speed))
-    setSeekDraft(draft => ({
-      seconds: reconcileDraftValue(draft.seconds, previous.seek.seconds, nextSettings.seek.seconds),
-    }))
-    setHoldSpeedDraft(draft => ({
-      speed: reconcileDraftValue(draft.speed, previous.holdSpeed.speed, nextSettings.holdSpeed.speed),
-    }))
   }, [])
 
   useEffect(() => {
@@ -169,14 +141,6 @@ export const useShortcutSettingsForm = () => {
     }))
   }
 
-  const setSeekDraftSeconds = (value: string) => {
-    setSeekDraft({ seconds: value })
-  }
-
-  const setHoldSpeedDraftSpeed = (value: string) => {
-    setHoldSpeedDraft({ speed: value })
-  }
-
   const commitSpeedField = (field: SpeedField) => {
     const draftValue = speedDraft[field].trim()
     const parsed = Number.parseFloat(draftValue)
@@ -203,52 +167,6 @@ export const useShortcutSettingsForm = () => {
     }))
   }
 
-  const commitSeekSeconds = () => {
-    const draftValue = seekDraft.seconds.trim()
-    const parsed = Number.parseFloat(draftValue)
-
-    if (!draftValue || !Number.isFinite(parsed)) {
-      setSeekDraftSeconds(formatSeekValue(settings.seek.seconds))
-      return
-    }
-
-    const nextSeek = normalizeSeekSettings({
-      ...settings.seek,
-      seconds: parsed,
-    })
-    setSeekDraft(seekDraftFromSettings(nextSeek))
-    updateSettings(current => ({
-      ...current,
-      seek: normalizeSeekSettings({
-        ...current.seek,
-        seconds: parsed,
-      }),
-    }))
-  }
-
-  const commitHoldSpeed = () => {
-    const draftValue = holdSpeedDraft.speed.trim()
-    const parsed = Number.parseFloat(draftValue)
-
-    if (!draftValue || !Number.isFinite(parsed)) {
-      setHoldSpeedDraftSpeed(formatSpeedValue(settings.holdSpeed.speed))
-      return
-    }
-
-    const nextHoldSpeed = normalizeHoldSpeedSettings({
-      ...settings.holdSpeed,
-      speed: parsed,
-    })
-    setHoldSpeedDraft(holdSpeedDraftFromSettings(nextHoldSpeed))
-    updateSettings(current => ({
-      ...current,
-      holdSpeed: normalizeHoldSpeedSettings({
-        ...current.holdSpeed,
-        speed: parsed,
-      }),
-    }))
-  }
-
   const handleSpeedKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') {
       event.currentTarget.blur()
@@ -263,46 +181,11 @@ export const useShortcutSettingsForm = () => {
     }
   }
 
-  const handleSeekKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Enter') {
-      event.currentTarget.blur()
-      return
-    }
-
-    if (event.key === 'Escape') {
-      setSeekDraftSeconds(formatSeekValue(settings.seek.seconds))
-      event.currentTarget.blur()
-    }
-  }
-
-  const handleHoldSpeedKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Enter') {
-      event.currentTarget.blur()
-      return
-    }
-
-    if (event.key === 'Escape') {
-      setHoldSpeedDraftSpeed(formatSpeedValue(settings.holdSpeed.speed))
-      event.currentTarget.blur()
-    }
-  }
-
   const resetShortcutBindings = () => {
-    updateSettings(current => ({ ...current, bindings: DEFAULT_SETTINGS.bindings }))
-  }
-
-  const resetSpeed = () => {
-    setSpeedDraft(speedDraftFromSettings(DEFAULT_SETTINGS.speed))
-    updateSettings(current => ({ ...current, speed: DEFAULT_SETTINGS.speed }))
-  }
-
-  const resetSeek = () => {
-    setSeekDraft(seekDraftFromSettings(DEFAULT_SETTINGS.seek))
-    updateSettings(current => ({ ...current, seek: DEFAULT_SETTINGS.seek }))
+    updateSettings(current => ({ ...current, seekShortcuts: [], preferredSpeedShortcuts: [], hiddenFeatures: current.hiddenFeatures.filter(id => !id.startsWith('group:')), subtitleSizeCycle: DEFAULT_SETTINGS.subtitleSizeCycle, subtitleSizeShortcuts: [], bindings: DEFAULT_SETTINGS.bindings }))
   }
 
   const resetHoldSpeed = () => {
-    setHoldSpeedDraft(holdSpeedDraftFromSettings(DEFAULT_SETTINGS.holdSpeed))
     updateSettings(current => ({ ...current, holdSpeed: DEFAULT_SETTINGS.holdSpeed }))
   }
 
@@ -336,26 +219,14 @@ export const useShortcutSettingsForm = () => {
       setField: setSpeedDraftField,
       commitField: commitSpeedField,
       handleKeyDown: handleSpeedKeyDown,
-      reset: resetSpeed,
-    },
-    seek: {
-      draft: seekDraft,
-      setSeconds: setSeekDraftSeconds,
-      commit: commitSeekSeconds,
-      handleKeyDown: handleSeekKeyDown,
-      reset: resetSeek,
     },
     holdSpeed: {
-      draft: holdSpeedDraft,
       enabled: settings.holdSpeed.enabled,
       showHint: settings.holdSpeed.showHint,
       enableControlDisabled: holdSpeedEnableControlDisabled,
       detailsDisabled: holdSpeedDetailsDisabled,
       setEnabled: setHoldSpeedEnabled,
       setShowHint: setHoldSpeedShowHint,
-      setSpeed: setHoldSpeedDraftSpeed,
-      commit: commitHoldSpeed,
-      handleKeyDown: handleHoldSpeedKeyDown,
       reset: resetHoldSpeed,
     },
   }

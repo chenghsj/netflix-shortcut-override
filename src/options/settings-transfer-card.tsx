@@ -3,7 +3,7 @@ import {
   DownloadIcon,
   UploadIcon,
 } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 
 import { KeyBindingKbd } from '@/components/key-binding-kbd'
 import { Alert, AlertTitle } from '@/components/app-ui/alert'
@@ -26,10 +26,12 @@ import {
   type ParsedSettingsBackup,
   type SettingsBackupParseErrorCode,
 } from '@/shared/settings-backup'
-import { SHORTCUT_ACTIONS, SUBTITLE_NAVIGATION_ACTIONS, type Locale, type ShortcutSettings } from '@/shared/shortcut-types'
+import { SUBTITLE_NAVIGATION_ACTIONS, type Locale, type ShortcutSettings } from '@/shared/shortcut-types'
+import { getShortcutActions } from '@/shared/shortcut-bindings'
 import { SUBTITLE_NAVIGATION_COPY } from '@/shared/subtitle-navigation'
 
 type SettingsTransferCardProps = {
+  title?: ReactNode
   copy: ReturnType<typeof getCopy>
   locale: Locale
   settings: ShortcutSettings
@@ -54,6 +56,7 @@ const getErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : 'Unknown error'
 
 export function SettingsTransferCard({
+  title,
   copy,
   locale,
   settings,
@@ -161,9 +164,8 @@ export function SettingsTransferCard({
     <>
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <DatabaseBackupIcon data-icon="inline-start" />
-            {copy.backupRestore}
+          <CardTitle>
+            {title ?? <span className="flex items-center gap-2"><DatabaseBackupIcon data-icon="inline-start" />{copy.backupRestore}</span>}
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
@@ -242,7 +244,7 @@ export function SettingsTransferCard({
               <dt className="text-muted-foreground">{copy.enabled}</dt>
               <dd>{enabledLabel(importedSettings.enabled)}</dd>
               <dt className="text-muted-foreground">{copy.backupEnabledShortcuts}</dt>
-              <dd>{enabledShortcutCount} / {SHORTCUT_ACTIONS.length}</dd>
+              <dd>{enabledShortcutCount} / {getShortcutActions(importedSettings).length}</dd>
               <dt className="text-muted-foreground">{subtitleCopy.title}</dt>
               <dd className="min-w-0">
                 <p>{formatTemplate(copy.backupSubtitleNavigationSummary, {
@@ -256,7 +258,7 @@ export function SettingsTransferCard({
                     return (
                       <li key={action} className="flex flex-wrap items-center gap-x-2 gap-y-1">
                         <span>{subtitleCopy[action]}</span>
-                        <KeyBindingKbd binding={binding.key} className="flex-wrap" />
+                        <KeyBindingKbd binding={binding.key} emptyLabel={copy.unassignedShortcut} className="flex-wrap" />
                         <span className="text-muted-foreground">{enabledLabel(binding.enabled)}</span>
                       </li>
                     )

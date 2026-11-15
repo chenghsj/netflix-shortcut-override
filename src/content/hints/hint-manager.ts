@@ -2,6 +2,7 @@ import {
   HINT_IDS,
   TEXT_HINT_LABEL_ID,
   HOLD_SPEED_HINT_ID,
+  POSITION_HINT_LABEL_ID,
   SPEED_HINT_LABEL_ID,
   VOLUME_HINT_LABEL_ID,
 } from './hint-constants'
@@ -27,6 +28,7 @@ import {
   renderMediaHint,
   renderTextHint,
   renderPlaybackHint,
+  renderPositionHint,
   renderSeekHint,
   renderHoldSpeedHint,
   renderSpeedHint,
@@ -86,6 +88,9 @@ class DocumentHintManager implements HintManager {
         return
       case 'speed':
         renderSpeedHint(this.rendererContext, request)
+        return
+      case 'position':
+        renderPositionHint(this.rendererContext, request)
         return
       case 'seek':
         this.seekSeries = renderSeekHint(this.rendererContext, request, this.seekSeries)
@@ -191,12 +196,15 @@ class DocumentHintManager implements HintManager {
         positionCenteredHint(root, this.renderDoc)
         return
       case 'volume':
-      case 'speed': {
+      case 'speed':
+      case 'position': {
         const circle = root.firstElementChild as HTMLElement | null
         const labelId =
           request.type === 'volume'
             ? VOLUME_HINT_LABEL_ID
-            : SPEED_HINT_LABEL_ID
+            : request.type === 'speed'
+              ? SPEED_HINT_LABEL_ID
+              : POSITION_HINT_LABEL_ID
         const label = root.querySelector<HTMLElement>(`#${labelId}`)
         if (circle) positionCenteredHint(circle, this.renderDoc)
         if (label) positionLabeledHintLabel(label)

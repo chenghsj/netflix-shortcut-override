@@ -11,6 +11,8 @@ import {
   type NetflixApiResponse,
 } from '@/shared/netflix-api'
 import { executeNetflixPageApi } from '@/shared/netflix-page-api-executor'
+import { normalizeSubtitleFavorites } from '@/shared/subtitle-favorites'
+import { normalizeAudioFavorites } from '@/shared/audio-favorites'
 
 type BridgeState = {
   abortController: AbortController
@@ -50,7 +52,12 @@ const handleRequest = (event: Event) => {
       source: 'shortcut-override',
       id: detail.id,
       success: true,
-      result: executeNetflixPageApi(detail.action, detail.value),
+      result: executeNetflixPageApi(
+        detail.action,
+        detail.value,
+        detail.action === 'cycleSubtitleTrack' ? normalizeSubtitleFavorites(detail.subtitleFavorites) : undefined,
+        detail.action === 'cycleAudioTrack' ? normalizeAudioFavorites(detail.audioFavorites) : undefined,
+      ),
     })
   } catch (error) {
     sendResponse({

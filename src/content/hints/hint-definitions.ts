@@ -89,6 +89,53 @@ const createSeekDirectionIcon = (
     [{ tag: 'path', attributes: { d: path } }]
   )
 
+const createPositionDirectionIcon = (direction: 'backward' | 'forward'): HintIcon =>
+  createHintIcon(
+    {
+      'data-hint-icon': `position-${direction}`,
+      viewBox: '0 0 24 24',
+      width: 56,
+      height: 56,
+      fill: 'white',
+      stroke: 'white',
+      'stroke-width': 0.8,
+      'stroke-linejoin': 'round',
+      'aria-hidden': 'true',
+    },
+    [{
+      tag: 'path',
+      attributes: {
+        d: direction === 'forward'
+          ? 'M4 5v14l9-7-9-7zM11 5v14l9-7-9-7z'
+          : 'M20 5v14l-9-7 9-7zM13 5v14l-9-7 9-7z',
+      },
+    }]
+  )
+
+const createFrameDirectionIcon = (direction: 'backward' | 'forward'): HintIcon =>
+  createHintIcon(
+    {
+      'data-hint-icon': `frame-${direction}`,
+      viewBox: '0 0 24 24',
+      width: 56,
+      height: 56,
+      fill: 'currentColor',
+      'aria-hidden': 'true',
+    },
+    [
+      {
+        tag: 'path',
+        attributes: {
+          d: direction === 'forward' ? 'M5 5v14l10-7z' : 'M19 5v14L9 12z',
+        },
+      },
+      {
+        tag: 'rect',
+        attributes: { x: direction === 'forward' ? 17 : 5, y: 5, width: 2, height: 14, rx: 0.5 },
+      },
+    ]
+  )
+
 export const mediaHintIcons = {
   play: createHintIcon(
     { viewBox: '0 0 24 24', width: 36, height: 36, fill: 'white' },
@@ -136,6 +183,10 @@ export const mediaHintIcons = {
   forward: (seconds: number) => createSeekIcon(forwardPath, seconds),
   rewindDirection: createSeekDirectionIcon(rewindPath, 'backward'),
   forwardDirection: createSeekDirectionIcon(forwardPath, 'forward'),
+  positionBackward: createPositionDirectionIcon('backward'),
+  positionForward: createPositionDirectionIcon('forward'),
+  frameBackward: createFrameDirectionIcon('backward'),
+  frameForward: createFrameDirectionIcon('forward'),
   volume: createHintIcon(
     {
       'data-hint-icon': 'volume-up',
@@ -305,10 +356,11 @@ export const mediaHintIcons = {
 
 export type HintRequest =
   | { type: 'text'; label: string; durationMs?: number | null; loading?: boolean }
-  | { type: 'media'; icon: HintIcon; label: string }
+  | { type: 'media'; icon: HintIcon; label: string; compact?: boolean; durationMs?: number }
   | { type: 'playback'; icon: HintIcon; color?: string }
   | { type: 'volume'; icon: HintIcon; label: string }
   | { type: 'speed'; icon: HintIcon; label: string }
+  | { type: 'position'; icon: HintIcon; label: string }
   | { type: 'seek'; direction: -1 | 1; seconds: number }
   | { type: 'holdSpeed'; label: string }
 

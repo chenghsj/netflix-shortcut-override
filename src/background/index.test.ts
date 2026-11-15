@@ -164,6 +164,68 @@ describe('background Netflix API bridge', () => {
     } finally { window.history.replaceState(null, '', '/') }
   })
 
+  it('cycles favorites backward in the serialized player executor', async () => {
+    const current = { id: 'en', bcp47: 'en', rawTrackType: 'closedcaptions' }
+    const french = { id: 'fr', bcp47: 'fr', rawTrackType: 'closedcaptions' }
+    const spanish = { id: 'es-419', bcp47: 'es-419', rawTrackType: 'closedcaptions' }
+    const setTextTrack = vi.fn()
+    const player = {
+      getTextTrackList: () => [current, french, spanish], getTextTrack: () => current, setTextTrack,
+    }
+    Object.assign(window, { netflix: { appContext: { state: { playerApp: { getAPI: () => ({
+      videoPlayer: {
+        getAllPlayerSessionIds: () => ['session'],
+        getVideoPlayerBySessionId: () => player,
+      },
+    }) } } } } })
+    vi.mocked(chrome.scripting.executeScript).mockImplementation(async injection => {
+      const { func, args } = injection as unknown as { func: (...args: unknown[]) => unknown; args: unknown[] }
+      const isolated = Function(`return (${func.toString()})`)() as typeof func
+      return [{ frameId: 0, result: isolated(...args) }]
+    })
+    await import('@/background/index')
+    const listener = vi.mocked(chrome.runtime.onMessage.addListener).mock.calls.at(-1)?.[0]
+    const respond = vi.fn()
+    listener?.({
+      type: 'EXECUTE_NETFLIX_API', action: 'cycleSubtitleTrack', value: -1,
+      subtitleFavorites: [
+        { language: 'en' },
+        { language: 'fr' },
+        { language: 'es-419' },
+      ],
+    }, { tab: { id: 42 } } as chrome.runtime.MessageSender, respond)
+    await vi.waitFor(() => expect(respond).toHaveBeenCalledWith({
+      success: true, result: expect.objectContaining({ subtitleTrackLanguage: 'es-419' }),
+    }))
+    expect(setTextTrack).toHaveBeenCalledExactlyOnceWith(spanish)
+  })
+
+  it('normalizes audio favorites and switches them in the serialized executor', async () => {
+    const english = { id: 'en', bcp47: 'en' }
+    const described = { id: 'en-ad', bcp47: 'en', rawTrackType: 'ASSISTIVE' }
+    const setAudioTrack = vi.fn()
+    const player = { getAudioTrackList: () => [english, described], getAudioTrack: () => english, setAudioTrack }
+    Object.assign(window, { netflix: { appContext: { state: { playerApp: { getAPI: () => ({
+      videoPlayer: { getAllPlayerSessionIds: () => ['session'], getVideoPlayerBySessionId: () => player },
+    }) } } } } })
+    vi.mocked(chrome.scripting.executeScript).mockImplementation(async injection => {
+      const { func, args } = injection as unknown as { func: (...args: unknown[]) => unknown; args: unknown[] }
+      const isolated = Function(`return (${func.toString()})`)() as typeof func
+      return [{ frameId: 0, result: isolated(...args) }]
+    })
+    await import('@/background/index')
+    const listener = vi.mocked(chrome.runtime.onMessage.addListener).mock.calls.at(-1)?.[0]
+    const respond = vi.fn()
+    listener?.({ type: 'EXECUTE_NETFLIX_API', action: 'cycleAudioTrack', value: 1,
+      audioFavorites: [{ language: ' EN ', audioDescription: true }, { language: 'en', audioDescription: true }, null],
+    }, { tab: { id: 42 } } as chrome.runtime.MessageSender, respond)
+    await vi.waitFor(() => expect(setAudioTrack).toHaveBeenCalledExactlyOnceWith(described))
+    expect(chrome.scripting.executeScript).toHaveBeenCalledWith(expect.objectContaining({
+      args: ['cycleAudioTrack', 1, [], [{ language: 'en', audioDescription: true }]],
+    }))
+    expect(respond).toHaveBeenCalledWith({ success: true, result: expect.objectContaining({ audioTrackSwitchCalled: true }) })
+  })
+
   it('returns a specific permission error without requesting the subtitle CDN', async () => {
     vi.mocked(chrome.permissions.contains).mockImplementation(() => Promise.resolve(false) as never)
     vi.mocked(chrome.tabs.get).mockImplementation(() => Promise.resolve({ id: 42, url: 'https://www.netflix.com/watch/123' }) as never)

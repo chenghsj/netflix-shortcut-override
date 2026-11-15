@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createNetflixPlaybackSession } from '@/content/netflix-playback-session'
+import { createShortcutCommandController } from '@/content/shortcuts/shortcut-command-controller'
 import type { NetflixApiResponse } from '@/shared/netflix-api'
 import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
 import { AdoptedVideoBinding } from './adopted-video-binding'
@@ -30,6 +31,58 @@ describe('AdoptedVideoBinding', () => {
     binding.destroy()
     iframe.remove()
   })
+
+  it.each(['keyboard pause', 'PiP pause', 'another seek', 'disable', 'disable and re-enable', 'replace video', 'close'] as const)(
+    'does not resume an old timeline seek after %s', async action => {
+      let finishSeek!: (response: NetflixApiResponse) => void
+      const success: NetflixApiResponse = { success: true, result: {
+        action: 'seekTo', playerApiFound: true, playerFound: true, sessionIds: [], seekCalled: true,
+      } }
+      const transport = vi.fn().mockImplementation((command: string) => command === 'seekTo'
+        ? new Promise<NetflixApiResponse>(resolve => { finishSeek = resolve })
+        : Promise.resolve(success))
+      const session = createNetflixPlaybackSession(transport)
+      const video = document.createElement('video')
+      let paused = false
+      const play = vi.fn(async () => { paused = false })
+      Object.defineProperties(video, {
+        paused: { configurable: true, get: () => paused },
+        duration: { configurable: true, value: 240 },
+        currentTime: { configurable: true, value: 40 },
+        play: { configurable: true, value: play },
+        pause: { configurable: true, value: () => { paused = true } },
+      })
+      document.body.append(video)
+      const commands = createShortcutCommandController(() => DEFAULT_SETTINGS, session)
+      binding = new AdoptedVideoBinding({ sourceDocument: document, pipWindow,
+        playbackSession: session, commands, settings: DEFAULT_SETTINGS, onUserSeek: vi.fn() })
+      const area = binding.adopt(video)
+      pipWindow.document.body.append(area)
+      const timeline = area.querySelector<HTMLInputElement>('[data-pip-control="timeline"]')!
+      timeline.value = '90'
+      timeline.dispatchEvent(new Event('input'))
+      timeline.dispatchEvent(new Event('change'))
+      expect(transport).toHaveBeenCalledWith('seekTo', 90_000)
+
+      if (action === 'keyboard pause') commands.execute('playPause', pipWindow.document)
+      else if (action === 'PiP pause') area.querySelector<HTMLButtonElement>('[data-pip-control="playback"]')!.click()
+      else if (action === 'another seek') commands.execute('seekForward', pipWindow.document)
+      else if (action === 'disable' || action === 'disable and re-enable') {
+        binding.updateSettings({ ...DEFAULT_SETTINGS, enabled: false })
+        if (action === 'disable and re-enable') binding.updateSettings(DEFAULT_SETTINGS)
+      } else if (action === 'replace video') {
+        const replacement = document.createElement('video')
+        document.body.append(replacement)
+        binding.replace(replacement)
+      }
+      else binding.destroy()
+      finishSeek(success)
+      await vi.waitFor(() => expect(timeline.dataset.dragging).toBe('false'))
+      for (let index = 0; index < 8; index++) await Promise.resolve()
+      expect(play).not.toHaveBeenCalled()
+      expect(transport.mock.calls.some(([command]) => command === 'play')).toBe(false)
+    },
+  )
 
   it('adopts a video with its controls and subtitle mirror', () => {
     const video = document.createElement('video')

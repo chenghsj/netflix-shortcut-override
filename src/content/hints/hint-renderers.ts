@@ -29,6 +29,8 @@ import {
   HOLD_SPEED_HINT_VISIBLE_TRANSFORM,
   SPEED_HINT_ID,
   SPEED_HINT_LABEL_ID,
+  POSITION_HINT_ID,
+  POSITION_HINT_LABEL_ID,
   TRANSIENT_HINT_VISIBLE_DURATION_MS,
   VOLUME_HINT_ID,
   VOLUME_HINT_LABEL_ENTER_TRANSITION,
@@ -80,8 +82,10 @@ const isHTMLElementInDocument = (
   return Boolean(HTMLElementConstructor && element instanceof HTMLElementConstructor)
 }
 
-const scheduleMediaExit = (context: HintRendererContext, root: HTMLElement): void => {
-  context.scheduleExit(TRANSIENT_HINT_VISIBLE_DURATION_MS, () => {
+const scheduleMediaExit = (
+  context: HintRendererContext, root: HTMLElement, durationMs = TRANSIENT_HINT_VISIBLE_DURATION_MS,
+): void => {
+  context.scheduleExit(durationMs, () => {
     root.style.transition = HINT_EXIT_TRANSITION
     root.style.opacity = '0'
     root.style.transform = getTransform(context, HINT_EXIT_TRANSFORM)
@@ -99,12 +103,23 @@ export const renderMediaHint = (
       : null
   const existingIcon = visibleRoot?.firstElementChild as HTMLElement | null
   const existingLabel = visibleRoot?.lastElementChild as HTMLElement | null
+  const compact = request.compact ?? request.icon === mediaHintIcons.subtitles
+  const applySize = (root: HTMLElement, label: HTMLElement): void => {
+    setStyles(root, {
+      gap: compact ? '4px' : '8px',
+      padding: compact ? '12px 20px' : '20px 32px',
+      borderRadius: compact ? '10px' : '12px',
+    })
+    label.style.fontSize = compact ? '12px' : '13px'
+  }
 
   if (visibleRoot && existingIcon && existingLabel) {
     existingIcon.replaceChildren(renderHintIcon(context.renderDoc, request.icon))
+    existingIcon.style.transform = compact ? 'scale(0.82)' : ''
     existingLabel.textContent = request.label
+    applySize(visibleRoot, existingLabel)
     positionCenteredHint(visibleRoot, context.renderDoc)
-    scheduleMediaExit(context, visibleRoot)
+    scheduleMediaExit(context, visibleRoot, request.durationMs)
     return
   }
 
@@ -131,9 +146,11 @@ export const renderMediaHint = (
   const icon = context.renderDoc.createElement('div')
   icon.appendChild(renderHintIcon(context.renderDoc, request.icon))
   icon.style.color = 'white'
+  icon.style.transform = compact ? 'scale(0.82)' : ''
   const label = context.renderDoc.createElement('span')
   label.textContent = request.label
   setStyles(label, { fontSize: '13px', fontWeight: '600', letterSpacing: '0.03em' })
+  applySize(nextRoot, label)
   nextRoot.replaceChildren(icon, label)
   positionCenteredHint(nextRoot, context.renderDoc)
   nextRoot.style.visibility = 'visible'
@@ -142,7 +159,7 @@ export const renderMediaHint = (
   void nextRoot.offsetWidth
   nextRoot.style.opacity = HINT_VISIBLE_OPACITY
   nextRoot.style.transform = getTransform(context, HINT_VISIBLE_TRANSFORM)
-  scheduleMediaExit(context, nextRoot)
+  scheduleMediaExit(context, nextRoot, request.durationMs)
 }
 
 export const renderPlaybackHint = (
@@ -423,6 +440,11 @@ export const renderSpeedHint = (
     SPEED_HINT_LABEL_ID,
     context.responsive ? '9' : '2147483647'
   )
+
+export const renderPositionHint = (
+  context: HintRendererContext,
+  request: Extract<HintRequest, { type: 'position' }>
+): void => renderLabeledHint(context, request, POSITION_HINT_ID, POSITION_HINT_LABEL_ID)
 
 const updateSeekLabel = (
   renderDoc: Document,

@@ -33,7 +33,7 @@ export function CompatibilityConnectionAlert({
         </div>
       </div>
       <Button
-        variant="outline"
+        variant="default"
         className="mt-2.5 w-full"
         onClick={onReloadPage}
       >

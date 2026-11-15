@@ -86,7 +86,7 @@ Do not use Chrome DevTools as the verification path for this real-browser check.
 
 ## 5. Verify Keyboard Shortcuts
 
-For the ordinary shortcut checks below, leave the Subtitle navigation master off so its default `S` binding does not replace Skip Intro. Before testing shortcuts, open the extension toolbar popup on the watch page.
+For the ordinary shortcut checks below, leave the Subtitle navigation master off. Before testing shortcuts, open the extension toolbar popup on the watch page. On the first open and after closing/reopening, confirm it directly shows shortcut search, the Playback category, and its saved keys, without tabs or quick-setting controls. The header must retain the global enable switch, compatibility status, and Open options entry. The popup must grow to its intrinsic height rather than displaying only the header and footer. Check this from a non-Netflix page too; a long search result list must scroll independently while the header and footer remain visible.
 
 Verify playback focus restoration:
 
@@ -127,10 +127,10 @@ Select the shield-shaped diagnostics button in the title bar and verify:
 - Compatibility reports that Netflix playback features are ready.
 - Extension, video, page bridge, Netflix player API, and Picture-in-Picture rows show their expected available states.
 - Copy diagnostics is available after diagnostics respond and produces a report without the active Netflix URL.
-- Missing playback state is retried within roughly two seconds while the diagnostics dialog stays open.
+- Missing playback state is retried within roughly two seconds even while the diagnostics dialog is closed. Open the popup while Netflix is initializing, leave the dialog closed, and confirm the pending header disappears once playback is ready. Repeat after opening and closing diagnostics during initialization.
 - Automatic checks stop after playback is ready or a stable unsupported capability is identified.
 - A missing content-script receiver produces the inline reload recovery state instead of retrying indefinitely.
-- Closing the diagnostics dialog stops automatic checks and returns to the uncluttered popup.
+- Closing the diagnostics dialog returns to the popup; pending playback checks continue until ready. Closing the popup cancels its observation.
 
 Run these against the real Netflix watch page:
 
@@ -138,6 +138,10 @@ Run these against the real Netflix watch page:
 - Hold the configured Play / Pause key: temporary hold speed, then restore on release.
 - `ArrowRight`: seek forward by configured seconds.
 - `ArrowLeft`: seek backward by configured seconds.
+- `,` / `.` move one frame backward / forward and stay paused. Start once during playing video to confirm it pauses before stepping, then repeat while already paused. Hold each briefly to verify cumulative movement, reverse direction, resume and pause, then verify stepping starts from the new position. Confirm the start/end clamp and that ordinary seeking resets the accumulated position. Netflix diagnostics determine frame duration, with a 24 FPS estimate when unavailable; record any seek rounding separately. Compare frame/audio hint sizing with the existing compact subtitle-language hint and verify subtitle/audio language labels remain visible for 1 second after the last change.
+- With General settings → Hide pause overlay enabled, pause on the source page using Netflix's controls and the configured Play / Pause shortcut, then repeat after frame stepping. Wait at least 60 seconds each time. Confirm Netflix's title/synopsis/paused overlay and dark backdrop stay hidden while the frame, captions and controls remain available and the playback position stays fixed. Turn Hide pause overlay off to restore the overlay immediately, then on to hide it. Confirm the saved off value survives reopening Options and a global-disable cycle; restore it to on after testing. Disabling the global override must also restore the overlay.
+- Configure Favorite audio tracks under Volume and audio: batch-add two available languages, reorder them, and verify Shift+A / Shift+D follow that order in normal playback and PiP. Confirm missing favorites are skipped, an entirely unavailable list preserves the current audio with a hint, clearing the list restores all-track cycling, and a sole matching selected track is not reselected. Save the standard and Audio Description variants of one language separately and verify neither is substituted for the other. Reopen Options and round-trip a backup to check order and variant retention.
+- `Shift+A` / `Shift+D`: previous / next audio track, wrapping in both directions. Verify the native menu's selected track and actual sound agree with the hint, including audio-description variants when offered. Holding a key must switch only once. Check a single-track title when available. Remap and disable each new action in Options, confirm the popup reflects the saved keys, and verify typing remains unaffected. Repeat the frame and audio checks in PiP.
 - `ArrowUp`: volume up.
 - `ArrowDown`: volume down.
 - `M`: mute/unmute.
@@ -145,10 +149,18 @@ Run these against the real Netflix watch page:
 - `F`: fullscreen.
 - `Shift+P`: enter Picture-in-Picture; press it again to exit.
 - `S`: Skip Intro when the Netflix button is visible.
+- `Ctrl+P`: play the previous episode with one key press, including when player controls are hidden and the episode picker is closed. Confirm playback changes, rather than stopping at the episode preview.
+- `Ctrl+N`: play the next episode, returning to the original episode after the previous-episode check.
 - `Shift+.`: speed up.
 - `Shift+,`: speed down.
 - `Shift+"`: set the configured preferred speed directly; repeated presses keep that speed.
 - `Shift+/`: reset speed.
+
+### Subtitle-track queue and settings checks
+
+- Press `Shift+C` or `Shift+X` rapidly while a subtitle switch is pending. Valid consecutive presses must execute in order. Before the pending switch finishes, separately test global disable, disabling the originating row, changing watch IDs, replacing the video, and closing the originating PiP window. Queued commands must not dispatch afterward or show a cancelled-command hint. Disabling and immediately re-enabling the global switch must not revive the old queue. Preserve the already-issued PiP command's confirmed fallback update. If the request completes too quickly to establish a queue, record that cancellation case as unverified.
+- In Options → Subtitles, confirm the Sentence jumps and replay heading has no information button or tooltip. Turn the global switch off and confirm inline prerequisite guidance remains visible and saved settings are retained. Restore the original settings.
+- Edit a percentage jump at 50% and drag its numeric label eight pixels to the right: it should preview 55%, without saving. Seconds editors advance by 1 over the same distance. Pointer cancellation restores the starting draft; dialog Cancel leaves persisted values unchanged. Direct percentage entry still accepts 51%.
 
 Expected:
 
@@ -282,17 +294,17 @@ npm run build
 
 ## 11. Subtitle Navigation Regression Checks
 
-Open the popup on its Shortcuts tab with subtitle navigation off. Confirm the subtitle header shows its master switch and hides the action rows. Enable both masters in Options or the popup and confirm all four configured subtitle keys appear. Disabled rows show Disabled, and ordinary shortcuts claimed by enabled subtitle rows show Subtitle priority with the overriding action in their tooltip. Verify the default S/Skip Intro overlap, a custom key with modifiers, and release after disabling the overlapping row. Turning off the global override hides the subtitle rows and disables the subtitle master without clearing its saved values. Key editing and resets stay in Options. The popup master requests website access through the same permission flow as Options.
+Open the popup with subtitle navigation off. Select Subtitle navigation in the category selector and confirm all four configured keys are available for reference, with a category Disabled indicator while the subtitle master is off. Confirm there is no subtitle master or playback preference control in the popup. Use Open settings to open Subtitle navigation directly, enable it in Options, and return to confirm that individual disabled rows still show Disabled. For legacy overlaps, the ordinary shortcut stays active and the subtitle row shows Shortcut priority with the general action in its accessible description. Verify a custom key with modifiers and release after disabling the overlapping row in Options. Turning off the popup global switch preserves the saved subtitle preference and keeps the keys available for reference. Confirm Open settings has visible text and an external-link icon, and its tooltip explains that editing happens on the settings page. Verify search finds subtitle-navigation actions and physical keys across categories, Escape restores the selected category, and reopening the popup clears its temporary search and category without saving navigation in settings.
 
 This is an acceptance checklist, not a record of a completed run. Record the browser and extension version, loaded directory, selected subtitle language, and each result. Reload the unpacked `dist/chromium` extension and Netflix tab before testing source changes.
 
 ### Settings and key priority
 
-1. With a fresh installation, confirm Netflix is the only required host and `nflxvideo.net` is optional. For fresh settings, confirm Subtitle navigation is off by default and ordinary shortcuts work without CDN access. Both shortcut tables use the same Function / Key / Enabled / Actions columns. The title's help tooltip explains the feature and the global switch dependency; the subtitle master appears before its Reset button.
+1. With a fresh installation, confirm Netflix is the only required host and `nflxvideo.net` is optional. For fresh settings, confirm Subtitle navigation is off by default and ordinary shortcuts work without CDN access. Both shortcut tables use the same Function / Key / Enabled / Actions columns. The section title has no information button or tooltip; the subtitle master appears before its Reset button.
 2. Enable the global shortcut override and Subtitle navigation, and select a Netflix subtitle track. Already-granted host access must enable without another prompt. If access is withheld, the subtitle master click must display Chrome's permission request for Netflix and `nflxvideo.net`, without `nflximg.net` or `nflxext.com`; denial keeps it off with localized retry guidance, and a subsequent accepted request enables it. Do not revoke existing permissions solely for a test without arranging restoration with the user.
 3. Verify A/D jump to the previous/next subtitle start while preserving both playing and paused states. Verify S seeks to the current or most recently started subtitle and plays once without an automatic loop or stop. Verify W toggles immediately and does not apply hold speed.
-4. Verify ordinary shortcuts still work. With subtitle navigation enabled, S replays instead of skipping the intro. Disable the replay row and confirm S is released to the ordinary Skip Intro binding when its button is available.
-5. Edit a subtitle key and disable a row. Turn the global override off: subtitle controls become disabled, the title tooltip remains available, and the saved values are retained. Turn it back on and confirm those same values return.
+4. Confirm fresh replay is Not set and disabled. Assign S to Replay and explicitly transfer the key from Skip Intro, then confirm S replays. Disable replay and re-enable Skip Intro to confirm S skips when its button is available.
+5. Edit a subtitle key and disable a row. Turn the global override off: subtitle controls become disabled, inline prerequisite guidance appears, and the saved values are retained. Turn it back on and confirm those same values return.
 6. With only the subtitle master off, confirm keys remain editable/resettable and row switches are disabled. The subtitle section Reset restores its four keys and row enabled states while preserving its master and other settings; the ordinary section Reset preserves subtitle settings. Restore test changes afterward.
 
 ### Disabled-key reuse and conflict popover
@@ -300,7 +312,7 @@ This is an acceptance checklist, not a record of a completed run. Record the bro
 1. Record the original settings. Disable subtitle Play / pause (W), then edit Next subtitle to W. Saving must succeed and leave Play / pause disabled. Attempt to enable Play / pause: the popover identifies W and Next subtitle; neither row changes yet.
 2. Dismiss with Escape and by clicking outside. Settings remain unchanged and keyboard focus returns to the available row switch. Choose Change key, then cancel the recorder: settings still remain unchanged and focus returns. Repeat, record Q, and save: Play / pause becomes enabled on Q while Next subtitle stays enabled on W.
 3. Restore the overlap and choose Use for Play / pause. Play / pause becomes enabled on W and Next subtitle becomes disabled while retaining W. Ordinary shortcut settings remain unchanged. Repeat the reuse, cancellation, and transfer flow in the ordinary table, for example with disabled Mute and enabled Skip intro on S.
-4. Reset a row whose default key was reused by another enabled row. The same popover must appear before its key or enabled state changes. Confirm transfer, then verify only the affected rows changed. Enabled rows continue reserving keys for editing even with their table master off; disabled rows release them. Existing cross-table subtitle priority remains unchanged.
+4. Reset a row whose default key was reused by another enabled row. The same popover must appear before its key or enabled state changes. Confirm transfer, then verify only the affected rows changed. Enabled rows continue reserving keys for editing even with their table master off; disabled rows release them. Repeat this between a general and a subtitle-navigation row: cancel must preserve the existing owner, and only explicit transfer may disable it. Legacy overlaps must execute the general shortcut.
 5. Open a conflict popover and change settings from another view. It must close and stay closed when those settings are restored. Restore all original keys and enabled states after testing.
 
 ### Loading, errors, and cancellation
@@ -314,3 +326,36 @@ This is an acceptance checklist, not a record of a completed run. Record the bro
 7. Change subtitle language or watch ID and confirm timings from the old track/session are not used for the new one.
 
 Automated tests cover string bridge messages and cancellation during both caption delivery and a pending seek. They do not establish actual Netflix/Chrome event timing; record those results separately.
+
+## 12. Frame and Audio Shortcut Check, 2026-11-14
+
+Rebuilt both targets and reloaded the existing unpacked Chrome extension from this checkout's `dist/chromium` (development version 0.6.8). The Traditional Chinese Options page showed enabled previous/next frame and previous/next audio-language rows with the new defaults.
+
+- With Netflix paused, period and comma displayed the corresponding localized frame hint. Repeated presses moved the video position in each direction while remaining paused. Immediate position reads sometimes retained the previous value until Netflix completed its small seek; this is not evidence of guaranteed decoded-frame accuracy.
+- During playback, period displayed the localized reminder to pause and did not pause the video automatically. Playback was paused again after the check.
+- Shift+D changed Japanese audio to Korean; Netflix's native menu marked Korean selected. Shift+A restored Japanese, and both its native selection marker and the extension hint agreed. Audio remained muted, so actual sound output was not evaluated.
+- All 882 automated tests, TypeScript, ESLint, both builds and build verification passed. Firefox package lint reported no errors and two bundled `innerHTML` warnings.
+
+Live Firefox, PiP, end-of-video clamping, missing diagnostics, audio-description variants, single-track titles, and all remapping/disable cases were not exercised in this run. Automated coverage establishes their modeled behavior only.
+
+### Refinement follow-up, 2026-11-14
+
+The final preference subsequently reduced subtitle/audio language-label visibility from 1.5 seconds to 1 second. The timed observations below describe the earlier 1.5-second build.
+
+The pause-only behavior above was subsequently replaced: pressing period during playing video now pauses through Netflix's API before stepping. This was verified live in the reloaded Chrome build; the video changed from playing to paused and showed the shorter localized frame label.
+
+Frame and audio feedback now use the incumbent compact subtitle surface (12px label, 12px × 20px padding, and 0.82 icon scale). The measured frame surface was approximately 95 × 100 CSS pixels, and the audio-language surface approximately 103 × 92. Subtitle-language feedback was still fully visible 1.11 seconds after a switch; audio-language feedback was fully visible at 1.08 seconds and had begun fading by 1.86 seconds, consistent with the 1.5-second visible duration. Audio/subtitle selections were restored and playback left paused. All 885 automated tests, ESLint, type checking, both builds, and build verification passed. Live Firefox and PiP remain unverified.
+
+### Real subtitle-queue acceptance, 2026-11-15
+
+Google Chrome 157.0.8103.52 in the user's real Chrome profile, local extension 0.6.9 loaded from this checkout's `dist/chromium` (`glnfldecggfgnjjhclkbcikogdonigcf`), on the real Netflix watch player. The temporary acceptance build forwarded real Netflix commands unchanged and retained the first completed subtitle response outside the transport timeout, making a second real key press wait in the existing session queue. A visible panel counted actual transport calls. The harness was injected by a temporary Vite transform without editing application source; it is not a shipped feature.
+
+| Case | Observed result | Status |
+| --- | --- | --- |
+| Normal consecutive `Shift+C` presses | Two presses sent one command while the first response was retained; release sent the second command and selected Traditional Chinese. | Pass |
+| Episode transition while queued | Two presses started on watch `81787987` (episode 11). Netflix's native Next episode control changed to `81787988` (episode 12). Releasing the retained response left the actual send count at one, with no response still held. | Pass |
+| Global disable while queued | Two presses sent one command and retained its response. The user switched off the extension's own global control; the live Netflix panel confirmed the disabled setting before release. The send count stayed at one after release and after the user restored the global control. | Pass |
+
+This controlled delay establishes the queue lifecycle on real Netflix; it does not measure how often ordinary Chrome timing produces a queue. No Firefox or PiP acceptance result is implied.
+
+Cleanup rebuilt and verified the ordinary Chromium and Firefox production outputs, with no temporary probe remaining in the bundles. The real Netflix tab was reloaded on episode 11, normal next/previous subtitle shortcuts were checked, and Netflix's native menu showed Traditional Chinese selected. The global extension switch was restored on; the original watch position was restored to 272.192 seconds (about 4:32), paused, muted and at 1× speed. Application source hashes were unchanged by the acceptance harness.

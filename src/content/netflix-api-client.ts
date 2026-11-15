@@ -6,6 +6,7 @@ import {
 import {
   NETFLIX_API_MESSAGE_TYPE,
   type NetflixApiAction,
+  type NetflixApiRequest,
   type NetflixApiResponse,
 } from '@/shared/netflix-api'
 import { getBrowserCapabilities } from '@/shared/browser-capabilities'
@@ -17,7 +18,9 @@ const hasNetflixPageBridge = (): boolean =>
 
 const sendNetflixPageApi = (
   action: NetflixApiAction,
-  value?: number
+  value?: number,
+  subtitleFavorites?: NetflixApiRequest['subtitleFavorites'],
+  audioFavorites?: NetflixApiRequest['audioFavorites']
 ): Promise<NetflixApiResponse> =>
   new Promise(resolve => {
     const id = `shortcut-override-${Date.now()}-${(netflixApiRequestId += 1)}`
@@ -41,17 +44,21 @@ const sendNetflixPageApi = (
     window.addEventListener(NETFLIX_API_RESPONSE_EVENT, handleResponse)
     window.dispatchEvent(
       new CustomEvent(NETFLIX_API_REQUEST_EVENT, {
-        detail: { source: 'shortcut-override', id, action, value },
+        detail: { source: 'shortcut-override', id, action, value, ...(subtitleFavorites && { subtitleFavorites }), ...(audioFavorites && { audioFavorites }) },
       })
     )
   })
 
 const sendNetflixBackgroundApi = (
   action: NetflixApiAction,
-  value?: number
+  value?: number,
+  subtitleFavorites?: NetflixApiRequest['subtitleFavorites'],
+  audioFavorites?: NetflixApiRequest['audioFavorites']
 ): Promise<NetflixApiResponse> =>
   new Promise(resolve => {
-    chrome.runtime.sendMessage({ type: NETFLIX_API_MESSAGE_TYPE, action, value }, response => {
+    chrome.runtime.sendMessage({
+      type: NETFLIX_API_MESSAGE_TYPE, action, value, ...(subtitleFavorites && { subtitleFavorites }), ...(audioFavorites && { audioFavorites }),
+    }, response => {
       const error = chrome.runtime.lastError?.message
       if (error) {
         resolve({ success: false, error })
@@ -64,19 +71,20 @@ const sendNetflixBackgroundApi = (
 
 export const sendNetflixApi = async (
   action: NetflixApiAction,
-  value?: number
+  value?: number,
+  subtitleFavorites?: NetflixApiRequest['subtitleFavorites'],
+  audioFavorites?: NetflixApiRequest['audioFavorites']
 ): Promise<NetflixApiResponse> => {
   if (!getBrowserCapabilities().requiresNetflixPageBridge || !hasNetflixPageBridge()) {
-    return sendNetflixBackgroundApi(action, value)
+    return sendNetflixBackgroundApi(action, value, subtitleFavorites, audioFavorites)
   }
 
-  const pageResponse = await sendNetflixPageApi(action, value)
+  const pageResponse = await sendNetflixPageApi(action, value, subtitleFavorites, audioFavorites)
   if (pageResponse.success) return pageResponse
 
-  // A seek changes the current playback position, so replaying it after a
-  // page-bridge timeout could apply the same seek twice if the page handled
+  // Relative commands can advance twice if the page handled
   // the request but its response arrived late.
-  if (action === 'seek') return pageResponse
+  if (action === 'seek' || action === 'stepFrame' || action === 'cycleSubtitleTrack' || action === 'cycleAudioTrack') return pageResponse
 
   const backgroundResponse = await sendNetflixBackgroundApi(action, value)
   return backgroundResponse.success ? backgroundResponse : pageResponse

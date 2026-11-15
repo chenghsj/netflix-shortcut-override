@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { markPipDocument } from '@/content/pip/pip-document'
 import { createHintIcon, getHintManager } from './hint-manager'
+import { TRACK_HINT_VISIBLE_DURATION_MS } from './hint-constants'
 
 const testIcon = (attributes: Record<string, string> = {}) => createHintIcon(attributes)
 
@@ -85,6 +86,24 @@ describe('HintManager', () => {
     expect(root?.style.opacity).toBe('1')
     expect((circle as HTMLElement | null)?.style.width).toBe('92px')
     expect(label?.style.fontSize).toBe('16px')
+  })
+
+  it('keeps track labels readable longer, renews their timer, and restores the ordinary duration for other media hints', () => {
+    vi.useFakeTimers()
+    const manager = getHintManager(document)
+    manager.show({ type: 'media', icon: testIcon(), label: 'Japanese', compact: true, durationMs: TRACK_HINT_VISIBLE_DURATION_MS })
+    const hint = document.getElementById('shortcut-override-media-hint')!
+    vi.advanceTimersByTime(500)
+    expect(hint.style.opacity).toBe('1')
+    manager.show({ type: 'media', icon: testIcon(), label: 'English', compact: true, durationMs: TRACK_HINT_VISIBLE_DURATION_MS })
+    vi.advanceTimersByTime(999)
+    expect(hint.style.opacity).toBe('1')
+    vi.advanceTimersByTime(1)
+    expect(hint.style.opacity).toBe('0')
+    manager.show({ type: 'media', icon: testIcon(), label: 'Next frame', compact: true })
+    const frameHint = document.getElementById('shortcut-override-media-hint')!
+    vi.advanceTimersByTime(360)
+    expect(frameHint.style.opacity).toBe('0')
   })
 
   it('updates labeled hints using the PiP document realm', () => {

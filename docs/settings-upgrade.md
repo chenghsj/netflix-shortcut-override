@@ -5,7 +5,7 @@ Version 0.6.5 preserves Classic for existing installations and legacy backups. N
 ## Run automated checks
 
 ```sh
-npm test -- src/shared/settings-upgrade.test.ts src/background/settings-migration.test.ts src/shared/storage.test.ts
+npm test -- src/shared/settings-upgrade.test.ts src/shared/settings-compatibility.test.ts src/background/settings-migration.test.ts src/shared/storage.test.ts
 npm run build
 ```
 
@@ -14,6 +14,14 @@ The fixture in `src/shared/fixtures/settings-v0.6.4.json` contains settings and 
 Tests compare every functional field after migration and backup import. They also cover empty installations, older-client whole-object writes, initialization races, synchronous off/on events, and failed-write recovery. Build verification checks both generated manifest versions against `package.json`.
 
 These checks use mocked extension storage. They do not establish real browser update delivery or cross-device synchronization.
+
+`src/shared/fixtures/settings-v0.6.8.json` contains the default stored object and backup produced by the v0.6.8 tag (`ca07f5aa733c7c7a16b6502bcb83589cb7f2922d`). `settings-compatibility.test.ts` covers first reads and backup imports with occupied new default keys, including subtitle navigation with its master off. Existing enabled assignments keep their keys; only conflicting newly introduced actions are disabled. Individually disabled rows release their keys.
+
+The same tests exercise legacy whole-object writes after a current-client save. They verify custom seeking, new built-in bindings, subtitle and audio favorites, custom sizes and their order, empty shortcuts, and playback automation. Changes to shared preferences still apply. Resets and backup replacements update both records, so deleted settings cannot return during later recovery.
+
+Schema v28 adds `audioFavorites` with an empty default. Each entry stores a canonical language and an explicit `audioDescription` boolean. Current backups require a normalized, duplicate-free array; v27 and earlier backups migrate to an empty list. A saved current snapshot retains the favorites when a v27 client omits the field. An explicit reset or imported legacy backup clears them.
+
+Schema v29 adds `preferredSpeedShortcuts`, an empty list by default. Each entry has a stable `preferred-speed:` ID, a speed from 0.25× to 4× in 0.05 increments, and an independent binding. The original `speed.preferred` and `setPreferredSpeed` binding remain intact. Current backups require the list and each entry's binding. Older-client saves retain omitted entries through the compatibility snapshot; resetting shortcuts removes the additional groups.
 
 ## Check an installed extension update
 
@@ -33,16 +41,26 @@ Use a disposable browser profile. Keep the same extension ID and storage across 
 
 `shortcutSettings` retains the functional settings object, its inline `uiStyle`, and the older `spaceHold` alias. Older clients may replace that object.
 
+`shortcutSettingsCompatibility` retains a validated current-format snapshot under a separate synchronized key that older clients leave alone. Saves write both records in one storage call. Startup seeds this record from complete supported stored settings without rewriting the original object. When upgrading an older compatibility snapshot, startup first recovers the preferences it retained, so a legacy client's last write cannot erase newer settings during the schema upgrade. Reads of an older settings version recover fields it omitted, while honoring its shared fields and legacy aliases. Numeric subtitle sizes and unassigned keys also survive older clients that normalize unsupported values to defaults. Recovered new shortcuts yield to enabled keys assigned by an older client. Current-format records remain authoritative, including empty lists and resets. Each synchronized item is checked against the storage byte limit before saving.
+
 `shortcutUiStyle` stores the current client's synchronized appearance selection. `saveSettings` writes it together with the functional settings object. Older clients do not write this key.
 
 `shortcutUiStyleDefault` stores the synchronized installation default. Background initialization writes this key without writing the selection or functional object. A local copy records the fallback before the first sync write, allowing recovery after a failed write or worker restart.
 
 Reads prefer the explicit selection, synchronized default, valid inline style, local fallback, then normalized defaults. Initial recovery preserves a valid inline style ahead of local fallback. Each functional storage event is delivered synchronously; hydration can correct appearance but cannot discard a transient disable.
 
-Subscription updates omit `uiStyle` until the initial read finishes or an explicit selection is known. The form and content settings owners retain their current appearance when it is omitted.
+Subscription updates omit `uiStyle` until the initial read finishes or an explicit selection is known. The form and content settings owners retain their current appearance when it is omitted. Compatibility-record events invalidate pending reads and update subscriptions; initial hydration reconciles recovered fields as well as appearance without dropping live disable events.
 
 The settings owner queues field updates and explicit replacements. PiP submits only its changed fields, and the form submits its original pure updater. Any relevant raw storage event received during a read causes that read to retry before saving, including appearance events whose UI delivery is deferred. A failed save does not block later edits.
 
 Options and content obtain initial delivery and later changes through `observeSettings`. Its readiness promise settles loading without supplying another snapshot to apply. See [Review settings ownership](review-settings-owner.md) for the owner boundary, reading order, and regression cases.
 
 Chrome sync remains last-writer-wins between concurrent new-client saves. An inline-only development preference has no independent protection until initialization or a new-client save persists it. These limits do not change the older-client protection after the independent keys exist.
+
+Schema v30 adds `hiddenFeatures`, an empty list for earlier settings. Entries identify hidden general or subtitle-navigation actions, or hold speed. Only existing disabled features may remain hidden; enabling or deleting a feature clears its hidden entry during normalization. Current backups validate this list, and compatibility recovery preserves it when an older client omits it. The feature checklist previews visibility locally and persists changes only on Apply.
+
+Schema v31 adds the boolean `hidePauseOverlay` preference under General settings. It defaults to false for fresh settings and older records/backups. Explicit on and off choices survive saves and backups; compatibility recovery also retains the choice when an older client replaces the shared settings object without this field. Current backups require a boolean value. Both this preference and the global extension switch must be on to hide the overlay; disabling the extension preserves the preference.
+
+`hiddenFeatures` also accepts `group:seek`, `group:percentage`, and `group:preferredSpeed`. A group marker is retained only while every current member is hidden and disabled; empty groups retain their explicit marker. Enabling a member clears the parent marker during normalization.
+
+`hiddenFeatures` also accepts `subtitleFavorites` and `audioFavorites`, including for empty lists. These markers disable favorite filtering and hide the corresponding settings panel without changing either saved list. Backups and older-client compatibility recovery retain the markers and saved preferences.

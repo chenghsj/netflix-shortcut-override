@@ -1,12 +1,316 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
-import { saveSettings } from '@/shared/storage'
+import type { ShortcutSettings } from '@/shared/shortcut-types'
+import { getSettings, saveSettings } from '@/shared/storage'
+import { PipManager } from '@/content/pip/pip-manager'
 
 import { setupContentIndexTests } from './content-script.test-support'
 
 describe('content media shortcuts', () => {
   setupContentIndexTests()
+
+  it('does not revive queued subtitle changes after a global disable and re-enable', async () => {
+    document.body.innerHTML = '<video></video>'
+    vi.mocked(chrome.runtime.sendMessage).mockClear()
+    for (let index = 0; index < 2; index += 1) {
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyC', key: 'C', shiftKey: true, bubbles: true, cancelable: true }))
+    }
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledTimes(1)
+    const reply = vi.mocked(chrome.runtime.sendMessage).mock.calls[0][1]
+    if (typeof reply !== 'function') throw new Error('Expected subtitle response callback')
+    const settings = await getSettings()
+    await saveSettings({ ...settings, enabled: false })
+    await saveSettings(settings)
+    reply({ success: true, result: { subtitlesEnabled: true } })
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledTimes(1)
+  })
+
+  it('routes each preferred speed key and suppresses held repeats and disabled groups', async () => {
+    const settings: ShortcutSettings = structuredClone(DEFAULT_SETTINGS)
+    settings.preferredSpeedShortcuts = [{ id: 'preferred-speed:two', speed: 2 }, { id: 'preferred-speed:slow', speed: 0.75 }]
+    settings.bindings['preferred-speed:two'] = { enabled: true, key: { ...DEFAULT_SETTINGS.bindings.mute.key, code: 'Digit2', key: '2' } }
+    settings.bindings['preferred-speed:slow'] = { enabled: false, key: { ...DEFAULT_SETTINGS.bindings.mute.key, code: 'Digit3', key: '3' } }
+    await saveSettings(settings)
+    document.body.innerHTML = '<video></video>'
+    const video = document.querySelector('video')!
+    const key = (code: string, key: string, repeat = false) => {
+      const event = new KeyboardEvent('keydown', { code, key, repeat, bubbles: true, cancelable: true })
+      window.dispatchEvent(event)
+      return event
+    }
+    expect(key('Digit2', '2').defaultPrevented).toBe(true)
+    expect(video.playbackRate).toBe(2)
+    video.playbackRate = 1
+    expect(key('Digit2', '2', true).defaultPrevented).toBe(true)
+    expect(video.playbackRate).toBe(1)
+    expect(key('Digit3', '3').defaultPrevented).toBe(false)
+    expect(video.playbackRate).toBe(1)
+  })
+
+  it('releases cleared shortcuts and their old Netflix keys without executing commands', async () => {
+    const settings: ShortcutSettings = structuredClone(DEFAULT_SETTINGS)
+    settings.subtitleNavigation.enabled = true
+    settings.bindings.playPause.key = null
+    settings.bindings.seekBackward.key = null
+    settings.subtitleNavigation.bindings.previous.key = null
+    await saveSettings(settings)
+    document.body.innerHTML = '<video></video>'
+    vi.mocked(chrome.runtime.sendMessage).mockClear()
+    for (const [code, key] of [['Space', ' '], ['ArrowLeft', 'ArrowLeft'], ['KeyA', 'a']]) {
+      const event = new KeyboardEvent('keydown', { code, key, bubbles: true, cancelable: true })
+      window.dispatchEvent(event)
+      expect(event.defaultPrevented).toBe(false)
+    }
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalled()
+  })
+
+  it('runs the general shortcut instead of subtitle navigation when saved keys overlap', async () => {
+    const settings = structuredClone(DEFAULT_SETTINGS)
+    settings.subtitleNavigation.enabled = true
+    settings.subtitleNavigation.bindings.playback.key = { ...settings.bindings.mute.key }
+    await saveSettings(settings)
+    const video = document.createElement('video')
+    document.body.append(video)
+    vi.mocked(chrome.runtime.sendMessage).mockClear()
+    const event = new KeyboardEvent('keydown', { code: 'KeyM', key: 'm', bubbles: true, cancelable: true })
+    window.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(true)
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(expect.objectContaining({ action: 'setMuted', value: 1 }), expect.any(Function))
+    expect(vi.mocked(chrome.runtime.sendMessage).mock.calls.some(([message]) => (message as { action?: string }).action === 'togglePlayback')).toBe(false)
+  })
+
+  it('routes frame and audio keys, preserves typing and disabled rows, and suppresses held audio repeats', async () => {
+    document.body.innerHTML = '<video></video><input />'
+    const press = (init: KeyboardEventInit, target: EventTarget = window) => {
+      const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init })
+      target.dispatchEvent(event)
+      return event
+    }
+    vi.mocked(chrome.runtime.sendMessage).mockClear()
+    for (const [init, action, value] of [
+      [{ code: 'Comma', key: ',' }, 'stepFrame', -1],
+      [{ code: 'Period', key: '.', repeat: true }, 'stepFrame', 1],
+      [{ code: 'KeyA', key: 'A', shiftKey: true }, 'cycleAudioTrack', -1],
+    ] as const) {
+      expect(press(init).defaultPrevented).toBe(true)
+      expect(chrome.runtime.sendMessage).toHaveBeenLastCalledWith(
+        expect.objectContaining({ action, value }), expect.any(Function),
+      )
+      const reply = vi.mocked(chrome.runtime.sendMessage).mock.calls.at(-1)?.[1]
+      if (typeof reply === 'function') reply({ success: true, result: { seekCalled: true, audioTrackSwitchCalled: true } })
+      await Promise.resolve()
+      await Promise.resolve()
+    }
+    vi.mocked(chrome.runtime.sendMessage).mockClear()
+    expect(press({ code: 'KeyD', key: 'D', shiftKey: true, repeat: true }).defaultPrevented).toBe(true)
+    const input = document.querySelector('input')!
+    input.focus()
+    expect(press({ code: 'Period', key: '.' }, input).defaultPrevented).toBe(false)
+    input.blur()
+    const settings = structuredClone(DEFAULT_SETTINGS)
+    settings.bindings.nextFrame.enabled = false
+    await saveSettings(settings)
+    expect(press({ code: 'Period', key: '.' }).defaultPrevented).toBe(false)
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalled()
+    settings.bindings.nextFrame = { enabled: true, key: { code: 'KeyB', key: 'b', ctrl: false, alt: false, shift: false, meta: false } }
+    await saveSettings(settings)
+    expect(press({ code: 'KeyB', key: 'b' }).defaultPrevented).toBe(true)
+    expect(chrome.runtime.sendMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({ action: 'stepFrame', value: 1 }), expect.any(Function),
+    )
+  })
+
+  it.each(['subtitle', 'PiP', 'disable and re-enable'] as const)('cancels a delayed episode selection after %s takes over', async action => {
+    const settings = structuredClone(DEFAULT_SETTINGS)
+    settings.subtitleNavigation.enabled = true
+    await saveSettings(settings)
+    document.body.innerHTML = '<video></video><button data-uia="control-episodes">Episodes</button>'
+    const press = (init: KeyboardEventInit) => {
+      const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init })
+      window.dispatchEvent(event)
+      return event
+    }
+    expect(press({ code: 'KeyP', key: 'p', ctrlKey: true }).defaultPrevented).toBe(true)
+    if (action === 'subtitle') {
+      expect(press({ code: 'KeyD', key: 'd' }).defaultPrevented).toBe(true)
+    } else if (action === 'PiP') {
+      const supported = vi.spyOn(PipManager, 'isSupported').mockReturnValue(true)
+      const toggle = vi.spyOn(PipManager.prototype, 'toggle').mockResolvedValue(true)
+      try {
+        expect(press({ code: 'KeyP', key: 'P', shiftKey: true }).defaultPrevented).toBe(true)
+        expect(toggle).toHaveBeenCalledOnce()
+      } finally {
+        supported.mockRestore()
+        toggle.mockRestore()
+      }
+    } else {
+      await saveSettings({ ...settings, enabled: false })
+      await saveSettings(settings)
+    }
+    const played = vi.fn()
+    const list = document.createElement('div')
+    list.innerHTML = '<div data-uia="episode-pane-item"><button class="play-button">Previous</button></div><div data-uia="episode-pane-item" aria-selected="true">Current</div>'
+    list.querySelector('button')!.addEventListener('click', played)
+    document.body.append(list)
+    // Deliver the picker mutation to any navigation still waiting for it.
+    await Promise.resolve()
+    expect(played).not.toHaveBeenCalled()
+  })
+
+  it('dispatches custom seeking keys, ignores repeated percentage and episode keys, and preserves typing', async () => {
+    const settings = structuredClone(DEFAULT_SETTINGS)
+    settings.seekShortcuts = [{ id: 'seek:percent', kind: 'percentage', value: 25 }]
+    settings.bindings['seek:percent'] = { enabled: true, key: { code: 'Digit5', key: '5', ctrl: false, alt: false, shift: false, meta: false } }
+    await saveSettings(settings)
+    const video = document.createElement('video')
+    Object.defineProperty(video, 'duration', { value: 200 })
+    document.body.append(video)
+    const press = (extra: KeyboardEventInit = {}) => {
+      const event = new KeyboardEvent('keydown', { code: 'Digit5', key: '5', bubbles: true, cancelable: true, ...extra })
+      window.dispatchEvent(event)
+      return event
+    }
+    vi.mocked(chrome.runtime.sendMessage).mockClear()
+    expect(press().defaultPrevented).toBe(true)
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(expect.objectContaining({ action: 'seekTo', value: 50000 }), expect.any(Function))
+    const calls = vi.mocked(chrome.runtime.sendMessage).mock.calls.length
+    expect(press({ repeat: true }).defaultPrevented).toBe(true)
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledTimes(calls)
+    const input = document.createElement('input')
+    document.body.append(input)
+    input.focus()
+    expect(press().defaultPrevented).toBe(false)
+    input.blur()
+    const next = document.createElement('button')
+    next.dataset.uia = 'control-next'
+    const click = vi.fn()
+    next.addEventListener('click', click)
+    document.body.append(next)
+    expect(press({ code: 'KeyN', key: 'n', ctrlKey: true }).defaultPrevented).toBe(true)
+    expect(click).toHaveBeenCalledOnce()
+    expect(press({ code: 'KeyN', key: 'n', ctrlKey: true, repeat: true }).defaultPrevented).toBe(true)
+    expect(click).toHaveBeenCalledOnce()
+  })
+
+  it('handles Ctrl+P by expanding and playing the previous Netflix episode once', async () => {
+    document.body.innerHTML = '<video></video><button data-uia="control-episodes">Episodes</button>'
+    const play = vi.fn()
+    document.querySelector('button')!.addEventListener('click', () => {
+      const list = document.createElement('div')
+      list.setAttribute('role', 'listbox')
+      list.innerHTML = '<div data-uia="episode-pane-back">Season</div><div data-uia="episode-pane-item" role="option"><div data-uia="episode-pane-item-preview-closed" style="display: none"><button class="play-button" aria-hidden="true" tabindex="-1">Play</button></div></div><div data-uia="episode-pane-item" aria-selected="true">Current</div>'
+      const previous = list.querySelector<HTMLElement>('[data-uia="episode-pane-item"]')!
+      const preview = previous.firstElementChild as HTMLElement
+      previous.addEventListener('pointerdown', () => {
+        if (preview.dataset.uia === 'episode-pane-item-preview-open') play()
+        else queueMicrotask(() => {
+          preview.dataset.uia = 'episode-pane-item-preview-open'
+          preview.style.display = ''
+        })
+      })
+      document.body.append(list)
+    })
+    const press = (repeat = false) => {
+      const event = new KeyboardEvent('keydown', {
+        code: 'KeyP', key: 'p', ctrlKey: true, repeat, bubbles: true, cancelable: true,
+      })
+      window.dispatchEvent(event)
+      return event
+    }
+
+    expect(press().defaultPrevented).toBe(true)
+    expect(press(true).defaultPrevented).toBe(true)
+    await vi.waitFor(() => expect(play).toHaveBeenCalledOnce())
+  })
+
+  it('applies custom fixed and cycle sizes, ignores repeats, and preserves typing and disabled keys', async () => {
+    const settings = structuredClone(DEFAULT_SETTINGS)
+    settings.subtitleSizeCycle = [100, 200, 150]
+    settings.subtitleSizeShortcuts = [{ id: 'subtitle-size:fixed', kind: 'fixed', sizes: [175] },
+      { id: 'subtitle-size:cycle', kind: 'cycle', sizes: [200, 150, 100] }]
+    settings.bindings['subtitle-size:fixed'] = { enabled: true, key: { code: 'KeyB', key: 'b', ctrl: false, alt: false, shift: false, meta: false } }
+    settings.bindings['subtitle-size:cycle'] = { enabled: true, key: { code: 'KeyG', key: 'g', ctrl: false, alt: false, shift: false, meta: false } }
+    await saveSettings(settings)
+    const press = (code = 'KeyB', extra: KeyboardEventInit = {}) => {
+      const event = new KeyboardEvent('keydown', { code, key: code.slice(-1).toLowerCase(), bubbles: true, cancelable: true, ...extra })
+      window.dispatchEvent(event)
+      return event
+    }
+    expect(press().defaultPrevented).toBe(false)
+    document.body.append(document.createElement('video'))
+    expect(press().defaultPrevented).toBe(true)
+    await vi.waitFor(async () => expect((await getSettings()).subtitleSize).toBe(175))
+    expect(document.getElementById('shortcut-override-subtitle-size')).toHaveTextContent('zoom: 1.75')
+    press('KeyG')
+    await vi.waitFor(async () => expect((await getSettings()).subtitleSize).toBe(200))
+    expect(press('KeyG', { repeat: true }).defaultPrevented).toBe(true)
+    expect((await getSettings()).subtitleSize).toBe(200)
+    press('KeyG')
+    await vi.waitFor(async () => expect((await getSettings()).subtitleSize).toBe(150))
+    press('KeyG')
+    await vi.waitFor(async () => expect((await getSettings()).subtitleSize).toBe('medium'))
+    expect(document.getElementById('shortcut-override-subtitle-size')).toBeNull()
+    press('KeyV', { shiftKey: true, key: 'V' })
+    await vi.waitFor(async () => expect((await getSettings()).subtitleSize).toBe(200))
+    const input = document.createElement('input')
+    document.body.append(input); input.focus()
+    expect(press().defaultPrevented).toBe(false)
+    input.blur()
+    const disabled = await getSettings()
+    disabled.bindings['subtitle-size:fixed'].enabled = false
+    await saveSettings(disabled)
+    expect(press().defaultPrevented).toBe(false)
+    expect((await getSettings()).pip.subtitleSize).toBe('medium')
+  })
+
+  it('cycles and saves caption size, ignores repeats, and restores native rendering when disabled', async () => {
+    document.body.append(document.createElement('video'))
+    const press = (repeat = false) => {
+      const event = new KeyboardEvent('keydown', {
+        code: 'KeyV', key: 'V', shiftKey: true, repeat, bubbles: true, cancelable: true,
+      })
+      window.dispatchEvent(event)
+      return event
+    }
+    for (const size of ['large', 'small', 'medium'] as const) {
+      expect(press().defaultPrevented).toBe(true)
+      await vi.waitFor(async () => expect((await getSettings()).subtitleSize).toBe(size))
+      expect(document.documentElement.getAttribute('data-shortcut-override-subtitle-size'))
+        .toBe(size === 'medium' ? null : size)
+      expect(press(true).defaultPrevented).toBe(true)
+      expect((await getSettings()).subtitleSize).toBe(size)
+    }
+    press()
+    await vi.waitFor(async () => expect((await getSettings()).subtitleSize).toBe('large'))
+    await saveSettings({ ...(await getSettings()), enabled: false })
+    expect(document.getElementById('shortcut-override-subtitle-size')).toBeNull()
+    expect(press().defaultPrevented).toBe(false)
+    await saveSettings({ ...(await getSettings()), enabled: true })
+    expect(document.documentElement).toHaveAttribute('data-shortcut-override-subtitle-size', 'large')
+  })
+
+  it('honors remapped caption-size keys and leaves typing and pages without video alone', async () => {
+    const settings = structuredClone(DEFAULT_SETTINGS)
+    settings.bindings.cycleSubtitleSize.key = { ...settings.bindings.cycleSubtitleSize.key, code: 'KeyB', key: 'B' }
+    await saveSettings(settings)
+    const press = (code = 'KeyB') => {
+      const event = new KeyboardEvent('keydown', { code, key: code.slice(-1), shiftKey: true, bubbles: true, cancelable: true })
+      window.dispatchEvent(event)
+      return event
+    }
+    expect(press().defaultPrevented).toBe(false)
+    document.body.append(document.createElement('video'))
+    expect(press('KeyV').defaultPrevented).toBe(false)
+    const input = document.createElement('input')
+    document.body.append(input)
+    input.focus()
+    expect(press().defaultPrevented).toBe(false)
+    input.blur()
+    expect(press().defaultPrevented).toBe(true)
+    await vi.waitFor(async () => expect((await getSettings()).subtitleSize).toBe('large'))
+  })
 
   it('enables WASD as a group while preserving typing and modified keys', async () => {
     document.body.append(document.createElement('video'))
@@ -477,6 +781,11 @@ describe('content media shortcuts', () => {
   })
 
   it('routes the default C shortcut to the Netflix subtitle API', () => {
+    vi.mocked(chrome.runtime.sendMessage).mockImplementationOnce((_message, callback) => {
+      const reply = { success: true, result: { subtitleToggleCalled: true, subtitlesEnabled: false } }
+      if (typeof callback === 'function') callback(reply)
+      return Promise.resolve(reply) as never
+    })
     const video = document.createElement('video')
     document.body.append(video)
     const event = new KeyboardEvent('keydown', {
@@ -496,5 +805,66 @@ describe('content media shortcuts', () => {
       },
       expect.any(Function)
     )
+  })
+
+  it.each([
+    { key: 'C', locale: 'en', trackLanguage: 'ja', expected: 'Japanese (CC)' },
+    { key: 'C', locale: 'zh-TW', trackLanguage: 'ja', expected: '日文 (CC)' },
+    { key: 'C', locale: 'zh-TW', trackLanguage: 'not a language tag', expected: '日本語 (CC)' },
+    { key: 'X', locale: 'zh-TW', trackLanguage: 'ja', expected: '日文 (CC)' },
+  ] as const)('cycles once per Shift+$key press and shows $expected in the $locale hint', async ({
+    key, locale, trackLanguage, expected,
+  }) => {
+    await saveSettings({ ...DEFAULT_SETTINGS, locale })
+    vi.mocked(chrome.runtime.sendMessage).mockImplementationOnce((_message, callback) => {
+      const reply = {
+        success: true,
+        result: {
+          subtitlesEnabled: true,
+          subtitleTrack: '日本語 (CC)',
+          subtitleTrackLanguage: trackLanguage,
+          subtitleTrackIsClosedCaption: true,
+        },
+      }
+      if (typeof callback === 'function') callback(reply)
+      return Promise.resolve(reply) as never
+    })
+    document.body.append(document.createElement('video'))
+    for (const repeat of [false, true]) {
+      const event = new KeyboardEvent('keydown', {
+        code: `Key${key}`, key, shiftKey: true, repeat, bubbles: true, cancelable: true,
+      })
+      window.dispatchEvent(event)
+      expect(event.defaultPrevented).toBe(true)
+    }
+    await vi.waitFor(() => {
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledTimes(1)
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+        type: 'EXECUTE_NETFLIX_API',
+        action: 'cycleSubtitleTrack',
+        value: key === 'X' ? -1 : undefined,
+      }, expect.any(Function))
+      expect(document.getElementById('shortcut-override-media-hint')).toHaveTextContent(expected)
+    })
+  })
+
+  it('sends the current subtitle favorites and localizes the no-match hint', async () => {
+    const subtitleFavorites = [{ language: 'ja' }] as const
+    await saveSettings({ ...DEFAULT_SETTINGS, locale: 'zh-TW', subtitleFavorites: [...subtitleFavorites] })
+    vi.mocked(chrome.runtime.sendMessage).mockImplementationOnce((_message, callback) => {
+      const reply = { success: true, result: { subtitleCycleOutcome: 'no-tracks-available' } }
+      if (typeof callback === 'function') callback(reply)
+      return Promise.resolve(reply) as never
+    })
+    document.body.append(document.createElement('video'))
+    window.dispatchEvent(new KeyboardEvent('keydown', {
+      code: 'KeyC', key: 'C', shiftKey: true, bubbles: true, cancelable: true,
+    }))
+    await vi.waitFor(() => {
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+        type: 'EXECUTE_NETFLIX_API', action: 'cycleSubtitleTrack', subtitleFavorites,
+      }, expect.any(Function))
+      expect(document.getElementById('shortcut-override-media-hint')).toHaveTextContent('找不到可切換的字幕。')
+    })
   })
 })

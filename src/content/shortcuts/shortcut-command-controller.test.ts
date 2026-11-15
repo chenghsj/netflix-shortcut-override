@@ -5,9 +5,39 @@ import { createNetflixPlaybackSession } from '@/content/netflix-playback-session
 import type { NetflixApiResponse } from '@/shared/netflix-api'
 import { createShortcutCommandController } from './shortcut-command-controller'
 import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
+import type { ShortcutSettings } from '@/shared/shortcut-types'
 import { PipControls } from '@/content/pip/pip-controls'
 
+const subtitleTrackResponse: NetflixApiResponse = {
+  success: true,
+  result: {
+    action: 'cycleSubtitleTrack', playerApiFound: true, playerFound: true,
+    seekCalled: false, sessionIds: ['session-id'], subtitlesEnabled: true,
+  },
+}
+
 describe('ShortcutCommandController', () => {
+  it('applies each custom preferred speed and keeps it after a held speed ends', () => {
+    vi.useFakeTimers()
+    document.body.innerHTML = '<video></video>'
+    const video = document.querySelector('video')!
+    Object.defineProperty(video, 'paused', { configurable: true, get: () => false })
+    const settings: ShortcutSettings = structuredClone(DEFAULT_SETTINGS)
+    settings.preferredSpeedShortcuts = [{ id: 'preferred-speed:slow', speed: 0.75 }, { id: 'preferred-speed:fast', speed: 3.35 }]
+    for (const shortcut of settings.preferredSpeedShortcuts) settings.bindings[shortcut.id] = { enabled: true, key: null }
+    const controller = createShortcutCommandController(() => settings)
+    controller.beginHoldSpeedInteraction(document, video, 'Space')
+    vi.advanceTimersByTime(1000)
+    expect(video.playbackRate).toBe(settings.holdSpeed.speed)
+    expect(controller.execute('preferred-speed:slow', document)).toBe(true)
+    controller.completeHoldSpeedInteraction('Space')
+    expect(video.playbackRate).toBe(0.75)
+    expect(controller.execute('preferred-speed:fast', document)).toBe(true)
+    expect(video.playbackRate).toBe(3.35)
+    settings.bindings['preferred-speed:fast'].enabled = false
+    expect(controller.execute('preferred-speed:fast', document)).toBe(false)
+    expect(controller.execute('preferred-speed:missing', document)).toBe(false)
+  })
   beforeEach(() => {
     document.body.innerHTML = ''
   })
@@ -15,6 +45,155 @@ describe('ShortcutCommandController', () => {
   afterEach(() => {
     getHintManager(document).destroy()
     vi.useRealTimers()
+  })
+
+  it('shows frame feedback and keeps the audio track label including audio description', async () => {
+    document.body.innerHTML = '<video></video>'
+    const transport = vi.fn().mockResolvedValueOnce({ success: true, result: { seekCalled: true } })
+      .mockResolvedValueOnce({ success: true, result: { audioTrackSwitchCalled: true, audioTrack: 'English (Audio Description)' } })
+    const controller = createShortcutCommandController(() => DEFAULT_SETTINGS, createNetflixPlaybackSession(transport))
+    controller.execute('nextFrame', document)
+    await vi.waitFor(() => expect(document.querySelector('[data-hint-icon="frame-forward"]')).toBeInTheDocument())
+    expect(document.body).not.toHaveTextContent('Next frame')
+    controller.execute('nextAudioTrack', document)
+    await vi.waitFor(() => expect(document.body).toHaveTextContent('English (Audio Description)'))
+    expect(transport).toHaveBeenCalledWith('cycleAudioTrack', 1)
+  })
+
+  it.each([
+    { locale: 'en', expected: 'Japanese' },
+    { locale: 'zh-TW', expected: '日語' },
+    { locale: 'zh-CN', expected: '日语' },
+    { locale: 'ja', expected: '日本語' },
+    { locale: 'ko', expected: '일본어' },
+  ] as const)('localizes original audio to $expected for the $locale hint without the original marker', async ({ locale, expected }) => {
+    document.body.innerHTML = '<video></video>'
+    const settings = { ...DEFAULT_SETTINGS, locale }
+    const transport = vi.fn().mockResolvedValue({
+      success: true,
+      result: { audioTrackSwitchCalled: true, audioTrack: '日語 [原始]', audioTrackLanguage: 'ja' },
+    })
+    const controller = createShortcutCommandController(() => settings, createNetflixPlaybackSession(transport))
+    controller.execute('nextAudioTrack', document)
+    await vi.waitFor(() => expect(document.getElementById('shortcut-override-media-hint')?.textContent).toBe(expected))
+  })
+
+  it.each([
+    { locale: 'en', expected: 'English (Audio Description)' },
+    { locale: 'zh-TW', expected: '英文 (口述影像)' },
+    { locale: 'zh-CN', expected: '英语 (口述影像)' },
+    { locale: 'ja', expected: '英語 (音声ガイド)' },
+    { locale: 'ko', expected: '영어 (화면 해설)' },
+  ] as const)('localizes the audio-description distinction for the $locale hint', async ({ locale, expected }) => {
+    document.body.innerHTML = '<video></video>'
+    const settings = { ...DEFAULT_SETTINGS, locale }
+    const transport = vi.fn().mockResolvedValue({
+      success: true,
+      result: {
+        audioTrackSwitchCalled: true, audioTrack: 'English (Audio Description)',
+        audioTrackLanguage: 'en', audioTrackIsAudioDescription: true,
+      },
+    })
+    const controller = createShortcutCommandController(() => settings, createNetflixPlaybackSession(transport))
+    controller.execute('previousAudioTrack', document)
+    await vi.waitFor(() => expect(document.getElementById('shortcut-override-media-hint')?.textContent).toBe(expected))
+  })
+
+  it.each([
+    { name: '日語 [原始]', language: undefined, expected: '日語' },
+    { name: 'English (Original)', language: 'invalid language tag', expected: 'English' },
+    { name: '日本語（オリジナル）', language: 'unknown', expected: '日本語' },
+    { name: 'English (Audio Description)', language: undefined, expected: 'English (Audio Description)' },
+  ])('keeps a usable Netflix label without the original marker when language is $language', async ({ name, language, expected }) => {
+    document.body.innerHTML = '<video></video>'
+    const settings = { ...DEFAULT_SETTINGS, locale: 'zh-TW' as const }
+    const transport = vi.fn().mockResolvedValue({
+      success: true, result: { audioTrackSwitchCalled: true, audioTrack: name, audioTrackLanguage: language },
+    })
+    const controller = createShortcutCommandController(() => settings, createNetflixPlaybackSession(transport))
+    controller.execute('nextAudioTrack', document)
+    await vi.waitFor(() => expect(document.getElementById('shortcut-override-media-hint')?.textContent).toBe(expected))
+  })
+
+  it('sends favorite audio preferences and localizes the unavailable hint', async () => {
+    document.body.innerHTML = '<video></video>'
+    const settings = { ...DEFAULT_SETTINGS, locale: 'zh-TW' as const,
+      audioFavorites: [{ language: 'ja', audioDescription: false }] }
+    const transport = vi.fn().mockResolvedValue({ success: true, result: { audioCycleOutcome: 'no-tracks-available' } })
+    const controller = createShortcutCommandController(() => settings, createNetflixPlaybackSession(transport))
+    controller.execute('nextAudioTrack', document)
+    await vi.waitFor(() => expect(document.body).toHaveTextContent('影片未提供清單中的常用音軌'))
+    expect(transport).toHaveBeenCalledWith('cycleAudioTrack', 1, undefined, settings.audioFavorites)
+  })
+
+  it.each([
+    ['nextAudioTrack', 'audioFavorites', 'cycleAudioTrack', 1],
+    ['cycleSubtitleTrack', 'subtitleFavorites', 'cycleSubtitleTrack', undefined],
+  ] as const)('ignores disabled favorite filtering for %s and restores it when enabled', async (action, feature, apiAction, value) => {
+    document.body.innerHTML = '<video></video>'
+    const settings: ShortcutSettings = { ...structuredClone(DEFAULT_SETTINGS), locale: 'en',
+      audioFavorites: [{ language: 'ja', audioDescription: false }], subtitleFavorites: [{ language: 'ja' }], hiddenFeatures: [feature] }
+    const transport = vi.fn().mockResolvedValue({ success: true, result: {} })
+    const controller = createShortcutCommandController(() => settings, createNetflixPlaybackSession(transport))
+    expect(controller.execute(action, document)).toBe(true)
+    await vi.waitFor(() => expect(transport).toHaveBeenCalledTimes(1))
+    expect(transport.mock.calls[0]).toEqual(value === undefined ? [apiAction] : [apiAction, value])
+    settings.hiddenFeatures = []
+    expect(controller.execute(action, document)).toBe(true)
+    await vi.waitFor(() => expect(transport).toHaveBeenCalledTimes(2))
+    expect(transport.mock.calls[1]).toEqual(feature === 'audioFavorites'
+      ? [apiAction, value, undefined, settings.audioFavorites] : [apiAction, value, settings.subtitleFavorites])
+    expect(settings[feature]).toHaveLength(1)
+  })
+
+  it('uses the ordinary no-audio-tracks hint while favorite filtering is disabled', async () => {
+    document.body.innerHTML = '<video></video>'
+    const settings: ShortcutSettings = { ...structuredClone(DEFAULT_SETTINGS), locale: 'en', audioFavorites: [{ language: 'ja', audioDescription: false }], hiddenFeatures: ['audioFavorites'] }
+    const transport = vi.fn().mockResolvedValue({ success: true, result: { audioCycleOutcome: 'no-tracks-available' } })
+    const controller = createShortcutCommandController(() => settings, createNetflixPlaybackSession(transport))
+    controller.execute('nextAudioTrack', document)
+    await vi.waitFor(() => expect(document.body).toHaveTextContent('No audio tracks available'))
+    expect(document.body).not.toHaveTextContent('No favorite audio tracks available')
+  })
+
+  it('seeks custom seconds and percentages through Netflix without assigning native currentTime', () => {
+    const transport = vi.fn().mockResolvedValue({ success: true, result: { seekCalled: true } })
+    const settings = structuredClone(DEFAULT_SETTINGS)
+    settings.seekShortcuts = [{ id: 'seek:back', kind: 'relative', value: 15 }, { id: 'seek:percent', kind: 'percentage', value: 37 }]
+    settings.bindings['seek:back-backward'] = { ...settings.bindings.seekBackward }
+    settings.bindings['seek:back-forward'] = { ...settings.bindings.seekForward }
+    settings.bindings['seek:percent'] = { ...settings.bindings.seekForward }
+    const video = document.createElement('video')
+    const nativeSeek = vi.fn()
+    Object.defineProperty(video, 'duration', { configurable: true, value: 200 })
+    Object.defineProperty(video, 'currentTime', { get: () => 12, set: nativeSeek })
+    document.body.append(video)
+    const onSeekRequested = vi.fn()
+    const controller = createShortcutCommandController(() => settings, createNetflixPlaybackSession(transport), { onSeekRequested })
+    expect(controller.execute('seek:back-backward', document)).toBe(true)
+    expect(transport).toHaveBeenLastCalledWith('seek', -15000)
+    expect(controller.execute('seek:back-forward', document)).toBe(true)
+    expect(transport).toHaveBeenLastCalledWith('seek', 15000)
+    expect(controller.execute('seek:percent', document)).toBe(true)
+    expect(transport).toHaveBeenLastCalledWith('seekTo', 74000)
+    expect(onSeekRequested).toHaveBeenCalledTimes(3)
+    expect(nativeSeek).not.toHaveBeenCalled()
+    expect(controller.execute('seek:deleted', document)).toBe(false)
+    settings.bindings['seek:percent'].enabled = false
+    expect(controller.execute('seek:percent', document)).toBe(false)
+  })
+
+  it.each([NaN, Infinity, 0])('does not submit a percentage seek when duration is %s', duration => {
+    const settings = structuredClone(DEFAULT_SETTINGS)
+    settings.seekShortcuts = [{ id: 'seek:percent', kind: 'percentage', value: 50 }]
+    settings.bindings['seek:percent'] = { ...settings.bindings.seekForward }
+    const video = document.createElement('video')
+    Object.defineProperty(video, 'duration', { value: duration })
+    document.body.append(video)
+    const transport = vi.fn()
+    const controller = createShortcutCommandController(() => settings, createNetflixPlaybackSession(transport))
+    expect(controller.execute('seek:percent', document)).toBe(false)
+    expect(transport).not.toHaveBeenCalled()
   })
 
   it('routes keyboard, hold-speed, and PiP commands through one playback session', async () => {
@@ -228,6 +407,53 @@ describe('ShortcutCommandController', () => {
     await vi.waitFor(() => {
       expect(onSubtitlesToggled).toHaveBeenCalledWith(true, document)
     })
+  })
+
+  it.each(['cycleSubtitleTrack', 'previousSubtitleTrack'] as const)('keeps rapid %s requests in order', async action => {
+    document.body.innerHTML = '<video></video>'
+    let finishFirst!: (response: NetflixApiResponse) => void
+    const transport = vi.fn().mockImplementationOnce(() => new Promise<NetflixApiResponse>(resolve => { finishFirst = resolve }))
+      .mockResolvedValue(subtitleTrackResponse)
+    const controller = createShortcutCommandController(() => DEFAULT_SETTINGS, createNetflixPlaybackSession(transport))
+    controller.execute(action, document)
+    controller.execute(action, document)
+    expect(transport).toHaveBeenCalledTimes(1)
+    finishFirst(subtitleTrackResponse)
+    await vi.waitFor(() => expect(transport).toHaveBeenCalledTimes(2))
+    expect(transport.mock.calls).toEqual(action === 'previousSubtitleTrack'
+      ? [['cycleSubtitleTrack', -1], ['cycleSubtitleTrack', -1]]
+      : [['cycleSubtitleTrack'], ['cycleSubtitleTrack']])
+  })
+
+  it.each(
+    ['global disable', 'row disable', 'watch change', 'video replacement', 'cancel and re-enable'].flatMap(reason =>
+      (['cycleSubtitleTrack', 'previousSubtitleTrack'] as const).map(action => ({ reason, action }))),
+  )('drops queued $action requests after $reason', async ({ action, reason }) => {
+    document.body.innerHTML = '<video></video>'
+    window.history.replaceState(null, '', '/watch/123')
+    const settings: ShortcutSettings = structuredClone(DEFAULT_SETTINGS)
+    let finishFirst!: (response: NetflixApiResponse) => void
+    const transport = vi.fn().mockImplementationOnce(() => new Promise<NetflixApiResponse>(resolve => { finishFirst = resolve }))
+      .mockResolvedValue(subtitleTrackResponse)
+    const controller = createShortcutCommandController(() => settings, createNetflixPlaybackSession(transport))
+    controller.execute(action, document)
+    controller.execute(action, document)
+    expect(transport).toHaveBeenCalledTimes(1)
+
+    if (reason === 'global disable') settings.enabled = false
+    if (reason === 'row disable') settings.bindings[action].enabled = false
+    if (reason === 'watch change') window.history.replaceState(null, '', '/watch/456')
+    if (reason === 'video replacement') document.querySelector('video')!.replaceWith(document.createElement('video'))
+    if (reason === 'cancel and re-enable') {
+      settings.enabled = false
+      controller.cancelPendingAction()
+      settings.enabled = true
+    }
+    finishFirst(subtitleTrackResponse)
+    // Drain both the transport completion and the queued command continuation.
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(transport, reason).toHaveBeenCalledTimes(1)
+    window.history.replaceState(null, '', '/')
   })
 
   it('restores the playback rate and hides the hold hint on completion', async () => {

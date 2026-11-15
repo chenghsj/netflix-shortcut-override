@@ -151,6 +151,10 @@
   box-shadow: none;
 }
 
+:root[data-ui-style='markdown'] body[data-app-ui] .app-shortcut-group-header:not(:hover):not(:has(:focus-visible)) {
+  background: transparent;
+}
+
 :root[data-ui-style='markdown'] body[data-app-ui] :is([data-slot='card'], section.border-2) {
   padding-block: var(--markdown-line);
   padding-inline: 8px;
@@ -312,6 +316,37 @@
   color: var(--primary);
 }
 
+:root[data-ui-style='markdown'] body[data-app-ui] [data-slot='sidebar-menu-button'] {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted-foreground);
+  font-weight: 400;
+}
+
+:root[data-ui-style='markdown'] body[data-app-ui] [data-slot='sidebar-menu-button']::before,
+:root[data-ui-style='markdown'] body[data-app-ui] [data-slot='sidebar-menu-button']::after {
+  color: transparent;
+}
+
+:root[data-ui-style='markdown'] body[data-app-ui] [data-slot='sidebar-menu-button']::before {
+  content: '[' / '';
+}
+
+:root[data-ui-style='markdown'] body[data-app-ui] [data-slot='sidebar-menu-button']::after {
+  content: ']' / '';
+}
+
+:root[data-ui-style='markdown'] body[data-app-ui] [data-slot='sidebar-menu-button'][data-active='true'] {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+:root[data-ui-style='markdown'] body[data-app-ui] [data-slot='sidebar-menu-button'][data-active='true']::before,
+:root[data-ui-style='markdown'] body[data-app-ui] [data-slot='sidebar-menu-button'][data-active='true']::after {
+  color: var(--primary);
+}
+
 :root[data-ui-style='markdown'] body[data-app-ui] .app-switch {
   justify-content: center;
   border: 0;
@@ -351,6 +386,18 @@
 }
 
 :root[data-ui-style='markdown'] body[data-app-ui] [data-slot='input']:not(:disabled) {
+  background: transparent;
+}
+
+:root[data-ui-style='markdown'] body[data-app-ui] [data-slot='input-group'] {
+  border-width: 0 0 1px;
+  border-color: var(--input);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+:root[data-ui-style='markdown'] body[data-app-ui] [data-slot='input-group-control'] {
   background: transparent;
 }
 

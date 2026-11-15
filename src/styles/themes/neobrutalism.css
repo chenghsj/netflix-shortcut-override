@@ -1,4 +1,3 @@
-:root:not([data-ui-style]),
 :root[data-ui-style='neobrutalism'] {
   --background: #f7f2e8;
   --foreground: #26201a;
@@ -21,7 +20,7 @@
   --destructive-foreground: #fffdf7;
   --border: #26201a;
   --input: #26201a;
-  --ring: #26201a;
+  --ring: #b27a00;
   --shadow-color: #26201a;
   --radius: 16px;
   --ui-brand-icon: url("/icons/icon48.png");
@@ -88,7 +87,6 @@
   --ui-ghost-hover-bg: var(--accent);
 }
 
-:root:not([data-ui-style]).dark,
 :root[data-ui-style='neobrutalism'].dark {
   --ui-brand-icon: url("/icons/icon-dark48.png");
   --background: #34322f;
@@ -115,4 +113,32 @@
   --ring: oklch(75% 0.135 82);
   --shadow-color: #080605;
   --ui-border-width: 1px;
+}
+
+:root[data-ui-style='neobrutalism'] body[data-app-ui] :is(
+  button,
+  input:not([data-slot='input-group-control']),
+  textarea:not([data-slot='input-group-control']),
+  select
+):focus-visible,
+:root[data-ui-style='neobrutalism'] body[data-app-ui] [data-slot='input-group']:has([data-slot='input-group-control']:focus-visible) {
+  --ui-focus-color: var(--ring);
+  --ui-shadow-xs: 1px 1px 0 0 var(--ui-focus-color);
+  --ui-shadow-sm: 3px 3px 0 0 var(--ui-focus-color);
+  border-color: var(--ui-focus-color);
+  outline: none;
+  /* Keep Tailwind's shadow layers aligned so focus only interpolates color. */
+  box-shadow:
+    var(--tw-inset-shadow, 0 0 #0000),
+    var(--tw-inset-ring-shadow, 0 0 #0000),
+    0 0 #0000,
+    0 0 #0000,
+    var(--tw-shadow, 0 0 #0000);
+  transition-property: background-color, color, border-color, box-shadow, translate;
+}
+
+:root[data-ui-style='neobrutalism'] body[data-app-ui] [aria-invalid='true']:focus,
+:root[data-ui-style='neobrutalism'] body[data-app-ui] [data-slot='input-group']:has([aria-invalid='true']:focus-visible) {
+  --ui-focus-color: var(--destructive);
+  border-color: var(--ui-focus-color);
 }

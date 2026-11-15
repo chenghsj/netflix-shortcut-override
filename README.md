@@ -25,13 +25,16 @@ For manual installation, download a browser package from [GitHub Releases](https
 
 ## Features
 
-- Customize each shortcut, enable or disable actions, and resolve key conflicts in Options.
-- Control playback, seeking, volume, subtitles, fullscreen, skip intro, and playback speed.
+- Customize shortcuts, leave keys unassigned, enable or disable actions, and resolve key conflicts in Options.
+- Control playback, frame stepping, seeking, episode navigation, volume, fullscreen, and playback speed.
+- Add seek pairs, jumps to a video percentage, preferred speeds, and subtitle-size shortcuts.
+- Cycle through favorite subtitle and audio tracks in your chosen order, including audio-description variants.
 - Jump to the previous or next subtitle, or replay the current one.
 - Watch in Picture-in-Picture with mirrored Netflix subtitles and playback controls on Chrome and Edge.
 - Hold the Play / Pause key for temporary speed adjustment, then release to restore the original speed.
+- Automatically skip intros and recaps or advance to the next episode; optionally hide Netflix's pause overlay.
 - Check compatibility and copy local diagnostics from the toolbar popup.
-- Sync settings through browser storage, export/import backups, and choose from five interface languages.
+- Sync settings through browser storage, export/import backups, and choose from five interface languages and three interface styles.
 
 ## Default Shortcuts
 
@@ -41,19 +44,40 @@ All keys can be changed in Options.
 | --- | --- |
 | Play / Pause | `Space` |
 | Rewind / Forward | `Left` / `Right` |
+| Previous / next frame (pauses playback) | `,` / `.` |
+| Previous / next audio language | `Shift + A` / `Shift + D` |
 | Volume up / down | `Up` / `Down` |
 | Mute | `M` |
 | Toggle Netflix subtitles | `C` |
+| Next Netflix subtitle track | `Shift + C` |
+| Previous Netflix subtitle track | `Shift + X` |
+| Cycle subtitle size (customizable; default 80% → 100% → 125%) | `Shift + V` |
 | Fullscreen | `F` |
 | Picture-in-Picture | `Shift + P` |
 | Skip intro | `S` |
+| Previous / next episode | `Ctrl + P` / `Ctrl + N` |
 | Increase / decrease playback speed | `Shift + .` / `Shift + ,` |
-| Set preferred playback speed | `Shift + "` |
+| Set preferred playback speed (default `1.5x`) | `Shift + "` |
 | Reset playback speed | `Shift + /` |
 
 With hold speed enabled, tap Play / Pause to toggle playback or hold it for roughly 250 ms to use the hold speed (default `2x`).
 
 The default seek interval is `10s` and can be set from `1s` to `60s`. Options also lets you adjust speed limits, steps, preferred speed, and hold speed. See the [detailed user guide](docs/user-guide.md) for ranges and reset behavior.
+
+`Ctrl + P` and `Ctrl + N` may be reserved by your browser. Remap the episode shortcuts if needed; they use Netflix's episode controls and require an available episode.
+
+## Settings and Customization
+
+Use the Options sidebar to choose a shortcut category, General settings, Playback automation, or Backup and restore. Search settings, action names, language names, or keys across all five interface languages. The toolbar popup provides searchable shortcut reference and compatibility status; **Open settings** opens the corresponding Options page for editing.
+
+- **Seeking:** add rewind/forward pairs with a shared interval of 1–3,600 seconds and separate keys, or jump to a position from 0–100% of the video.
+- **Subtitle size:** edit the default 80% → 100% → 125% cycle, or add fixed sizes and custom cycles from 50–300%. New cycles support 2–6 different sizes; drag to set their order. Regular playback and PiP keep their current sizes separately.
+- **Playback speed:** add preferred-speed shortcuts from `0.25x` to `4x`. Edit each speed and key together; configure hold speed beneath Play / Pause and speed limits and steps on the Playback speed page.
+- **Favorite tracks:** add subtitle languages or audio tracks in batches, then drag to set their switching order. Audio Description tracks are separate choices. Shortcuts skip unavailable favorites; an empty list cycles through all available tracks. Favorites apply when switching with shortcuts and do not automatically select a track when a title opens.
+- **Page features:** use **Manage page features** to hide unused controls and disable their shortcuts while retaining saved keys and values. Showing a feature again enables its shortcuts when their keys are free. You can also clear a key in its editor and save it as **Not set**.
+- **Appearance:** choose Classic, Neobrutalism, or Markdown independently of light/dark mode or the system theme.
+
+In **Playback automation**, enable Intro, Recap, or Next episode independently. Each clicks the matching Netflix button when it becomes visible. In **General settings**, **Hide pause overlay** hides the paused title, synopsis, and dark backdrop while keeping subtitles and playback controls visible. These options are all off by default.
 
 ## Subtitle Navigation
 
@@ -67,12 +91,12 @@ Subtitle navigation is **off by default**:
 | --- | --- |
 | Previous subtitle | `A` |
 | Next subtitle | `D` |
-| Replay current subtitle | `S` |
+| Replay current subtitle | Not set (disabled) |
 | Play / Pause | `W` |
 
-`A` and `D` preserve the playing or paused state. `S` starts playback from the current subtitle; it does not loop or stop at its end. `W` toggles playback immediately, without hold speed.
+`A` and `D` preserve the playing or paused state. Replay starts playback from the current subtitle; it does not loop or stop at its end. `W` toggles playback immediately, without hold speed.
 
-**Enabled subtitle keys take priority over ordinary shortcuts.** With the defaults, `S` replays a subtitle while subtitle navigation is on. Disable that action or subtitle navigation to use `S` for skip intro again.
+**Subtitle navigation does not override ordinary shortcuts.** An enabled shortcut keeps its key. Choose another subtitle key or explicitly transfer it in the conflict dialog. Existing duplicate settings keep the ordinary shortcut active; `S` continues skipping the intro until its key is explicitly reassigned.
 
 If website access is denied, the feature stays off. Turn it on again to retry. These shortcuts also work in the extension-managed Picture-in-Picture window on Chrome and Edge.
 
@@ -82,7 +106,7 @@ The interface follows supported browser UI languages automatically, or you can c
 
 ## Browser Support and Limitations
 
-- Supports Chrome, Edge, and Firefox Desktop. The extension's subtitle-preserving Picture-in-Picture feature requires Chrome or Edge; it is disabled on Firefox.
+- Supports Chrome 111+, Edge 111+, and Firefox Desktop 128+. The extension's subtitle-preserving Picture-in-Picture feature requires Chrome or Edge 116+; it is disabled on Firefox.
 - Shortcuts work on Netflix watch pages or pages with a visible player, and are skipped while typing in editable fields.
 - Fullscreen is available only on the Netflix page. Skip intro requires a visible Netflix skip button.
 - Seeking, subtitle switching, and subtitle navigation depend on undocumented Netflix player interfaces and may need updates when Netflix changes them.
@@ -112,8 +136,11 @@ npm run build
 
 Load `dist/chromium` in Chrome/Edge, or `dist/firefox/manifest.json` as a temporary Firefox add-on.
 
+`npm run build` type-checks, builds both browsers, and verifies the generated background entry points. Use `npm run dev` for development with HMR. Run `npm test` and `npm run lint` for automated checks.
+
 - [Detailed user guide](docs/user-guide.md): settings, subtitle navigation, permissions, and privacy details.
 - [Development guide](docs/development.md): HMR, scripts, architecture, and testing.
+- [Settings upgrade checks](docs/settings-upgrade.md): migration, backup compatibility, and installed-browser verification.
 - [Release guide](docs/release.md): version tags, packaging, checksums, and Firefox submission.
 - [Troubleshooting](docs/troubleshooting.md): shortcut, website access, and development issues.
 - [Behavior specification](docs/behavior-spec.md) · [Chrome browser tests](docs/chrome-real-browser-test.md) · [Firefox browser tests](docs/firefox-real-browser-test.md)

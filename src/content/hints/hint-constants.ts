@@ -7,6 +7,8 @@ export const VOLUME_HINT_ID = 'shortcut-override-volume-hint'
 export const VOLUME_HINT_LABEL_ID = 'shortcut-override-volume-hint-label'
 export const SPEED_HINT_ID = 'shortcut-override-speed-hint'
 export const SPEED_HINT_LABEL_ID = 'shortcut-override-speed-hint-label'
+export const POSITION_HINT_ID = 'shortcut-override-position-hint'
+export const POSITION_HINT_LABEL_ID = 'shortcut-override-position-hint-label'
 export const SEEK_HINT_ID = 'shortcut-override-seek-hint'
 export const HOLD_SPEED_HINT_ID = 'shortcut-override-hold-speed-hint'
 
@@ -19,11 +21,14 @@ export const HINT_IDS = [
   VOLUME_HINT_LABEL_ID,
   SPEED_HINT_ID,
   SPEED_HINT_LABEL_ID,
+  POSITION_HINT_ID,
+  POSITION_HINT_LABEL_ID,
   SEEK_HINT_ID,
   HOLD_SPEED_HINT_ID,
 ] as const
 
 export const TRANSIENT_HINT_VISIBLE_DURATION_MS = 360
+export const TRACK_HINT_VISIBLE_DURATION_MS = 1000
 export const HINT_VISIBLE_OPACITY = '1'
 export const HINT_SURFACE_BACKGROUND = 'rgba(0,0,0,0.68)'
 export const HINT_HIDDEN_TRANSFORM = 'translate(-50%,-50%) scale(0.96)'

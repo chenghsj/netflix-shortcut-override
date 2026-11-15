@@ -1,11 +1,5 @@
-import {
-  MIN_SETTINGS_BACKUP_VERSION,
-  SHORTCUT_SETTINGS_VERSION,
-  isCompleteSettingsForBackup,
-  normalizeSettings,
-} from '@/shared/shortcut-settings'
-import { keyBindingsEqual } from './shortcut-bindings'
-import { SUBTITLE_NAVIGATION_ACTIONS, SHORTCUT_ACTIONS, type ShortcutSettings } from '@/shared/shortcut-types'
+import { normalizeSettings, parseSettingsForBackup } from '@/shared/shortcut-settings'
+import type { ShortcutSettings } from '@/shared/shortcut-types'
 
 export const SETTINGS_BACKUP_FORMAT = 'netflix-shortcut-override-settings'
 export const SETTINGS_BACKUP_FORMAT_VERSION = 1
@@ -61,50 +55,6 @@ const isCanonicalIsoTimestamp = (value: unknown): value is string => {
   return Number.isFinite(timestamp) && new Date(timestamp).toISOString() === value
 }
 
-const isCurrentSettingsNormalized = (
-  raw: Record<string, unknown>,
-  normalized: ShortcutSettings
-): boolean => {
-  const settings = raw as unknown as ShortcutSettings
-
-  return (
-    settings.version === normalized.version &&
-    settings.enabled === normalized.enabled &&
-    settings.subtitleNavigation.enabled === normalized.subtitleNavigation.enabled &&
-    SUBTITLE_NAVIGATION_ACTIONS.every(action => {
-      const left = settings.subtitleNavigation.bindings[action], right = normalized.subtitleNavigation.bindings[action]
-      return left.enabled === right.enabled && keyBindingsEqual(left.key, right.key) && left.key.key === right.key.key
-    }) &&
-    settings.locale === normalized.locale &&
-    settings.theme === normalized.theme &&
-    settings.uiStyle === normalized.uiStyle &&
-    settings.speed.min === normalized.speed.min &&
-    settings.speed.max === normalized.speed.max &&
-    settings.speed.step === normalized.speed.step &&
-    settings.speed.preferred === normalized.speed.preferred &&
-    settings.holdSpeed.enabled === normalized.holdSpeed.enabled &&
-    settings.holdSpeed.speed === normalized.holdSpeed.speed &&
-    settings.holdSpeed.showHint === normalized.holdSpeed.showHint &&
-    settings.seek.seconds === normalized.seek.seconds &&
-    settings.pip.subtitlesEnabled === normalized.pip.subtitlesEnabled &&
-    settings.pip.subtitleSize === normalized.pip.subtitleSize &&
-    settings.pip.subtitleBackground === normalized.pip.subtitleBackground &&
-    SHORTCUT_ACTIONS.every(action => {
-      const binding = settings.bindings[action]
-      const normalizedBinding = normalized.bindings[action]
-      return (
-        binding.enabled === normalizedBinding.enabled &&
-        binding.key.code === normalizedBinding.key.code &&
-        binding.key.key === normalizedBinding.key.key &&
-        binding.key.ctrl === normalizedBinding.key.ctrl &&
-        binding.key.alt === normalizedBinding.key.alt &&
-        binding.key.shift === normalizedBinding.key.shift &&
-        binding.key.meta === normalizedBinding.key.meta
-      )
-    })
-  )
-}
-
 export const createSettingsBackup = (
   settings: ShortcutSettings,
   { extensionVersion, exportedAt = new Date() }: CreateSettingsBackupOptions
@@ -149,32 +99,9 @@ export const parseSettingsBackup = (source: string): SettingsBackupParseResult =
     return { ok: false, error: 'missingSettings' }
   }
 
-  const rawSettingsVersion = parsed.settings.version
-  if (
-    typeof rawSettingsVersion !== 'number' ||
-    !Number.isInteger(rawSettingsVersion) ||
-    rawSettingsVersion < 1
-  ) {
-    return { ok: false, error: 'invalidSettingsVersion' }
-  }
-  const settingsVersion = rawSettingsVersion
-
-  if (
-    settingsVersion < MIN_SETTINGS_BACKUP_VERSION ||
-    settingsVersion > SHORTCUT_SETTINGS_VERSION
-  ) {
-    return { ok: false, error: 'unsupportedSettingsVersion' }
-  }
-  if (!isCompleteSettingsForBackup(parsed.settings, settingsVersion)) {
-    return { ok: false, error: 'invalidSettings' }
-  }
-  const normalizedSettings = normalizeSettings(parsed.settings)
-  if (
-    settingsVersion === SHORTCUT_SETTINGS_VERSION &&
-    !isCurrentSettingsNormalized(parsed.settings, normalizedSettings)
-  ) {
-    return { ok: false, error: 'invalidSettings' }
-  }
+  const result = parseSettingsForBackup(parsed.settings)
+  if (!result.ok) return result
+  const { settingsVersion, settings } = result
 
   return {
     ok: true,
@@ -183,7 +110,7 @@ export const parseSettingsBackup = (source: string): SettingsBackupParseResult =
       extensionVersion: parsed.extensionVersion,
       formatVersion: parsed.formatVersion,
       settingsVersion,
-      settings: normalizedSettings,
+      settings,
     },
   }
 }

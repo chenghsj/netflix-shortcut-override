@@ -9,16 +9,19 @@ import {
 import type { KeyBinding } from '@/shared/shortcut-types'
 
 type KeyBindingKbdProps = ComponentProps<typeof KbdGroup> & {
-  binding: KeyBinding
+  binding: KeyBinding | null
+  emptyLabel?: string
   kbdClassName?: string
 }
 
 export function KeyBindingKbd({
   binding,
+  emptyLabel = '—',
   className,
   kbdClassName,
   ...props
 }: KeyBindingKbdProps) {
+  if (!binding) return <span className={cn('text-sm text-muted-foreground', className)} {...props}>{emptyLabel}</span>
   const label = formatKeyBinding(binding)
 
   return (

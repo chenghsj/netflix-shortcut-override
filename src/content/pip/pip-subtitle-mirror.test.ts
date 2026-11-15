@@ -464,6 +464,12 @@ describe('SubtitleMirror', () => {
         .backgroundColor
     ).toBe('transparent')
 
+    mirror.setSettings({ subtitlesEnabled: true, subtitleSize: 175, subtitleBackground: 'dark' })
+    await flushFrames(window, pipWindow)
+    expect(inner?.style.fontSize).toBe('35px')
+    expect(inner?.style.lineHeight).toBe('42px')
+    expect(inner?.style.transform).toBe(stableTransform)
+
     mirror.setSettings({
       subtitlesEnabled: false,
       subtitleSize: 'large',

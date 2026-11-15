@@ -9,8 +9,7 @@ type PipTimelineControllerOptions = {
   timeline: HTMLInputElement
   currentTimeLabel: HTMLElement
   durationLabel: HTMLElement
-  seekTo: (milliseconds: number) => Promise<PlaybackCommandResult>
-  resumeAfterSeek?: () => Promise<PlaybackCommandResult>
+  seekTo: (milliseconds: number, isCurrent: () => boolean) => Promise<PlaybackCommandResult>
   onReveal: () => void
   onError: (message: string) => void
 }
@@ -138,7 +137,7 @@ class PipTimelineController {
   }
 
   private commit(): void {
-    const { timeline, video, resumeAfterSeek, seekTo } = this.options
+    const { timeline, seekTo } = this.options
     timeline.blur()
     if (!this.pendingCommit && !this.dragging) return
     const requestedTime = Number(timeline.value)
@@ -147,9 +146,8 @@ class PipTimelineController {
     this.dragging = false
     timeline.dataset.dragging = 'false'
     const requestId = ++this.requestId
-    const shouldResume = resumeAfterSeek !== undefined && (video.ended || !video.paused)
     this.beginPendingSeek(targetTime, requestId)
-    void this.runSeek(seekTo(targetTime * 1_000), requestId, shouldResume)
+    void this.runSeek(seekTo(targetTime * 1_000, () => this.started && requestId === this.requestId), requestId)
   }
 
   private cancelPreview(): void {
@@ -182,7 +180,6 @@ class PipTimelineController {
   private async runSeek(
     request: Promise<PlaybackCommandResult>,
     requestId: number,
-    shouldResume: boolean
   ): Promise<void> {
     try {
       const seekResult = await request
@@ -190,14 +187,6 @@ class PipTimelineController {
         this.clearPendingSeek()
         this.syncFromVideo()
         this.options.onError(seekResult.failureLabel)
-        return
-      }
-      if (!shouldResume || requestId !== this.requestId) return
-      const resumeResult = await this.options.resumeAfterSeek!()
-      if (resumeResult.failureLabel && requestId === this.requestId) {
-        this.clearPendingSeek()
-        this.syncFromVideo()
-        this.options.onError(resumeResult.failureLabel)
       }
     } catch (error) {
       if (requestId !== this.requestId) return

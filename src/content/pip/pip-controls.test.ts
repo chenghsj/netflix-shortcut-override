@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { PlaybackCommandResult } from '@/content/netflix-playback-session'
 import { PipControls } from './pip-controls'
 
 const flushPromises = async (): Promise<void> => {
@@ -156,7 +155,7 @@ describe('PipControls', () => {
     await flushPromises()
 
     expect(seekTo).toHaveBeenCalledOnce()
-    expect(seekTo).toHaveBeenCalledWith(90_000)
+    expect(seekTo).toHaveBeenCalledWith(90_000, expect.any(Function))
     expect(video.currentTime).toBe(12)
 
     controls.destroy()
@@ -169,13 +168,11 @@ describe('PipControls', () => {
     document.body.append(videoArea)
 
     const seekTo = createSeekTo()
-    const resumeAfterSeek = vi.fn()
     const controls = new PipControls({
       pipWindow: window,
       video,
       videoArea,
       seekTo,
-      resumeAfterSeek,
     })
     controls.start()
     const timeline = videoArea.querySelector<HTMLInputElement>('[data-pip-control="timeline"]')
@@ -186,135 +183,28 @@ describe('PipControls', () => {
     timeline.dispatchEvent(new Event('change', { bubbles: true }))
     await flushPromises()
 
-    expect(seekTo).toHaveBeenCalledWith(90_000)
-    expect(resumeAfterSeek).not.toHaveBeenCalled()
+    expect(seekTo).toHaveBeenCalledWith(90_000, expect.any(Function))
     controls.destroy()
   })
 
-  it('reasserts playback after seeking an episode that was still playing', async () => {
+  it.each(['another drag', 'close'] as const)('expires a submitted seek lifetime on %s', action => {
     const video = document.createElement('video')
-    setVideoState(video, {
-      currentTime: 1_406,
-      duration: 1_449,
-      ended: false,
-      paused: false,
-    })
+    setVideoState(video, { currentTime: 12, duration: 240 })
     const videoArea = document.createElement('div')
     document.body.append(videoArea)
     const seekTo = createSeekTo()
-    const resumeAfterSeek = vi.fn().mockResolvedValue({
-      response: { success: true, result: { action: 'play' } },
-      failureLabel: null,
-    })
-
-    const controls = new PipControls({
-      pipWindow: window,
-      video,
-      videoArea,
-      seekTo,
-      resumeAfterSeek,
-    })
+    const controls = new PipControls({ pipWindow: window, video, videoArea, seekTo })
     controls.start()
-    const timeline = videoArea.querySelector<HTMLInputElement>('[data-pip-control="timeline"]')
-    if (!timeline) throw new Error('Expected PiP timeline')
-
-    timeline.value = '1200'
-    timeline.dispatchEvent(new Event('input', { bubbles: true }))
-    timeline.dispatchEvent(new Event('change', { bubbles: true }))
-    await flushPromises()
-
-    expect(seekTo).toHaveBeenCalledWith(1_200_000)
-    expect(resumeAfterSeek).toHaveBeenCalledOnce()
-
+    const timeline = videoArea.querySelector<HTMLInputElement>('[data-pip-control="timeline"]')!
+    timeline.value = '90'
+    timeline.dispatchEvent(new Event('input'))
+    timeline.dispatchEvent(new Event('change'))
+    const isCurrent = seekTo.mock.calls[0][1] as () => boolean
+    expect(isCurrent()).toBe(true)
+    if (action === 'close') controls.destroy()
+    else timeline.dispatchEvent(new Event('pointerdown'))
+    expect(isCurrent()).toBe(false)
     controls.destroy()
-  })
-
-  it('resumes Netflix playback when seeking back from an ended episode', async () => {
-    const video = document.createElement('video')
-    setVideoState(video, {
-      currentTime: 240,
-      duration: 240,
-      ended: true,
-      paused: true,
-    })
-    const videoArea = document.createElement('div')
-    document.body.append(videoArea)
-    const seekTo = createSeekTo()
-    const resumeAfterSeek = vi.fn().mockResolvedValue({
-      response: { success: true, result: { action: 'play' } },
-      failureLabel: null,
-    })
-
-    const controls = new PipControls({
-      pipWindow: window,
-      video,
-      videoArea,
-      seekTo,
-      resumeAfterSeek,
-    })
-    controls.start()
-    const timeline = videoArea.querySelector<HTMLInputElement>('[data-pip-control="timeline"]')
-    if (!timeline) throw new Error('Expected PiP timeline')
-
-    timeline.value = '180'
-    timeline.dispatchEvent(new Event('input', { bubbles: true }))
-    timeline.dispatchEvent(new Event('change', { bubbles: true }))
-    await flushPromises()
-
-    expect(seekTo).toHaveBeenCalledWith(180_000)
-    expect(resumeAfterSeek).toHaveBeenCalledOnce()
-
-    controls.destroy()
-  })
-
-  it('cancels the ended-episode resume when PiP closes during a seek', async () => {
-    const video = document.createElement('video')
-    setVideoState(video, { currentTime: 240, duration: 240, ended: true, paused: true })
-    const videoArea = document.createElement('div')
-    document.body.append(videoArea)
-    let resolveSeek: (result: PlaybackCommandResult) => void = () => undefined
-    const seekTo = vi.fn(
-      () =>
-        new Promise<PlaybackCommandResult>(resolve => {
-          resolveSeek = resolve
-        })
-    )
-    const resumeAfterSeek = vi.fn().mockResolvedValue({
-      response: { success: true, result: { action: 'play' } },
-      failureLabel: null,
-    })
-
-    const controls = new PipControls({
-      pipWindow: window,
-      video,
-      videoArea,
-      seekTo,
-      resumeAfterSeek,
-    })
-    controls.start()
-    const timeline = videoArea.querySelector<HTMLInputElement>('[data-pip-control="timeline"]')
-    if (!timeline) throw new Error('Expected PiP timeline')
-
-    timeline.value = '180'
-    timeline.dispatchEvent(new Event('input', { bubbles: true }))
-    timeline.dispatchEvent(new Event('change', { bubbles: true }))
-    controls.destroy()
-    resolveSeek({
-      response: {
-        success: true,
-        result: {
-          action: 'seekTo',
-          playerApiFound: true,
-          sessionIds: [],
-          playerFound: true,
-          seekCalled: true,
-        },
-      },
-      failureLabel: null,
-    })
-    await flushPromises()
-
-    expect(resumeAfterSeek).not.toHaveBeenCalled()
   })
 
   it('keeps the requested timeline position while Netflix confirms the seek', async () => {

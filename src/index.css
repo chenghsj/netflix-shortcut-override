@@ -13,11 +13,25 @@
   font-family:
     'Geist Variable', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     'Segoe UI', sans-serif;
+  --sidebar: var(--card);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--ui-option-active-bg);
+  --sidebar-accent-foreground: var(--ui-option-active-fg);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
   color-scheme: light;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+:root:not([data-ui-style]) {
+  color-scheme: light dark;
+  background-color: Canvas;
+  color: CanvasText;
 }
 
 body {
@@ -26,7 +40,7 @@ body {
 
 :where(
   a[href],
-  button:not(:disabled),
+  button:not(:disabled):not([data-slot='drag-handle']),
   select:not(:disabled),
   label[for]:not([aria-disabled='true']),
   [role='button']:not([aria-disabled='true']):not([data-disabled]),
@@ -58,6 +72,11 @@ html.popup-page-root {
   overflow-x: hidden;
 }
 
+.popup-shell {
+  /* A viewport cap collapses content during the browser's initial popup sizing. */
+  height: 35rem;
+}
+
 @supports (-moz-appearance: none) {
   html.popup-page-root {
     width: auto;
@@ -76,6 +95,15 @@ html.popup-page-root {
 }
 
 @theme inline {
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
   --font-heading: var(--font-sans);
   --font-head: var(--font-sans);
   --color-secondary-hover: var(--secondary);

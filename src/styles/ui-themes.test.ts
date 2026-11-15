@@ -38,6 +38,24 @@ const appearance = [
 ]
 
 describe('UI theme contract', () => {
+  it.each(['light', 'dark'])('does not paint Neobrutalism in %s mode before the saved style is known', mode => {
+    const root = document.documentElement
+    const previousStyle = root.getAttribute('data-ui-style')
+    const previousDark = root.classList.contains('dark')
+    const stylesheet = document.createElement('style')
+    stylesheet.textContent = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'themes', 'neobrutalism.css'), 'utf8')
+    try {
+      root.removeAttribute('data-ui-style')
+      root.classList.toggle('dark', mode === 'dark')
+      document.head.append(stylesheet)
+      expect(getComputedStyle(root).getPropertyValue('--background')).toBe('')
+    } finally {
+      stylesheet.remove()
+      if (previousStyle !== null) root.setAttribute('data-ui-style', previousStyle)
+      root.classList.toggle('dark', previousDark)
+    }
+  })
+
   it.each(['light', 'dark'])('keeps Markdown heading and tab icons visible in %s mode', mode => {
     const root = document.documentElement
     const previousStyle = root.getAttribute('data-ui-style')

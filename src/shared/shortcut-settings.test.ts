@@ -14,6 +14,18 @@ import {
 } from '@/shared/shortcut-settings'
 
 describe('shortcut settings', () => {
+  it('defaults pause overlay hiding off for existing settings and preserves an explicit on preference', () => {
+    expect(DEFAULT_SETTINGS.hidePauseOverlay).toBe(false)
+    expect(normalizeSettings({ version: 30 }).hidePauseOverlay).toBe(false)
+    expect(normalizeSettings({ hidePauseOverlay: true }).hidePauseOverlay).toBe(true)
+    expect(normalizeSettings({ hidePauseOverlay: 'true' }).hidePauseOverlay).toBe(false)
+  })
+
+  it('leaves subtitle replay unassigned and disabled for fresh settings', () => {
+    expect(DEFAULT_SETTINGS.subtitleNavigation.bindings.replay).toEqual({ enabled: false, key: null })
+    expect(normalizeSettings({}).subtitleNavigation.bindings.replay).toEqual({ enabled: false, key: null })
+  })
+
   it.each([11, 12, 13])('migrates subtitle navigation settings from schema v%s without losing custom bindings', version => {
     const subtitlePractice = structuredClone(DEFAULT_SETTINGS.subtitleNavigation)
     subtitlePractice.enabled = true
@@ -21,7 +33,7 @@ describe('shortcut settings', () => {
       enabled: false,
       key: { code: 'KeyN', key: 'n', ctrl: true, alt: false, shift: false, meta: false },
     }
-    subtitlePractice.bindings.replay.enabled = true
+    subtitlePractice.bindings.replay = { enabled: true, key: { ...DEFAULT_SETTINGS.bindings.skipIntro.key } }
     const normalized = normalizeSettings({ version, subtitlePractice })
 
     expect(normalized.subtitleNavigation).toEqual(subtitlePractice)
@@ -128,7 +140,7 @@ describe('shortcut settings', () => {
     expect(normalized.bindings.toggleSubtitles).toEqual(
       DEFAULT_SETTINGS.bindings.toggleSubtitles
     )
-    expect(normalized.bindings.toggleSubtitles.key.code).toBe('KeyC')
+    expect(normalized.bindings.toggleSubtitles.key?.code).toBe('KeyC')
   })
 
   it('disables the migrated subtitle binding when C is already assigned', () => {

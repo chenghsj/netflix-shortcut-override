@@ -85,20 +85,29 @@ jobs:
       - name: Verify release version
         id: release_version
         shell: bash
+        env:
+          RELEASE_TAG: ${{ steps.release_ref.outputs.tag }}
         run: |
           set -euo pipefail
 
           package_version="$(node -p "require('./package.json').version")"
           expected_tag="v${package_version}"
-          tag="${{ steps.release_ref.outputs.tag }}"
+          tag="${RELEASE_TAG}"
+          version_tag="${tag%%-*}"
 
-          if [[ "${tag}" != "${expected_tag}" ]]; then
+          if [[ "${version_tag}" != "${expected_tag}" ]]; then
             echo "Release tag ${tag} does not match package.json version ${package_version}." >&2
-            echo "Update package.json or use ${expected_tag}." >&2
+            echo "Use ${expected_tag} or a prerelease such as ${expected_tag}-beta.1." >&2
             exit 1
           fi
 
-          echo "version=${package_version}" >> "${GITHUB_OUTPUT}"
+          prerelease=false
+          if [[ "${tag}" == *-* ]]; then
+            prerelease=true
+          fi
+
+          echo "version=${tag#v}" >> "${GITHUB_OUTPUT}"
+          echo "prerelease=${prerelease}" >> "${GITHUB_OUTPUT}"
 
       - name: Install dependencies
         run: npm ci
@@ -152,17 +161,23 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release_ref.outputs.tag }}
+          IS_PRERELEASE: ${{ steps.release_version.outputs.prerelease }}
         run: |
           set -euo pipefail
-          tag="${{ steps.release_ref.outputs.tag }}"
+          tag="${RELEASE_TAG}"
+          release_flags=(--latest)
+          if [[ "${IS_PRERELEASE}" == "true" ]]; then
+            release_flags=(--prerelease --latest=false)
+          fi
 
           if gh release view "${tag}" >/dev/null 2>&1; then
             gh release upload "${tag}" release-assets/* --clobber
-            gh release edit "${tag}" --title "${tag}" --notes-file release-notes.md
+            gh release edit "${tag}" --title "${tag}" --notes-file release-notes.md "${release_flags[@]}"
           else
             gh release create "${tag}" release-assets/* \
               --title "${tag}" \
               --notes-file release-notes.md \
               --verify-tag \
-              --latest
+              "${release_flags[@]}"
           fi

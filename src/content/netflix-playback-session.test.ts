@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import type { NetflixApiResponse } from '@/shared/netflix-api'
 
 import {
   createNetflixPlaybackSession,
@@ -18,6 +19,103 @@ const createTransport = (): ReturnType<typeof vi.fn> & NetflixPlaybackTransport 
   })
 
 describe('Netflix playback session', () => {
+  it('treats frame stepping as a new playback intent and does not resume a pending PiP seek', async () => {
+    let finishSeek: (response: NetflixApiResponse) => void = () => undefined
+    const transport = vi.fn().mockImplementation((action: string) => action === 'seekTo'
+      ? new Promise<NetflixApiResponse>(resolve => { finishSeek = resolve })
+      : Promise.resolve({ success: true, result: { seekCalled: true } }))
+    const session = createNetflixPlaybackSession(transport)
+    const video = document.createElement('video')
+    const play = vi.fn()
+    Object.defineProperties(video, { paused: { value: false }, play: { value: play } })
+    const seeking = session.seekTo(5_000, { video, isCurrent: () => true })
+    await expect(session.stepFrame(-1)).resolves.toMatchObject({ failureLabel: null })
+    finishSeek({ success: true, result: { action: 'seekTo', playerApiFound: true, playerFound: true, seekCalled: true, sessionIds: [] } })
+    await seeking
+    expect(transport).toHaveBeenCalledWith('stepFrame', -1)
+    expect(play).not.toHaveBeenCalled()
+  })
+
+  it('serializes audio changes and recovers after a failed command', async () => {
+    let finishFirst: (response: NetflixApiResponse) => void = () => undefined
+    const transport = vi.fn().mockImplementationOnce(() => new Promise<NetflixApiResponse>(resolve => { finishFirst = resolve }))
+      .mockResolvedValue({ success: true, result: { audioTrackSwitchCalled: true, audioTrack: '日本語', audioTrackLanguage: 'ja' } })
+    const session = createNetflixPlaybackSession(transport)
+    const first = session.cycleAudioTrack(1)
+    const second = session.cycleAudioTrack(-1)
+    expect(transport).toHaveBeenCalledTimes(1)
+    finishFirst({ success: false, error: 'unavailable' })
+    expect((await first).failureLabel).toContain('unavailable')
+    await expect(second).resolves.toMatchObject({ failureLabel: null, track: { name: '日本語', language: 'ja' } })
+    expect(transport).toHaveBeenLastCalledWith('cycleAudioTrack', -1)
+  })
+
+  it('preserves the audio-description distinction for localized hints', async () => {
+    const transport = vi.fn().mockResolvedValue({
+      success: true,
+      result: {
+        audioTrackSwitchCalled: true, audioTrack: '日本語', audioTrackLanguage: 'ja', audioTrackIsAudioDescription: true,
+      },
+    })
+    await expect(createNetflixPlaybackSession(transport).cycleAudioTrack(1)).resolves.toMatchObject({
+      failureLabel: null, track: { name: '日本語', language: 'ja', isAudioDescription: true },
+    })
+  })
+
+  it('retains each queued command’s audio preferences and reports unavailable favorites without a failure', async () => {
+    const transport = vi.fn().mockResolvedValue({ success: true, result: { audioCycleOutcome: 'no-tracks-available' } })
+    const session = createNetflixPlaybackSession(transport)
+    const firstFavorites = [{ language: 'en', audioDescription: true }]
+    const secondFavorites = [{ language: 'ja', audioDescription: false }]
+    const first = session.cycleAudioTrack(1, undefined, firstFavorites)
+    const second = session.cycleAudioTrack(-1, undefined, secondFavorites)
+    await expect(first).resolves.toMatchObject({ noTracksAvailable: true, failureLabel: null })
+    await second
+    expect(transport.mock.calls).toEqual([
+      ['cycleAudioTrack', 1, undefined, firstFavorites], ['cycleAudioTrack', -1, undefined, secondFavorites],
+    ])
+  })
+
+  it('drops queued audio changes when the originating playback is no longer available', async () => {
+    let finish: (response: NetflixApiResponse) => void = () => undefined
+    const transport = vi.fn(() => new Promise<NetflixApiResponse>(resolve => { finish = resolve }))
+    const session = createNetflixPlaybackSession(transport)
+    let available = true
+    const first = session.cycleAudioTrack(1)
+    const queued = session.cycleAudioTrack(1, () => available)
+    available = false
+    finish({ success: false, error: 'old playback' })
+    await Promise.all([first, queued])
+    expect(transport).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([
+    { paused: false, ended: false, resumes: true },
+    { paused: true, ended: true, resumes: true },
+    { paused: true, ended: false, resumes: false },
+  ])('preserves playback after a view seek from $paused / ended $ended', async ({ paused, ended, resumes }) => {
+    const video = document.createElement('video')
+    const play = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperties(video, {
+      paused: { value: paused }, ended: { value: ended }, play: { value: play },
+    })
+    const transport = createTransport()
+    const session = createNetflixPlaybackSession(transport)
+    await session.seekTo(90_000, { video, isCurrent: () => true })
+    expect(transport).toHaveBeenCalledWith('seekTo', 90_000)
+    expect(play).toHaveBeenCalledTimes(resumes ? 1 : 0)
+  })
+
+  it('does not resume after a failed seek even if the video was playing', async () => {
+    const video = document.createElement('video')
+    const play = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperties(video, { paused: { value: false }, play: { value: play } })
+    const session = createNetflixPlaybackSession(vi.fn().mockResolvedValue({ success: false, error: 'seek rejected' }))
+    const result = await session.seekTo(90_000, { video, isCurrent: () => true })
+    expect(result.failureLabel).toContain('seek rejected')
+    expect(play).not.toHaveBeenCalled()
+  })
+
   it('routes playback commands and mirrors native display state in one seam', async () => {
     const transport = createTransport()
     let paused = true
@@ -165,5 +263,89 @@ describe('Netflix playback session', () => {
       response: { success: false, error: 'Netflix command rejected' },
       failureLabel: 'pause failed: Netflix command rejected',
     })
+  })
+})
+
+const subtitleResponse = (subtitlesEnabled: boolean): NetflixApiResponse => ({
+  success: true,
+  result: {
+    action: 'toggleSubtitles', playerApiFound: true, playerFound: true,
+    seekCalled: false, sessionIds: ['session-id'], subtitleToggleCalled: true,
+    subtitlesEnabled,
+  },
+})
+
+describe('subtitle confirmation through the playback session', () => {
+  it.each(['toggle', 'track'] as const)('discards a read superseded by a successful %s command', async command => {
+    let finishRead!: (response: NetflixApiResponse) => void
+    const transport = vi.fn((action: string) => action === 'getSubtitleState'
+      ? new Promise<NetflixApiResponse>(resolve => { finishRead = resolve })
+      : Promise.resolve(subtitleResponse(false)))
+    const session = createNetflixPlaybackSession(transport)
+    const initial = session.getSubtitleState()
+    const confirmed = await (command === 'toggle' ? session.toggleSubtitles() : session.cycleSubtitleTrack())
+    expect(confirmed).toMatchObject({ subtitlesEnabled: false, failureLabel: null })
+    finishRead(subtitleResponse(true))
+    expect(await initial).toMatchObject({ subtitlesEnabled: null })
+  })
+
+  it('preserves an independent state read when a subtitle command fails', async () => {
+    let finishRead!: (response: NetflixApiResponse) => void
+    const transport = vi.fn((action: string) => action === 'getSubtitleState'
+      ? new Promise<NetflixApiResponse>(resolve => { finishRead = resolve })
+      : Promise.reject(new Error('Unavailable')))
+    const session = createNetflixPlaybackSession(transport)
+    const initial = session.getSubtitleState()
+    expect(await session.toggleSubtitles()).toMatchObject({ subtitlesEnabled: null, failureLabel: 'toggleSubtitles failed: Unavailable' })
+    finishRead(subtitleResponse(true))
+    expect(await initial).toMatchObject({ subtitlesEnabled: true, failureLabel: null })
+  })
+
+  it('serializes a track command after a failed toggle and accepts later state reads', async () => {
+    let failToggle!: (error: Error) => void
+    const transport = vi.fn((action: string) => action === 'toggleSubtitles'
+      ? new Promise<NetflixApiResponse>((_, reject) => { failToggle = reject })
+      : Promise.resolve(subtitleResponse(true)))
+    const session = createNetflixPlaybackSession(transport)
+    const toggle = session.toggleSubtitles()
+    const track = session.cycleSubtitleTrack([{ language: 'ja' }], -1)
+    expect(transport).toHaveBeenCalledTimes(1)
+    failToggle(new Error('Unavailable'))
+    await expect(toggle).resolves.toMatchObject({ subtitlesEnabled: null })
+    await expect(track).resolves.toMatchObject({ subtitlesEnabled: true, failureLabel: null })
+    expect(transport).toHaveBeenNthCalledWith(2, 'cycleSubtitleTrack', -1, [{ language: 'ja' }])
+    await expect(session.getSubtitleState()).resolves.toMatchObject({ subtitlesEnabled: true })
+  })
+
+  it('distinguishes no matching track from an unconfirmed toggle', async () => {
+    const transport = vi.fn()
+      .mockResolvedValueOnce({ success: true, result: { subtitleCycleOutcome: 'no-tracks-available' } })
+      .mockResolvedValueOnce({ success: true, result: { subtitleToggleCalled: true } })
+    const session = createNetflixPlaybackSession(transport)
+    await expect(session.cycleSubtitleTrack()).resolves.toMatchObject({
+      subtitlesEnabled: null, failureLabel: null, noTracksAvailable: true,
+    })
+    await expect(session.toggleSubtitles()).resolves.toMatchObject({
+      subtitlesEnabled: null, failureLabel: 'Unable to toggle subtitles', noTracksAvailable: false,
+    })
+  })
+
+  it('rechecks queued subtitle availability after a failed toggle and accepts later commands', async () => {
+    let finishToggle!: (response: NetflixApiResponse) => void
+    const transport = vi.fn().mockImplementationOnce(() => new Promise<NetflixApiResponse>(resolve => { finishToggle = resolve }))
+      .mockResolvedValue(subtitleResponse(true))
+    const session = createNetflixPlaybackSession(transport)
+    let available = true
+    const toggle = session.toggleSubtitles()
+    const track = session.cycleSubtitleTrack([{ language: 'ja' }], -1, () => available)
+    available = false
+    finishToggle({ success: false, error: 'old playback' })
+    await toggle
+    await expect(track).resolves.toMatchObject({ subtitlesEnabled: null, failureLabel: null, noTracksAvailable: false })
+    expect(transport).toHaveBeenCalledTimes(1)
+
+    available = true
+    await expect(session.cycleSubtitleTrack(undefined, 1, () => available)).resolves.toMatchObject({ subtitlesEnabled: true })
+    expect(transport).toHaveBeenLastCalledWith('cycleSubtitleTrack')
   })
 })

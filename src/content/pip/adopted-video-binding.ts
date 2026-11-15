@@ -31,7 +31,6 @@ export class AdoptedVideoBinding {
   private videoArea: HTMLElement | null = null
   private subtitleMirror: SubtitleMirror | null = null
   private pipControls: PipControls | null = null
-  private subtitleStateVersion = 0
 
   constructor(options: AdoptedVideoBindingOptions) {
     this.sourceDocument = options.sourceDocument
@@ -75,15 +74,7 @@ export class AdoptedVideoBinding {
   }
 
   updateSettings(settings: ShortcutSettings): void {
-    this.applySettings(settings)
-  }
-
-  confirmSubtitleState(settings: ShortcutSettings): void {
-    this.subtitleStateVersion += 1
-    this.applySettings(settings)
-  }
-
-  private applySettings(settings: ShortcutSettings): void {
+    if (this.settings.enabled && !settings.enabled) this.playbackSession.cancelPendingPlayback()
     this.settings = settings
     this.subtitleMirror?.setSettings(settings.pip)
     this.pipControls?.updateSettings(this.getControlsSettings())
@@ -115,11 +106,10 @@ export class AdoptedVideoBinding {
       pipWindow: this.pipWindow,
       video,
       videoArea,
-      seekTo: milliseconds => {
+      seekTo: (milliseconds, isCurrent) => {
         this.onUserSeek()
-        return this.playbackSession.seekTo(milliseconds)
+        return this.playbackSession.seekTo(milliseconds, { video, isCurrent: () => this.settings.enabled && isCurrent() })
       },
-      resumeAfterSeek: () => this.playbackSession.play(video),
       onVisibilityChange: visible => this.subtitleMirror?.setControlsVisible(visible),
       settings: this.getControlsSettings(),
       onAction: action => this.executeControlAction(action, video),
@@ -137,7 +127,7 @@ export class AdoptedVideoBinding {
       },
     })
     this.pipControls.start()
-    void this.syncNetflixSubtitleState(this.subtitleStateVersion)
+    void this.syncNetflixSubtitleState(this.pipControls)
   }
 
   private getControlsSettings() {
@@ -177,25 +167,23 @@ export class AdoptedVideoBinding {
 
   private async toggleNetflixSubtitles(): Promise<void> {
     const result = await this.playbackSession.toggleSubtitles()
-    const subtitlesEnabled = result.response.result?.subtitlesEnabled
-    if (result.failureLabel || typeof subtitlesEnabled !== 'boolean') return
+    const subtitlesEnabled = result.subtitlesEnabled
+    if (subtitlesEnabled === null) return
 
     const nextSettings = {
       ...this.settings,
       pip: { ...this.settings.pip, subtitlesEnabled },
     }
-    this.confirmSubtitleState(nextSettings)
+    this.updateSettings(nextSettings)
     this.onSettingsChange?.(nextSettings)
   }
 
-  private async syncNetflixSubtitleState(version: number): Promise<void> {
+  private async syncNetflixSubtitleState(controls: PipControls): Promise<void> {
     const result = await this.playbackSession.getSubtitleState()
-    const subtitlesEnabled = result.response.result?.subtitlesEnabled
+    const subtitlesEnabled = result.subtitlesEnabled
     if (
-      result.failureLabel ||
-      typeof subtitlesEnabled !== 'boolean' ||
-      version !== this.subtitleStateVersion ||
-      !this.pipControls
+      subtitlesEnabled === null ||
+      controls !== this.pipControls
     ) {
       return
     }
@@ -210,7 +198,6 @@ export class AdoptedVideoBinding {
   }
 
   private cleanupBindings(): void {
-    this.subtitleStateVersion += 1
     this.pipControls?.destroy()
     this.pipControls = null
     this.subtitleMirror?.destroy()

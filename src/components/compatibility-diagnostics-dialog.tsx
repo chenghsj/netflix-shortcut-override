@@ -24,6 +24,7 @@ type CompatibilityDiagnosticsDialogProps = {
   open: boolean
   state: CompatibilityDiagnosticsState
   triggerState: CompatibilityDiagnosticsTriggerState
+  warning?: boolean
   onOpenChange: (open: boolean) => void
   onReloadPage: () => void
 }
@@ -58,6 +59,7 @@ export function CompatibilityDiagnosticsDialog({
   open,
   state,
   triggerState,
+  warning = false,
   onOpenChange,
   onReloadPage,
 }: CompatibilityDiagnosticsDialogProps) {
@@ -82,7 +84,7 @@ export function CompatibilityDiagnosticsDialog({
         >
           {triggerState === 'checking' ? (
             <RefreshCwIcon className="animate-spin" />
-          ) : triggerState === 'reload-required' ? (
+          ) : triggerState === 'reload-required' || warning ? (
             <ShieldAlertIcon />
           ) : (
             <ShieldCheckIcon />

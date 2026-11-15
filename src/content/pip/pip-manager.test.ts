@@ -220,10 +220,8 @@ describe('PipManager', () => {
     pipWindow.document
       .querySelector<HTMLButtonElement>('[data-pip-control="subtitle-switch"]')
       ?.click()
-    await Promise.resolve()
-    await Promise.resolve()
     expect(transport).toHaveBeenCalledWith('toggleSubtitles')
-    expect(onSettingsChange).toHaveBeenCalledWith(
+    await vi.waitFor(() => expect(onSettingsChange).toHaveBeenCalledWith(
       expect.objectContaining({
         pip: {
           subtitlesEnabled: false,
@@ -231,7 +229,7 @@ describe('PipManager', () => {
           subtitleBackground: 'translucent',
         },
       })
-    )
+    ))
     await flushPipFrames(pipWindow)
     expect(pipWindow.document.getElementById('shortcut-override-pip-subtitle')).toHaveStyle({
       visibility: 'hidden',

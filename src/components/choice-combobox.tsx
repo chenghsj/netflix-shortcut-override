@@ -4,7 +4,9 @@ import { useId, useState, type ReactNode } from 'react'
 import { Button } from '@/components/app-ui/button'
 import {
   Command,
+  CommandEmpty,
   CommandGroup,
+  CommandInput,
   CommandItem,
   CommandList,
 } from '@/components/app-ui/command'
@@ -16,6 +18,7 @@ export type ChoiceComboboxOption<Value extends string> = {
   label: string
   title?: string
   keywords?: string[]
+  disabled?: boolean
 }
 
 type ChoiceComboboxProps<Value extends string> = {
@@ -26,6 +29,10 @@ type ChoiceComboboxProps<Value extends string> = {
   size?: 'sm' | 'default'
   className?: string
   triggerIcon?: ReactNode
+  placeholder?: string
+  search?: { placeholder: string; empty: string }
+  createOption?: (query: string) => ChoiceComboboxOption<Value> | undefined
+  disabled?: boolean
 }
 
 export function ChoiceCombobox<Value extends string>({
@@ -36,10 +43,19 @@ export function ChoiceCombobox<Value extends string>({
   size = 'sm',
   className,
   triggerIcon,
+  placeholder,
+  search,
+  disabled,
+  createOption,
 }: ChoiceComboboxProps<Value>) {
   const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const matches = (option: ChoiceComboboxOption<Value>) =>
+    [option.value, option.label, option.title ?? '', ...(option.keywords ?? [])].join(' ').toLowerCase().includes(query.toLowerCase())
+  const customOption = query.trim() && !options.some(matches) ? createOption?.(query) : undefined
+  const menuOptions = customOption ? [...options, customOption] : options
   const selectedDescriptionId = useId()
-  const selected = options.find(option => option.value === value) ?? options[0]
+  const selected = options.find(option => option.value === value) ?? (placeholder === undefined ? options[0] : undefined)
   const selectedTitle = selected?.title ?? selected?.label
   const iconOnly = triggerIcon !== undefined
   const trigger = (
@@ -48,6 +64,7 @@ export function ChoiceCombobox<Value extends string>({
         variant="outline"
         size={iconOnly ? 'icon' : size}
         role="combobox"
+        disabled={disabled}
         aria-label={label}
         aria-describedby={iconOnly ? selectedDescriptionId : undefined}
         aria-expanded={open}
@@ -58,7 +75,7 @@ export function ChoiceCombobox<Value extends string>({
           <span id={selectedDescriptionId} className="sr-only">{selected?.label}</span>
         </> : <>
           <span className="min-w-0 flex-1 truncate text-left" title={selectedTitle}>
-            {selected?.label}
+            {selected?.label ?? (createOption && value ? value : placeholder)}
           </span>
           <ChevronsUpDownIcon data-icon="inline-end" className="opacity-50" />
         </>}
@@ -67,7 +84,7 @@ export function ChoiceCombobox<Value extends string>({
   )
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={nextOpen => { setOpen(nextOpen); setQuery('') }}>
       {trigger}
       <PopoverContent
         align="end"
@@ -75,17 +92,21 @@ export function ChoiceCombobox<Value extends string>({
         className="w-max min-w-[max(10rem,var(--radix-popover-trigger-width))] max-w-(--radix-popover-content-available-width) p-0"
       >
         <Command
+          label={search?.placeholder}
           filter={(itemValue, search, keywords) => {
             const haystack = `${itemValue} ${(keywords ?? []).join(' ')}`.toLowerCase()
-            return haystack.includes(search.toLowerCase()) ? 1 : 0
+            return itemValue === customOption?.value || haystack.includes(search.toLowerCase()) ? 1 : 0
           }}
         >
+          {search && <CommandInput placeholder={search.placeholder} value={query} onValueChange={setQuery} />}
           <CommandList className="max-h-56">
+            {search && <CommandEmpty>{search.empty}</CommandEmpty>}
             <CommandGroup>
-              {options.map(option => (
+              {menuOptions.map(option => (
                 <CommandItem
                   key={option.value}
                   value={option.value}
+                  disabled={option.disabled}
                   keywords={[option.label, option.title ?? option.label, ...(option.keywords ?? [])]}
                   data-checked={value === option.value}
                   onSelect={() => {

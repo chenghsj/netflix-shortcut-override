@@ -122,13 +122,12 @@ export class PipManager {
     this.adoptedVideoBinding?.updateSettings(settings)
   }
 
-  confirmSubtitleState(settings: ShortcutSettings): void {
-    this.settings = settings
-    this.adoptedVideoBinding?.confirmSubtitleState(settings)
-  }
-
   recordUserSeek(): void {
     this.videoHandoff?.recordUserSeek()
+  }
+
+  get currentVideo(): HTMLVideoElement | null {
+    return this.adoptedVideoBinding?.currentVideo ?? null
   }
 
   async toggle(): Promise<boolean> {

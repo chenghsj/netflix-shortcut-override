@@ -16,6 +16,16 @@ const resolveManifest = async (mode: 'chromium' | 'firefox') => {
 }
 
 describe('extension manifest', () => {
+  it.each(['chromium', 'firefox'] as const)('declares the minimum supported browser version in %s', async mode => {
+    const manifest = await resolveManifest(mode)
+    if (mode === 'chromium') {
+      expect(manifest.minimum_chrome_version).toBe('111')
+    } else {
+      expect(manifest.browser_specific_settings?.gecko?.strict_min_version).toBe('128.0')
+      expect(manifest).not.toHaveProperty('minimum_chrome_version')
+    }
+  })
+
   it.each(['chromium', 'firefox'] as const)('requires Netflix access and makes only subtitle CDN access optional in %s', async mode => {
     const manifest = await resolveManifest(mode)
     expect(manifest.host_permissions).toEqual(['*://*.netflix.com/*'])
@@ -40,6 +50,7 @@ describe('extension manifest', () => {
     })
     expect(manifest.browser_specific_settings?.gecko).toEqual({
       id: 'shortcut-override-for-netflix@chengjj',
+      strict_min_version: '128.0',
       data_collection_permissions: {
         required: ['none'],
       },

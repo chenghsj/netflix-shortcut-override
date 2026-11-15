@@ -51,6 +51,10 @@ export class CompatibilityReadinessObserver {
         return
       }
       onState(state)
+      if (this.readinessPolicy.shouldRefreshDiagnostics(state)) {
+        attempt = 0
+        this.schedule(generation, run, this.readinessPolicy.diagnosticsRefreshIntervalMs)
+      }
     }
 
     void run()

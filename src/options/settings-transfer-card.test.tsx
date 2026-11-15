@@ -115,7 +115,7 @@ describe('SettingsTransferCard', () => {
     const dialog = await screen.findByRole('dialog')
     const generalSummary = within(dialog).getByText(localizedCopy.backupEnabledShortcuts).nextElementSibling
     const subtitleSummary = within(dialog).getByText(subtitleCopy.title).nextElementSibling as HTMLElement
-    expect(generalSummary).toHaveTextContent('13 / 14')
+    expect(generalSummary).toHaveTextContent('22 / 23')
     expect(subtitleSummary).toHaveTextContent(localizedCopy.backupEnabled)
     expect(subtitleSummary).toHaveTextContent('2 / 4')
     expect(within(subtitleSummary).getAllByRole('listitem')).toHaveLength(4)

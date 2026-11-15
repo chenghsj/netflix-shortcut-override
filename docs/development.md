@@ -4,6 +4,10 @@
 
 Requires Node.js 22.18.0 or newer and npm. CI uses Node.js 24. Run commands from the repository root. Scripts run directly with Node.js and are included in `npm run typecheck`.
 
+Browser builds declare Chrome/Edge 111+ and Firefox Desktop 128+ as their minimum versions. Subtitle-preserving Picture-in-Picture requires Chrome/Edge 116+ and is checked separately at runtime.
+
+Firefox package lint reports two minimum-version warnings for `data_collection_permissions`: its built-in consent UI arrived in Desktop 140 and Android 142. The manifest retains `required: ['none']` for AMO and does not use the data-collection API. Firefox 128–139 ignores this declaration; the Desktop minimum remains 128 for MAIN-world execution and optional host permissions. See [Mozilla's consent documentation](https://extensionworkshop.com/documentation/develop/firefox-builtin-data-consent/) and [the older-version manifest compatibility report](https://bugzilla.mozilla.org/show_bug.cgi?id=1996829).
+
 ## Install From Source
 
 1. Install dependencies:
@@ -66,12 +70,16 @@ Reload the extension in `chrome://extensions` after changes that affect the mani
 
 The default `npm run build` command creates both browser-specific outputs under `dist`. Load `dist/firefox/manifest.json` as a temporary add-on from `about:debugging`. Firefox uses the same source code and settings; the Picture-in-Picture shortcut is disabled and passes through.
 
+The full build type-checks first, builds Chromium and Firefox concurrently, then verifies both outputs. TypeScript reuses incremental check results from `node_modules/.tmp`; the first check after installing dependencies takes longer. Source and configuration changes invalidate the affected cached results automatically. Both browser bundles are rebuilt on every run.
+
+For a production build of just one browser, use `npm run build:chromium` or `npm run build:firefox`. These commands only bundle that browser; run `npm run typecheck` separately when needed. Use `npm run dev` for UI development with HMR.
+
 ## Scripts
 
 | Command | Description |
 | --- | --- |
 | `npm run dev` | Start the CRXJS/Vite dev server with HMR. |
-| `npm run build` | Clear `dist`, type-check, build both browser outputs, and verify background entry points. |
+| `npm run build` | Clear `dist`, type-check with incremental caching, build both browser outputs concurrently, and verify background entry points. |
 | `npm run build:chromium` | Build the Chromium extension in `dist/chromium`. |
 | `npm run build:firefox` | Build the Firefox extension in `dist/firefox`. |
 | `npm run verify:build` | Verify both generated background loaders point to the background bundle and contain its message handlers. |
@@ -93,6 +101,7 @@ The default `npm run build` command creates both browser-specific outputs under 
 |   `-- icons
 |-- manifest.config.ts
 |-- scripts
+|   |-- build-browsers.ts
 |   |-- generate-icons.ts
 |   |-- generate-release-notes.ts
 |   `-- verify-build.ts
@@ -120,6 +129,8 @@ Key areas:
 - `src/content/hints/`: hint overlay rendering, layout, icons, and timing.
 - `src/content/pip/`: Document Picture-in-Picture lifecycle, subtitle mirroring, and PiP keyboard routing.
 - `src/content/pip/pip-video-handoff.ts`: candidate selection and explicit waiting, replacement, or episode decisions. Recovery timers and episode evidence remain in this owner.
+- `src/content/netflix-playback-session.ts`: playback commands and subtitle confirmation. Subtitle results expose confirmed state rather than raw transport data; successful subtitle commands invalidate older reads here. Timeline seeks also delegate playback restoration here, so newer transport intent supersedes an older seek completion; the timeline supplies only its current presentation lifetime. Adopted-video bindings guard their own presentation lifetime, while settings persistence stays with its existing owner.
+- Subtitle-track cycling accepts an availability predicate that the session evaluates immediately before dispatching a queued command. The shortcut controller owns checks for the global and originating row switches, watch path, video identity and originating window. Explicit cancellation uses a separate generation from latest-action feedback so rapid valid presses remain queued, while disable/re-enable cannot revive cancelled work. Discarded commands return no confirmed subtitle state or failure hint; already-issued PiP results retain the existing fallback-persistence contract.
 - `src/content/netflix-api-bridge.ts`: page-world bridge for Netflix player API access and selected subtitle metadata.
 - `src/content/subtitle-navigation.ts`: subtitle navigation, timing cache, loading feedback, and pending-action cancellation.
 - Subtitle navigation uses `subtitleNavigation` in settings and shortcut groups, and `SubtitleNavigation` / `SUBTITLE_NAVIGATION` in type and constant names. Settings schema v14 migrates the former `subtitlePractice` field from older settings and backups. Synced writes retain that field as an alias for older installations; current backups export only `subtitleNavigation`.
@@ -131,11 +142,18 @@ Key areas:
 - `src/popup/popup-app.tsx`: toolbar popup for quick status, toggles, shortcut summary, and options entry.
 - `src/options/options-app.tsx`: extension options UI and subtitle-section navigation.
 - `src/options/use-shortcut-editor.ts`: mutually exclusive recording and conflict confirmation, saved-key checks, and recorder focus restoration.
+- `src/shared/shortcut-edit.ts`: shortcut-edit snapshots and one evaluation path for preview and authoritative save. It owns entry freshness, atomic assignment-plus-parameter changes, parameter validation, and quota preflight for preferred-speed, seek, and subtitle-size edits. Plain key edits preserve the latest enabled state and retain storage-owned quota errors. The three editors keep draft strings, dialogs, recording, and focus; settings writes remain in storage.
 - `src/shared/use-subtitle-activation.ts`: synchronous browser permission requests, duplicate-request prevention, and cancellation of stale approvals on disable or unmount.
-- `src/shared/shortcut-bindings.ts`: shortcut actions, default key bindings, normalization, and conflict checks.
-- `src/shared/shortcut-settings.ts`: default settings, validation, and settings normalization.
+- `src/shared/shortcut-routing.ts`: shared shortcut support and general-shortcut precedence for Options, popup, editing, and playback routing. Playback-context readiness and event interception remain in content.
+- `src/shared/shortcut-bindings.ts`: shortcut actions, default key bindings, key normalization, matching, and display labels.
+- `src/shared/shortcut-assignment.ts`: shared assignment inspection and atomic updates for the editors. It owns key conflicts, seek-pair transfer consequences, browser support, and saved-key revalidation; editors retain their drafts and interaction lifetimes.
+- `src/shared/shortcut-catalog.ts`: shared shortcut identities and relationships: built-in/custom seek pairs, percentage and preferred-speed group membership, and the hold-speed parent. Options, popup, assignment, and feature management consume these facts while retaining their own labels, ordering, visibility, and search behavior.
+- `src/shared/shortcut-settings.ts`: default settings, normalization, and backup-content validation, including version acceptance and strict-current versus migratable-legacy rules. `settings-backup.ts` owns only the file envelope and delegates content parsing here.
 - `src/shared/playback-speed.ts`: playback-speed stepping and speed normalization helpers.
 - `src/shared/i18n.ts`: localized options copy and media hint labels.
+- `src/shared/shortcut-search.ts`: shared multilingual shortcut labels, function aliases, language-name keywords, and key matching for Options and the popup. Both UIs consume this index and keep only their presentation-specific row grouping.
+- `src/options/settings-search.ts`: multilingual section and field-label search for editable Options settings, including saved favorite-subtitle languages and empty percentage groups.
+- `src/shared/subtitle-language-catalog.ts`: language codes, translated names, native names, and common aliases shared by the favorite-subtitle picker and shortcut search.
 
 ## How Shortcut Handling Works
 

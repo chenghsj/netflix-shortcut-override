@@ -58,6 +58,23 @@ body[data-app-ui] [data-slot='table-container']:has(> .app-table) {
   box-shadow: none;
 }
 
+body[data-app-ui] [data-slot='table-container']:has(> .app-table[data-nested='true']) {
+  border: 0;
+  border-radius: 0;
+}
+
+body[data-app-ui] .app-shortcut-nested-group {
+  margin-block: 0.5rem;
+  margin-inline: 1rem;
+  border-radius: var(--ui-table-radius);
+  overflow: clip;
+}
+
+body[data-app-ui] .app-table:not([data-nested='true']) > [data-slot='table-body']:last-child > [data-slot='table-row']:last-child > [data-slot='table-cell'] > [data-state='closed'] > .app-shortcut-group-header {
+  border-end-start-radius: max(0px, calc(var(--ui-table-radius) - var(--ui-border-width)));
+  border-end-end-radius: max(0px, calc(var(--ui-table-radius) - var(--ui-border-width)));
+}
+
 body[data-app-ui] .app-switch [data-slot='switch-thumb'] {
   width: var(--app-switch-thumb-size);
   height: var(--app-switch-thumb-size);
@@ -73,6 +90,7 @@ body[data-app-ui] .app-switch [data-slot='switch-thumb'] {
 
 [data-slot='input-group']:has(> .app-command-input) {
   border-color: var(--border);
+  border-radius: var(--ui-control-radius);
   background-color: var(--card);
 }
 
@@ -97,10 +115,20 @@ body[data-app-ui] [data-slot='table-header'] {
   color: var(--ui-table-header-fg);
 }
 
+body[data-app-ui] .app-table[data-nested='true'] > [data-slot='table-header'] > tr {
+  border-bottom-width: 1px;
+}
+
 body[data-app-ui] [data-slot='card-title'],
 body.popup-page[data-app-ui] main h2,
 body.popup-page[data-app-ui] main h2 > button {
   font-weight: var(--ui-card-title-weight);
+}
+
+/* Popup reference: section titles, primary labels, nested labels, and values use 400.
+   Keycaps and status badges retain their theme-defined weights. */
+body[data-app-ui] .app-popup-shortcuts :is(.app-popup-section-title, .app-popup-primary-label) {
+  font-weight: 400;
 }
 
 body[data-app-ui] [data-slot='card-title'] > svg,
@@ -164,8 +192,25 @@ body[data-app-ui] [data-slot='table'] [data-variant='ghost']:is(:hover, :focus-v
   background-color: color-mix(in oklab, var(--accent) 88%, black);
 }
 
+:root[data-ui-style] body[data-app-ui] button.app-feature-disclosure[data-variant='ghost']:not(:disabled):is(:hover, :focus-visible) {
+  border-color: var(--border);
+  background-color: color-mix(in oklab, var(--accent) 80%, var(--foreground));
+  color: var(--accent-foreground);
+}
+
 body[data-app-ui] .app-brand-icon {
   content: var(--ui-brand-icon);
+}
+
+body[data-app-ui] .app-options-layout [data-slot='sidebar-container'],
+body[data-app-ui] [data-sidebar='sidebar'][data-mobile='true'] {
+  border-right-width: var(--ui-border-width);
+  border-color: var(--border);
+}
+
+body[data-app-ui] [data-sidebar='sidebar'][data-mobile='true'] {
+  width: 16rem;
+  max-width: calc(100vw - 3rem);
 }
 
 body[data-app-ui] [data-slot='command-item'] {
