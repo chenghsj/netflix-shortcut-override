@@ -15,7 +15,7 @@ import { PipManager } from '@/content/pip/pip-manager'
 import { isPipDocument } from '@/content/pip/pip-document'
 import { createNetflixPlaybackSession } from '@/content/netflix-playback-session'
 import { createShortcutCommandController } from '@/content/shortcuts/shortcut-command-controller'
-import { findRemappedNetflixNativeActionForKey } from '@/shared/shortcut-bindings'
+import { findRemappedNetflixNativeActionForKey, keyBindingFromEvent, keyBindingsEqual } from '@/shared/shortcut-bindings'
 import { DEFAULT_SETTINGS, normalizeSettings } from '@/shared/shortcut-settings'
 import type { ShortcutSettings } from '@/shared/shortcut-types'
 import { observeSettings, updateSettings } from '@/shared/storage'
@@ -107,7 +107,8 @@ const handleKeydown = (event: KeyboardEvent, explicitTargetDoc?: Document) => {
   if (isTypingTarget(targetDoc)) return
   if (!settings.enabled) return
 
-  if (event.repeat && commandController.shouldInterceptHoldSpeedRepeat(event.code)) {
+  const code = keyBindingFromEvent(event).code
+  if (event.repeat && commandController.shouldInterceptHoldSpeedRepeat(code)) {
     interceptShortcutEvent(event)
     return
   }
@@ -162,7 +163,7 @@ const handleKeydown = (event: KeyboardEvent, explicitTargetDoc?: Document) => {
     }
 
     if (settings.holdSpeed.enabled) {
-      commandController.beginHoldSpeedInteraction(targetDoc, video, event.code)
+      commandController.beginHoldSpeedInteraction(targetDoc, video, code)
     } else {
       commandController.execute('playPause', targetDoc)
     }
@@ -207,7 +208,7 @@ const handleKeyup = (event: KeyboardEvent) => {
     return
   }
 
-  if (commandController.completeHoldSpeedInteraction(event.code)) interceptShortcutEvent(event)
+  if (commandController.completeHoldSpeedInteraction(keyBindingFromEvent(event).code)) interceptShortcutEvent(event)
 }
 
 pipManager = new PipManager({
@@ -244,6 +245,10 @@ pipManager = new PipManager({
 })
 const applySettings = (nextSettings: ShortcutSettings) => {
   if (settings.enabled && !nextSettings.enabled) commandController.cancelPendingAction()
+  if (!nextSettings.enabled || !nextSettings.holdSpeed.enabled || !nextSettings.bindings.playPause.enabled ||
+    !keyBindingsEqual(settings.bindings.playPause.key, nextSettings.bindings.playPause.key)) {
+    commandController.cancelHoldSpeedInteraction()
+  }
   subtitleNavigation.updateSettings(nextSettings)
   settings = nextSettings
   settingsLoaded = true

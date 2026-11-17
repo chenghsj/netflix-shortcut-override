@@ -203,7 +203,7 @@ describe('shortcut settings', () => {
 
   it('keeps the speed input precision at 0.05 while default step is 0.25', () => {
     expect(SPEED_LIMITS.step.inputStep).toBe(0.05)
-    expect(SPEED_LIMITS.step.max).toBe(4)
+    expect(SPEED_LIMITS.step.max).toBe(5)
     expect(normalizeSpeedSettings({ step: 0.35 }).step).toBe(0.35)
     expect(normalizeSpeedSettings({ step: 3.5 }).step).toBe(3.5)
   })
@@ -211,17 +211,22 @@ describe('shortcut settings', () => {
   it('normalizes speed min max and step into safe bounds', () => {
     expect(normalizeSpeedSettings({ min: 0.1, max: 8, step: 0.001 })).toEqual({
       min: 0.25,
-      max: 4,
+      max: 5,
       step: 0.05,
       preferred: 1.5,
     })
-    expect(normalizeSpeedSettings({ step: 8 }).step).toBe(4)
+    expect(normalizeSpeedSettings({ step: 5 }).step).toBe(5)
+    expect(normalizeSpeedSettings({ step: 8 }).step).toBe(5)
+    expect(normalizeSpeedSettings({ max: 4.5 }).max).toBe(4.5)
+    expect(normalizeSpeedSettings({ max: 5 }).max).toBe(5)
   })
 
   it('normalizes preferred and hold speeds independently', () => {
     expect(normalizeSpeedSettings({ preferred: 2.35 }).preferred).toBe(2.35)
     expect(normalizeSpeedSettings({ preferred: 0.1 }).preferred).toBe(0.25)
-    expect(normalizeSpeedSettings({ preferred: 8 }).preferred).toBe(4)
+    expect(normalizeSpeedSettings({ preferred: 4.5 }).preferred).toBe(4.5)
+    expect(normalizeSpeedSettings({ preferred: 5 }).preferred).toBe(5)
+    expect(normalizeSpeedSettings({ preferred: 8 }).preferred).toBe(5)
     expect(HOLD_SPEED_LIMITS.speed.inputStep).toBe(0.05)
     expect(normalizeHoldSpeedSettings({ enabled: false, speed: 2.35 })).toEqual({
       enabled: false,
@@ -229,7 +234,8 @@ describe('shortcut settings', () => {
       showHint: true,
     })
     expect(normalizeHoldSpeedSettings({ speed: 0.1 }).speed).toBe(0.25)
-    expect(normalizeHoldSpeedSettings({ speed: 8 }).speed).toBe(4)
+    expect(normalizeHoldSpeedSettings({ speed: 5 }).speed).toBe(5)
+    expect(normalizeHoldSpeedSettings({ speed: 8 }).speed).toBe(5)
   })
 
   it('migrates legacy hold-speed settings and adds the preferred speed', () => {
@@ -267,7 +273,9 @@ describe('shortcut settings', () => {
     expect(SEEK_LIMITS.seconds.inputStep).toBe(1)
     expect(normalizeSeekSettings({ seconds: 15.4 }).seconds).toBe(15)
     expect(normalizeSeekSettings({ seconds: 0 }).seconds).toBe(1)
-    expect(normalizeSeekSettings({ seconds: 180 }).seconds).toBe(60)
+    expect(normalizeSeekSettings({ seconds: 180 }).seconds).toBe(180)
+    expect(normalizeSeekSettings({ seconds: 300 }).seconds).toBe(300)
+    expect(normalizeSeekSettings({ seconds: 301 }).seconds).toBe(300)
   })
 
   it('normalizes persisted PiP subtitle preferences', () => {

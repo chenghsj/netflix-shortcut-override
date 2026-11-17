@@ -1,6 +1,7 @@
 import { RestoreButton } from '@/components/reset-button'
+import { DeleteButton } from '@/components/delete-button'
 import { RESET_SCOPE_COPY } from '@/shared/reset-scopes'
-import { GripVerticalIcon, PlusIcon, Trash2Icon } from 'lucide-react'
+import { GripVerticalIcon, PlusIcon } from 'lucide-react'
 import { useLayoutEffect, useRef } from 'react'
 import { DragHandle } from '@/components/drag-handle'
 import { ShortcutRecordingArea } from '@/components/shortcut-recording-area'
@@ -53,7 +54,7 @@ export function SubtitleSizeDialog({ editor, settings, locale }: {
   }, [dialog?.sizes])
   return <Dialog open={Boolean(dialog)} onOpenChange={open => { if (!open) editor.close() }}>
     <DialogContent className="flex max-h-[90dvh] flex-col overflow-hidden sm:max-w-lg" onOpenAutoFocus={event => { event.preventDefault(); firstInput.current?.focus() }} onCloseAutoFocus={editor.restoreFocus}>
-      <DialogHeader className="shrink-0"><DialogTitle>{sizeCopy.edit}</DialogTitle><DialogDescription>{dialog?.kind === 'fixed' ? sizeCopy.fixedDescription : sizeCopy.description} {copy.shortcutOptional}</DialogDescription></DialogHeader>
+      <DialogHeader className="shrink-0"><DialogTitle>{sizeCopy.edit}</DialogTitle><DialogDescription>{dialog?.kind === 'fixed' ? sizeCopy.fixedDescription : sizeCopy.description}</DialogDescription></DialogHeader>
       <div className="-mx-2 flex min-h-0 min-w-0 flex-col gap-5 overflow-y-auto px-2 pt-1 pb-2">
         <fieldset className="min-w-0 space-y-3" aria-describedby="subtitle-size-range">
           <legend className="mb-2 text-sm font-medium">{sizeCopy.sizes}</legend>
@@ -91,8 +92,8 @@ export function SubtitleSizeDialog({ editor, settings, locale }: {
                 onChange={event => editor.setSize(size.id, event.target.value)} />
               <span aria-hidden="true">%</span>
               <span className="min-w-0 flex-1 text-xs text-muted-foreground"><span className="hidden sm:inline">{Number(size.value) === 100 ? sizeCopy.original : ''}</span></span>
-              {dialog.kind === 'cycle' && <Button variant="ghost" size="icon" className="text-muted-foreground focus-visible:text-foreground" disabled={dialog.sizes.length <= 2}
-                aria-label={sizeCopy.removeSize.replace('{index}', String(index + 1))} onClick={() => editor.removeSize(size.id)}><Trash2Icon /></Button>}
+              {dialog.kind === 'cycle' && <DeleteButton locale={locale} className="text-muted-foreground focus-visible:text-foreground" disabled={dialog.sizes.length <= 2}
+                label={sizeCopy.removeSize.replace('{index}', String(index + 1))} onClick={() => editor.removeSize(size.id)} />}
             </li>)}
           </ol>
           {dialog?.kind === 'cycle' && <Button variant="outline" disabled={dialog.sizes.length >= SUBTITLE_SIZE_LIMITS.count} onClick={editor.addSize}><PlusIcon data-icon="inline-start" />{sizeCopy.addSize}</Button>}

@@ -1,0 +1,107 @@
+<!doctype html>
+<!-- Browser regression fixture, intentionally excluded from extension build inputs. -->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Media key recording regression</title>
+    <style>
+      #result, #events, #cases { overflow-wrap: anywhere; white-space: pre-wrap; }
+    </style>
+  </head>
+  <body data-app-ui>
+    <button id="run" type="button">Run simulated media key checks</button>
+    <output id="result" aria-live="polite">Not run</output>
+    <details><summary>Detailed simulated results</summary><pre id="cases"></pre></details>
+    <details open><summary>Recent keyboard events (press a physical media key in the recorder)</summary><pre id="events">No events</pre></details>
+    <div id="root"></div>
+    <script type="module">
+      import React from 'react'
+      import { createRoot } from 'react-dom/client'
+      import { OptionsApp } from '/src/options/options-app.tsx'
+      import { DEFAULT_SETTINGS, normalizeSettings } from '/src/shared/shortcut-settings.ts'
+      import { getSettings, saveSettings } from '/src/shared/storage.ts'
+      import { keyBindingFromEvent, isKeyBinding } from '/src/shared/shortcut-bindings.ts'
+      import { resolvePlaybackShortcut } from '/src/shared/shortcut-routing.ts'
+      import { SPECIAL_SHORTCUT_KEYS, LEGACY_SPECIAL_KEY_ALIASES } from '/src/shared/special-shortcut-keys.ts'
+
+      // Start on the tested category even when the sidebar is hidden on a
+      // narrow viewport, including the Codex in-app browser.
+      window.history.replaceState(null, '', `${location.pathname}${location.search}#seeking`)
+      const root = createRoot(document.getElementById('root'))
+      let renderId = 0
+      const renderOptions = () => root.render(React.createElement(OptionsApp, { key: ++renderId }))
+      renderOptions()
+      const events = []
+      document.addEventListener('keydown', event => {
+        const binding = keyBindingFromEvent(event)
+        events.unshift({ key: event.key, code: event.code, trusted: event.isTrusted, repeat: event.repeat,
+          binding, valid: isKeyBinding(binding) })
+        document.getElementById('events').textContent = JSON.stringify(events.slice(0, 8), null, 2)
+      }, true)
+
+      const until = async read => {
+        const deadline = performance.now() + 3000
+        do {
+          const result = read()
+          if (result) return result
+          await new Promise(requestAnimationFrame)
+        } while (performance.now() < deadline)
+        throw new Error('Timed out waiting for the Options UI')
+      }
+      const button = (root, name) => [...root.querySelectorAll('button')]
+        .find(item => (item.getAttribute('aria-label') ?? item.textContent.trim()) === name)
+
+      document.getElementById('run').onclick = async event => {
+        const run = event.currentTarget
+        const output = document.getElementById('result')
+        const original = await getSettings()
+        const cases = []
+        run.disabled = true
+        output.dataset.state = 'running'
+        output.textContent = 'Running'
+        document.getElementById('cases').textContent = ''
+        try {
+          await saveSettings({ ...DEFAULT_SETTINGS, locale: 'en' })
+          // Plain development pages have no chrome.storage change events.
+          window.history.replaceState(null, '', `${location.pathname}${location.search}#seeking`)
+          renderOptions()
+          const names = [...SPECIAL_SHORTCUT_KEYS, ...Object.keys(LEGACY_SPECIAL_KEY_ALIASES)]
+          for (const key of names) {
+            const canonical = Object.hasOwn(LEGACY_SPECIAL_KEY_ALIASES, key) ? LEGACY_SPECIAL_KEY_ALIASES[key] : key
+            for (const code of ['', 'Unidentified', key]) {
+              ;(await until(() => button(document, 'Edit Next episode'))).click()
+              const area = await until(() => document.querySelector('[role="dialog"] [role="group"]'))
+              area.focus()
+              area.dispatchEvent(new KeyboardEvent('keydown', { key, code, bubbles: true, cancelable: true }))
+              const save = await until(() => {
+                const candidate = button(document.querySelector('[role="dialog"]'), 'Save')
+                return candidate && !candidate.disabled && candidate
+              })
+              save.click()
+              await until(() => !document.querySelector('[role="dialog"]'))
+              // Exercise the saved representation after storage normalization,
+              // then route every delivered code variant to the recorded action.
+              const saved = normalizeSettings(JSON.parse(JSON.stringify(await getSettings())))
+              const routes = ['', 'Unidentified', canonical].map(incomingCode => resolvePlaybackShortcut(saved,
+                new KeyboardEvent('keydown', { key: canonical, code: incomingCode }), true)?.action)
+              const pass = saved.bindings.nextEpisode.key?.code === canonical && routes.every(action => action === 'nextEpisode')
+              cases.push({ key, code, canonical, savedCode: saved.bindings.nextEpisode.key?.code, routes, pass })
+              if (!pass) throw new Error(`Recording or routing failed for ${key}, code=${JSON.stringify(code)}`)
+            }
+          }
+          output.textContent = JSON.stringify({ pass: true, count: cases.length, simulated: true }, null, 2)
+          output.dataset.state = 'passed'
+        } catch (error) {
+          output.textContent = JSON.stringify({ pass: false, error: String(error), count: cases.length }, null, 2)
+          output.dataset.state = 'failed'
+        } finally {
+          document.getElementById('cases').textContent = JSON.stringify(cases, null, 2)
+          await saveSettings(original)
+          renderOptions()
+          run.disabled = false
+        }
+      }
+    </script>
+  </body>
+</html>

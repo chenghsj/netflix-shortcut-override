@@ -1,0 +1,80 @@
+<!doctype html>
+<!-- Browser regression fixture, intentionally excluded from extension build inputs. -->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Help animation regression check</title>
+    <style>
+      #result, #frames { overflow-wrap: anywhere; white-space: pre-wrap; }
+    </style>
+  </head>
+  <body data-app-ui>
+    <button id="run" type="button">Run animation check</button>
+    <output id="result" aria-live="polite">Not run</output>
+    <details><summary>Frame measurements</summary><pre id="frames"></pre></details>
+    <div id="root"></div>
+    <script type="module">
+      import React from 'react'
+      import { createRoot } from 'react-dom/client'
+      import { OptionsApp } from '/src/options/options-app.tsx'
+      import '/src/index.css'
+
+      window.history.replaceState(null, '', `${location.pathname}${location.search}#help`)
+      createRoot(document.getElementById('root')).render(React.createElement(OptionsApp))
+
+      const sample = element => new Promise(resolve => {
+        const frames = []
+        const start = performance.now()
+        const next = () => {
+          const elapsed = performance.now() - start
+          frames.push({ ms: Math.round(elapsed), height: Number(element.getBoundingClientRect().height.toFixed(2)) })
+          if (elapsed < 400) requestAnimationFrame(next)
+          else resolve(frames)
+        }
+        requestAnimationFrame(next)
+      })
+
+      document.getElementById('run').onclick = async event => {
+        const button = event.currentTarget
+        const output = document.getElementById('result')
+        button.disabled = true
+        output.textContent = 'Running'
+        output.dataset.state = 'running'
+        try {
+          const guide = document.querySelector('[aria-labelledby="user-guide-heading"]')
+          const category = guide.querySelector('[data-slot="accordion-trigger"]')
+          const content = guide.querySelector('[data-slot="accordion-content"]')
+          const toggleAll = new URLSearchParams(location.search).has('all')
+          const trigger = toggleAll ? guide.querySelector('header button') : category
+          if (category.getAttribute('aria-expanded') === 'true') {
+            trigger.click()
+            await sample(content)
+          }
+          const before = content.getBoundingClientRect().height
+          trigger.click()
+          const opening = await sample(content)
+          const expanded = content.getBoundingClientRect().height
+          const unclipped = content.scrollHeight <= expanded + 1
+          trigger.click()
+          const closing = await sample(content)
+          const collapsed = content.getBoundingClientRect().height
+          const intermediate = frames => frames.filter(frame => frame.height > 1 && frame.height < expanded - 1).length
+          const openingFrames = intermediate(opening)
+          const closingFrames = intermediate(closing)
+          const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
+          const smooth = reducedMotion || (openingFrames >= 2 && closingFrames >= 2)
+          const pass = before < 1 && expanded > 10 && collapsed < 1 && unclipped && smooth
+          output.textContent = JSON.stringify({ pass, toggleAll, reducedMotion, before, expanded, collapsed, unclipped, openingFrames, closingFrames })
+          document.getElementById('frames').textContent = JSON.stringify({ opening, closing }, null, 2)
+          output.dataset.state = pass ? 'passed' : 'failed'
+        } catch (error) {
+          output.textContent = String(error)
+          output.dataset.state = 'failed'
+        } finally {
+          button.disabled = false
+        }
+      }
+    </script>
+  </body>
+</html>

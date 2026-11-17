@@ -1,10 +1,11 @@
-import { KeyboardIcon, SearchIcon, SettingsIcon, XIcon } from 'lucide-react'
+import { BookOpenIcon, KeyboardIcon, SearchIcon, SettingsIcon, XIcon } from 'lucide-react'
 import { useLayoutEffect, useRef, type CSSProperties, type ReactNode } from 'react'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/app-ui/input-group'
 import { Button } from '@/components/app-ui/button'
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/app-ui/breadcrumb'
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/app-ui/card'
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger, useSidebar } from '@/components/app-ui/sidebar'
+import { HELP_UI_COPY } from '@/help/help-copy'
 import { getCopy } from '@/shared/i18n'
 import { cn } from '@/lib/utils'
 import { useSidebarShortcuts } from '@/options/use-sidebar-shortcuts'
@@ -14,7 +15,7 @@ import { useSearchShortcut } from '@/shared/use-search-shortcut'
 
 export { OPTIONS_LAYOUT_COPY, type ShortcutCategory, type OptionsPage } from '@/shared/options-navigation'
 
-export type OptionsPageDescriptor = { id: OptionsPage; label: string; group: 'shortcuts' | 'settings'; content: ReactNode; afterContent?: ReactNode; afterContentInCard?: boolean; matches?: boolean; afterContentMatches?: boolean; titleHelp?: ReactNode; titleActions?: ReactNode }
+export type OptionsPageDescriptor = { id: OptionsPage; label: string; group: 'shortcuts' | 'settings' | 'help'; content: ReactNode; afterContent?: ReactNode; afterContentInCard?: boolean; matches?: boolean; afterContentMatches?: boolean; titleHelp?: ReactNode; titleActions?: ReactNode }
 
 type OptionsLayoutProps = {
   locale: Locale
@@ -79,6 +80,9 @@ function OptionsLayoutContent({ locale, pages, activePage, onPageChange, query, 
 
   const searching = Boolean(query.trim())
   const page = pages.find(page => page.id === activePage)!
+  const helpPage = pages.find(page => page.group === 'help')
+  const readingHelp = page.group === 'help'
+  const searchLabel = readingHelp ? HELP_UI_COPY[locale].search : searchCopy.search
   const results = pages.filter(page => page.matches || page.afterContentMatches)
   const showShortcutActions = searching ? results.some(page => page.group === 'shortcuts' && page.matches) : page.group === 'shortcuts'
   const titleActions = !searching && page.titleActions !== undefined ? page.titleActions : showShortcutActions ? shortcutActions : null
@@ -88,7 +92,12 @@ function OptionsLayoutContent({ locale, pages, activePage, onPageChange, query, 
     setOpenMobile(false)
   }
   const sidebarPages = (['shortcuts', 'settings'] as const).flatMap(group => pages.filter(page => page.group === group))
-  const sidebarShortcuts = useSidebarShortcuts(sidebarPages.map(page => page.id), select)
+  const navigationPages = [...sidebarPages, ...(helpPage ? [helpPage] : [])]
+  const sidebarShortcuts = useSidebarShortcuts(navigationPages.map(page => page.id), select)
+  const shortcutHint = (page: OptionsPageDescriptor) => <kbd aria-hidden="true"
+    className="ml-auto w-3 shrink-0 text-right font-sans text-xs font-normal text-muted-foreground tabular-nums group-data-[active=true]/menu-button:text-current">
+    {sidebarShortcuts.showHints && navigationPages.indexOf(page) + 1}
+  </kbd>
   return <>
     <Sidebar collapsible={isMobile ? 'offcanvas' : 'none'}
       className={isMobile ? undefined : cn('sticky top-6 h-[calc(100svh-3rem)] shrink-0 bg-transparent', !open && 'hidden')}>
@@ -106,15 +115,24 @@ function OptionsLayoutContent({ locale, pages, activePage, onPageChange, query, 
             <SidebarGroupContent className="pl-4"><SidebarMenu className="gap-1 border-l border-muted-foreground/25 pl-2">
               {sidebarPages.filter(page => page.group === group).map(page => <SidebarMenuItem key={page.id}>
                 <SidebarMenuButton isActive={!searching && activePage === page.id} aria-current={!searching && activePage === page.id ? 'page' : undefined}
-                  aria-keyshortcuts={`${sidebarShortcuts.modifier}+${sidebarPages.indexOf(page) + 1}`}
+                  aria-keyshortcuts={`${sidebarShortcuts.modifier}+${navigationPages.indexOf(page) + 1}`}
                   onClick={() => select(page.id)}>
                   <span className="min-w-0 flex-1">{page.label}</span>
-                  <kbd aria-hidden="true" className="ml-auto w-3 shrink-0 text-right font-sans text-xs font-normal text-muted-foreground tabular-nums">{sidebarShortcuts.showHints && sidebarPages.indexOf(page) + 1}</kbd>
+                  {shortcutHint(page)}
                 </SidebarMenuButton>
               </SidebarMenuItem>)}
             </SidebarMenu></SidebarGroupContent>
           </SidebarGroup>)}
         </nav>
+      {helpPage && <div className="mx-2 mt-2 border-t border-border pt-2">
+        <SidebarMenu><SidebarMenuItem>
+          <SidebarMenuButton isActive={readingHelp} aria-current={readingHelp ? 'page' : undefined}
+            aria-keyshortcuts={`${sidebarShortcuts.modifier}+${navigationPages.indexOf(helpPage) + 1}`} onClick={() => select(helpPage.id)}>
+            <BookOpenIcon aria-hidden="true" /><span className="min-w-0 flex-1">{helpPage.label}</span>
+            {shortcutHint(helpPage)}
+          </SidebarMenuButton>
+        </SidebarMenuItem></SidebarMenu>
+      </div>}
       </SidebarContent>
     </Sidebar>
     <SidebarInset className="min-w-0 bg-background">
@@ -126,15 +144,15 @@ function OptionsLayoutContent({ locale, pages, activePage, onPageChange, query, 
         {isMobile && <Card size="sm" aria-label={appCopy.enabled}>
           <CardContent>{globalControl}</CardContent>
         </Card>}
-        <InputGroup className="h-10">
+        <InputGroup className={cn('h-10', readingHelp && 'max-w-3xl')}>
           <InputGroupAddon><SearchIcon aria-hidden="true" /></InputGroupAddon>
-          <InputGroupInput ref={input} id="shortcut-search" type="text" role="searchbox" enterKeyHint="search" value={query} aria-label={searchCopy.search} placeholder={searchCopy.search} aria-keyshortcuts={searchShortcut.ariaKeyShortcuts}
+          <InputGroupInput ref={input} id="shortcut-search" type="text" role="searchbox" enterKeyHint="search" value={query} aria-label={searchLabel} placeholder={searchLabel} aria-keyshortcuts={searchShortcut.ariaKeyShortcuts}
             onChange={event => onQueryChange(event.target.value)} onKeyDown={event => { if (event.key === 'Escape') onQueryChange('') }} />
           <InputGroupAddon align="inline-end" className="pr-3 has-[>kbd]:mr-0"><kbd aria-hidden="true" className="whitespace-nowrap font-sans text-xs font-normal text-muted-foreground">{searchShortcut.label}</kbd></InputGroupAddon>
           {query && <InputGroupAddon align="inline-end"><Button variant="ghost" size="icon-sm" aria-label={copy.clear}
             onClick={() => { onQueryChange(''); input.current?.focus() }}><XIcon /></Button></InputGroupAddon>}
         </InputGroup>
-        {!searching && page.group === 'settings' ? page.content : <Card>
+        {readingHelp || (!searching && page.group === 'settings') ? page.content : <Card>
           <CardHeader className="flex flex-wrap items-center justify-between gap-3">
             <CardTitle id="shortcuts-heading" className="min-w-0">
               <OptionsBreadcrumb locale={locale} group={searching ? 'settings' : 'shortcuts'} label={searching ? copy.results : page.label} help={!searching && page.titleHelp} />

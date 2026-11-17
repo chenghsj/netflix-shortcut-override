@@ -7,6 +7,7 @@ import { useFeatureManagement } from '@/options/use-feature-management'
 import { FeatureCheckbox } from '@/components/feature-checkbox'
 import { formatSubtitleSizes } from '@/shared/subtitle-size-shortcuts'
 import { ResetButton, RestoreButton } from '@/components/reset-button'
+import { DeleteButton } from '@/components/delete-button'
 import { RESET_SCOPE_COPY } from '@/shared/reset-scopes'
 import { SUBTITLE_PERMISSION_COPY, SUBTITLE_NAVIGATION_COPY } from '@/shared/subtitle-navigation'
 import { resetSubtitleNavigationBindings } from '@/shared/shortcut-assignment'
@@ -16,7 +17,6 @@ import {
   PlayIcon,
   PlusIcon,
   StarIcon,
-  Trash2Icon,
 } from 'lucide-react'
 import { Fragment, useEffect, useId, useRef, useState, type ComponentProps } from 'react'
 
@@ -118,6 +118,8 @@ import { getUiStyleOptions } from '@/shared/ui-styles'
 import { SUBTITLE_OPTIONS_HASH } from '@/shared/feature-announcements'
 import { SEEK_GROUPS, SHORTCUT_GROUPS } from '@/shared/shortcut-groups'
 import { OptionsBreadcrumb, OptionsLayout, OPTIONS_LAYOUT_COPY, type OptionsPage, type OptionsPageDescriptor, type ShortcutCategory } from '@/options/options-layout'
+import { HelpPage } from '@/help/help-page'
+import { HELP_UI_COPY } from '@/help/help-copy'
 
 type OptionsShortcutGroupId = 'seek' | 'percentage' | 'holdSpeed' | 'preferredSpeed'
 type PageFeature = Omit<ManagedFeatureEntry, 'children'> & { matches: boolean; visible: boolean; children?: PageFeature[] }
@@ -471,7 +473,10 @@ export function OptionsApp() {
                       const { overridingAction } = getSubtitleNavigationAvailability(settings, action, browserCapabilities.supportsSubtitlePreservingPip)
                       const overrideDescription = overridingAction ? subtitlePopupCopy.overriddenBy.replace('{action}', actionLabels[overridingAction]) : undefined
                       return <TableRow key={action}>
-                        <TableCell className="font-medium whitespace-normal">{subtitleNavigationCopy[action]}</TableCell>
+                        <TableCell className="font-medium whitespace-normal">
+                          <span>{subtitleNavigationCopy[action]}</span>
+                          {action === 'replay' && <p className="mt-1 text-xs font-normal text-muted-foreground">{subtitleNavigationCopy.replayHint}</p>}
+                        </TableCell>
                         <TableCell><div className="flex flex-wrap items-center gap-1.5"><KeyBindingKbd binding={binding.key} emptyLabel={copy.unassignedShortcut} className="flex-wrap" />
                           {overridingAction && <Badge variant="secondary" className="max-w-full whitespace-normal" title={overrideDescription} aria-label={overrideDescription}>{subtitlePopupCopy.overridden}</Badge>}
                         </div></TableCell>
@@ -533,6 +538,9 @@ export function OptionsApp() {
                           const { supported: actionSupported } = getShortcutAvailability(
                             settings, action, browserCapabilities.supportsSubtitlePreservingPip,
                           )
+                          const actionHint = action === 'pictureInPicture'
+                            ? actionSupported ? copy.pictureInPictureTooltip : copy.pictureInPictureUnsupported
+                            : action === 'previousFrame' || action === 'nextFrame' ? copy.frameStepTooltip : null
                           return (
                             <Fragment key={action}>
                               <TableRow className={cn(action === catalog.holdSpeed.parentAction && matchesHoldSpeed && 'hover:bg-transparent has-aria-expanded:bg-transparent')}>
@@ -543,7 +551,7 @@ export function OptionsApp() {
                                         onClick={() => setShortcutGroupOpen('holdSpeed', !holdSpeedExpanded)}
                                         className="px-2 font-medium focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring" />
                                       : <span>{copy.actions[action]}</span>}
-                                    {action === 'pictureInPicture' && (
+                                    {actionHint && (
                                       <Tooltip>
                                         <TooltipTrigger asChild>
                                           <button
@@ -559,21 +567,8 @@ export function OptionsApp() {
                                           sideOffset={8}
                                           className="max-w-80 whitespace-pre-line"
                                         >
-                                          {actionSupported
-                                            ? copy.pictureInPictureTooltip
-                                            : copy.pictureInPictureUnsupported}
+                                          {actionHint}
                                         </TooltipContent>
-                                      </Tooltip>
-                                    )}
-                                    {(action === 'previousEpisode' || action === 'nextEpisode') && (
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <button type="button" aria-label={`${copy.actions[action]} info`}
-                                            className="inline-flex size-4 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
-                                            <CircleHelpIcon className="size-3.5" />
-                                          </button>
-                                        </TooltipTrigger>
-                                        <TooltipContent side="top" className="max-w-80 whitespace-normal">{seekCopy.episodeHint}</TooltipContent>
                                       </Tooltip>
                                     )}
                                   </div>
@@ -654,11 +649,11 @@ export function OptionsApp() {
                             : catalog.groups.percentage.shortcuts.filter(matchesPercentage)).map(shortcut => {
                             const pair = catalog.groups.seek.pairs.find(pair => pair.id === shortcut.id)
                             const label = getSeekShortcutLabel(shortcut, resolvedLocale)
-                            const remove = <Button variant="ghost" size="icon" className="text-muted-foreground focus-visible:text-foreground" aria-label={seekCopy.remove.replace('{action}', label)} onClick={() => updateSettings(current => {
+                            const remove = <DeleteButton locale={resolvedLocale} className="text-muted-foreground focus-visible:text-foreground" label={seekCopy.remove.replace('{action}', label)} onClick={() => updateSettings(current => {
                               const bindings = { ...current.bindings }
                               for (const action of pair ? [pair.actions.backward, pair.actions.forward] : [shortcut.id]) delete bindings[action]
                               return { ...current, bindings, seekShortcuts: current.seekShortcuts.filter(item => item.id !== shortcut.id) }
-                            })}><Trash2Icon /></Button>
+                            })} />
                             if (shortcut.kind === 'relative') return <TableRow key={shortcut.id} aria-label={label}>
                               <TableCell>{shortcut.value} {pairCopy.unit}</TableCell>
                               {seekBindingCell(pair!.actions.forward)}
@@ -796,6 +791,8 @@ export function OptionsApp() {
                 settings={settings}
                 onImport={replaceSettings}
               /> },
+    { id: 'help', label: HELP_UI_COPY[resolvedLocale].title, group: 'help', content: <HelpPage
+      locale={resolvedLocale} query={shortcutQuery} /> },
   )
 
   return (
@@ -902,12 +899,13 @@ export function OptionsApp() {
         >
           <DialogHeader>
             <DialogTitle>{recorder?.preferredSpeed !== undefined ? copy.preferredSpeed : copy.recordTitle}</DialogTitle>
-            <DialogDescription>{recorder?.preferredSpeed !== undefined ? speedCopy.preferredDescription : copy.recordDesc} {copy.shortcutOptional}</DialogDescription>
+            <DialogDescription>{recorder?.preferredSpeed !== undefined ? speedCopy.preferredDescription : `${copy.recordDesc} ${copy.shortcutOptional}`}</DialogDescription>
           </DialogHeader>
 
           <div className="flex flex-col gap-4">
             {recorder?.preferredSpeed !== undefined && <FieldGroup>
-              <NumericSettingField ref={preferredSpeedInput} id="preferred-speed" label={copy.preferredSpeed} tooltip={copy.preferredSpeedTooltip}
+              <NumericSettingField ref={preferredSpeedInput} id="preferred-speed" label={speedCopy.rate} tooltip={copy.preferredSpeedTooltip}
+                layout="inline-range" unit="×"
                 min={SPEED_LIMITS.preferred.min} max={SPEED_LIMITS.preferred.max} step={SPEED_LIMITS.preferred.inputStep}
                 value={recorder.preferredSpeed} onValueChange={editor.setPreferredSpeed} onBlur={editor.normalizePreferredSpeed}
                 onDragCommit={editor.normalizePreferredSpeed} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur() }} />

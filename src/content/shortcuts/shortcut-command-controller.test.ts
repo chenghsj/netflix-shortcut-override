@@ -425,6 +425,32 @@ describe('ShortcutCommandController', () => {
       : [['cycleSubtitleTrack'], ['cycleSubtitleTrack']])
   })
 
+  it.each(['previousAudioTrack', 'nextAudioTrack'] as const)('drops queued %s requests when their PiP window closes', async action => {
+    document.body.innerHTML = '<video></video><iframe></iframe>'
+    const pipWindow = document.querySelector('iframe')!.contentWindow!
+    let closed = false
+    Object.defineProperty(pipWindow, 'closed', { configurable: true, get: () => closed })
+    const response: NetflixApiResponse = {
+      success: true,
+      result: {
+        action: 'cycleAudioTrack', playerApiFound: true, playerFound: true,
+        seekCalled: false, sessionIds: ['session-id'], audioTrackSwitchCalled: true, audioTrack: 'English',
+      },
+    }
+    let finishFirst!: (response: NetflixApiResponse) => void
+    const transport = vi.fn().mockImplementationOnce(() => new Promise<NetflixApiResponse>(resolve => { finishFirst = resolve }))
+      .mockResolvedValue(response)
+    const controller = createShortcutCommandController(() => DEFAULT_SETTINGS, createNetflixPlaybackSession(transport))
+    controller.execute(action, pipWindow.document)
+    controller.execute(action, pipWindow.document)
+    expect(transport).toHaveBeenCalledTimes(1)
+
+    closed = true
+    finishFirst(response)
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(transport).toHaveBeenCalledTimes(1)
+  })
+
   it.each(
     ['global disable', 'row disable', 'watch change', 'video replacement', 'cancel and re-enable'].flatMap(reason =>
       (['cycleSubtitleTrack', 'previousSubtitleTrack'] as const).map(action => ({ reason, action }))),

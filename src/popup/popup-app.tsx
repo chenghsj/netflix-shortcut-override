@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { AlertCircleIcon, Settings2Icon, StarIcon } from 'lucide-react'
+import { AlertCircleIcon, BookOpenIcon, Settings2Icon, StarIcon } from 'lucide-react'
+import { HELP_UI_COPY } from '@/help/help-copy'
 import { GitHubIcon } from '@/components/github-icon'
 import { CompatibilityConnectionAlert } from '@/components/compatibility-connection-alert'
 import { CompatibilityDiagnosticsDialog } from '@/components/compatibility-diagnostics-dialog'
@@ -8,7 +9,7 @@ import { SettingsSaveStatus } from '@/components/settings-save-status'
 import { Alert, AlertDescription } from '@/components/app-ui/alert'
 import { Button } from '@/components/app-ui/button'
 import { Switch } from '@/components/app-ui/switch'
-import { TooltipProvider } from '@/components/app-ui/tooltip'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/app-ui/tooltip'
 import { useCompatibilitySession } from '@/popup/use-compatibility-session'
 import { usePopupFocusRestoration } from '@/popup/use-popup-focus-restoration'
 import { FEATURE_ANNOUNCEMENT_COPY } from '@/popup/feature-announcement-copy'
@@ -108,24 +109,39 @@ export function PopupApp() {
             onOpenCategorySettings={category => openOptionsPage(suppressFocusRestoration, category)} />
         </div>
       </div>
-      <footer className="grid shrink-0 grid-cols-2 gap-2 border-t border-border p-3">
-        <Button variant="outline" asChild className="min-w-0">
-          <a href={EXTERNAL_LINKS.githubRepository} target="_blank" rel="noreferrer" aria-label={copy.githubRepositoryAriaLabel}
-            onClick={suppressFocusRestoration} onAuxClick={suppressFocusRestoration}>
-            <GitHubIcon data-icon="inline-start" /><span className="min-w-0 truncate">{copy.githubRepository}</span>
-          </a>
-        </Button>
-        <OtherProjectsSelect label={copy.otherProjects} ariaLabel={copy.otherProjectsAriaLabel}
-          streamDanmakuLabel={copy.streamDanmakuStore} streamDanmakuTitle={copy.streamDanmakuStoreAriaLabel}
-          size="default" className="min-w-0 has-data-[icon=inline-start]:pl-2" labelClassName="text-center"
-          onNavigate={suppressFocusRestoration} />
-        <Button variant="outline" asChild className="col-span-2 min-w-0">
-          <a href={getShortcutOverrideRatingUrl()} target="_blank" rel="noreferrer" aria-label={copy.rateExtensionAriaLabel}
-            onClick={suppressFocusRestoration} onAuxClick={suppressFocusRestoration}>
-            <StarIcon data-icon="inline-start" aria-hidden="true" /><span className="min-w-0 truncate">{copy.rateExtension}</span>
-          </a>
-        </Button>
-        <SettingsSaveStatus error={saveError} errorLabel={copy.settingsSaveError} className="col-span-2" />
+      <footer className="flex shrink-0 flex-col gap-2 border-t border-border px-3 py-2">
+        <div className="flex items-center justify-center gap-2">
+          <Tooltip>
+            <TooltipTrigger asChild><Button variant="outline" size="icon" asChild>
+              <a href={EXTERNAL_LINKS.githubRepository} target="_blank" rel="noreferrer" aria-label={copy.githubRepositoryAriaLabel}
+                onClick={suppressFocusRestoration} onAuxClick={suppressFocusRestoration}>
+                <GitHubIcon />
+              </a>
+            </Button></TooltipTrigger>
+            <TooltipContent side="top">{copy.githubRepository}</TooltipContent>
+          </Tooltip>
+          <OtherProjectsSelect iconOnly label={copy.otherProjects} ariaLabel={copy.otherProjectsAriaLabel}
+            streamDanmakuLabel={copy.streamDanmakuStore} streamDanmakuTitle={copy.streamDanmakuStoreAriaLabel}
+            className="rounded-[var(--ui-control-radius)]" tooltipSide="top"
+            onNavigate={suppressFocusRestoration} />
+          <Tooltip>
+            <TooltipTrigger asChild><Button variant="outline" size="icon" aria-label={HELP_UI_COPY[locale].title}
+              onClick={() => openOptionsPage(suppressFocusRestoration, 'help')}>
+              <BookOpenIcon aria-hidden="true" />
+            </Button></TooltipTrigger>
+            <TooltipContent side="top">{HELP_UI_COPY[locale].title}</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild><Button variant="outline" size="icon" asChild>
+              <a href={getShortcutOverrideRatingUrl()} target="_blank" rel="noreferrer" aria-label={copy.rateExtensionAriaLabel}
+                onClick={suppressFocusRestoration} onAuxClick={suppressFocusRestoration}>
+                <StarIcon aria-hidden="true" />
+              </a>
+            </Button></TooltipTrigger>
+            <TooltipContent side="top">{copy.rateExtension}</TooltipContent>
+          </Tooltip>
+        </div>
+        <SettingsSaveStatus error={saveError} errorLabel={copy.settingsSaveError} />
       </footer>
     </main>
   </TooltipProvider>

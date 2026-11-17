@@ -33,6 +33,7 @@ type OtherProjectsSelectProps = {
   className?: string
   labelClassName?: string
   iconOnly?: boolean
+  tooltipSide?: 'top' | 'right' | 'bottom' | 'left'
   onNavigate?: () => void
 }
 
@@ -45,6 +46,7 @@ export function OtherProjectsSelect({
   className,
   labelClassName,
   iconOnly = false,
+  tooltipSide = 'bottom',
   onNavigate,
 }: OtherProjectsSelectProps) {
   const [open, setOpen] = useState(false)
@@ -79,7 +81,7 @@ export function OtherProjectsSelect({
       {iconOnly ? (
         <Tooltip open={tooltipOpen && !open} onOpenChange={nextOpen => setTooltipOpen(nextOpen && !open)}>
           <TooltipTrigger asChild>{trigger}</TooltipTrigger>
-          <TooltipContent side="bottom" sideOffset={8}>{label}</TooltipContent>
+          <TooltipContent side={tooltipSide} sideOffset={8}>{label}</TooltipContent>
         </Tooltip>
       ) : trigger}
       <PopoverContent align="end" className="w-(--radix-popover-trigger-width) min-w-44 p-0">

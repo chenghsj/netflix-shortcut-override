@@ -38,6 +38,41 @@ const createVersion9Settings = () => {
 }
 
 describe('settings backup', () => {
+  it.each(['LaunchMediaPlayer', 'Unidentified', 'Dead', 'a'])('can reimport an exported legacy unidentified %s binding', key => {
+    const backup = createSettingsBackup(DEFAULT_SETTINGS, { extensionVersion: '0.6.9', exportedAt })
+    const legacy = structuredClone(backup.settings)
+    legacy.version = 31
+    legacy.bindings.mute.key = { code: 'Unidentified', key, ctrl: false, alt: false, shift: false, meta: false }
+    const imported = parseSettingsBackup(JSON.stringify({ ...backup, settings: legacy }))
+    expect(imported.ok).toBe(true)
+    if (!imported.ok) throw new Error(imported.error)
+
+    const exported = createSettingsBackup(imported.value.settings, { extensionVersion: '0.6.9', exportedAt })
+    expect(parseSettingsBackup(serializeSettingsBackup(exported))).toMatchObject({
+      ok: true, value: { settings: { bindings: { mute: legacy.bindings.mute } } },
+    })
+  })
+
+  it('preserves 300-second seeking and 5x maximum and preferred speeds through export and import', () => {
+    const settings = {
+      ...DEFAULT_SETTINGS, seek: { seconds: 300 }, speed: { ...DEFAULT_SETTINGS.speed, max: 5, preferred: 5, step: 5 },
+      holdSpeed: { ...DEFAULT_SETTINGS.holdSpeed, speed: 5 },
+      seekShortcuts: [{ id: 'seek:long' as const, kind: 'relative' as const, value: 300 }],
+      preferredSpeedShortcuts: [{ id: 'preferred-speed:fast' as const, speed: 5 }],
+      bindings: { ...DEFAULT_SETTINGS.bindings, 'preferred-speed:fast': { enabled: true, key: null },
+        'seek:long-backward': { enabled: false, key: null }, 'seek:long-forward': { enabled: true, key: null } },
+    }
+    const backup = createSettingsBackup(settings, { extensionVersion: '0.6.9', exportedAt })
+    expect(backup.settings.seek.seconds).toBe(300)
+    expect(parseSettingsBackup(serializeSettingsBackup(backup))).toMatchObject({
+      ok: true, value: { settings: {
+        seek: { seconds: 300 }, speed: { max: 5, preferred: 5, step: 5 }, holdSpeed: { speed: 5 },
+        seekShortcuts: [{ id: 'seek:long', kind: 'relative', value: 300 }],
+        preferredSpeedShortcuts: [{ id: 'preferred-speed:fast', speed: 5 }],
+      } },
+    })
+  })
+
   it.each([true, false])('round-trips the pause overlay preference %s and upgrades older backups', hidePauseOverlay => {
     const backup = createSettingsBackup({ ...DEFAULT_SETTINGS, hidePauseOverlay }, { extensionVersion: '0.6.9', exportedAt })
     expect(parseSettingsBackup(serializeSettingsBackup(backup))).toMatchObject({ ok: true, value: { settings: { hidePauseOverlay } } })
@@ -65,7 +100,7 @@ describe('settings backup', () => {
     }
   })
 
-  it.each([true, false])('migrates v19 caption size without taking an existing enabled Shift+V binding (%s)', enabled => {
+  it.each([true, false])('migrates v19 caption size without taking an existing enabled Shift+C binding (%s)', enabled => {
     const backup = createSettingsBackup(DEFAULT_SETTINGS, { extensionVersion: '0.6.8', exportedAt })
     const key = DEFAULT_SETTINGS.bindings.cycleSubtitleSize.key
     const mute = { enabled, key }
@@ -188,10 +223,10 @@ describe('settings backup', () => {
     })
   })
 
-  it.each([true, false])('restores a v15 backup whose Shift+C binding is enabled: %s', enabled => {
+  it.each([true, false])('restores a v15 backup whose Shift+X binding is enabled: %s', enabled => {
     const backup = createSettingsBackup(DEFAULT_SETTINGS, { extensionVersion: '0.6.8', exportedAt })
-    const shiftC = DEFAULT_SETTINGS.bindings.cycleSubtitleTrack.key
-    const mute = { enabled, key: shiftC }
+    const shiftX = DEFAULT_SETTINGS.bindings.cycleSubtitleTrack.key
+    const mute = { enabled, key: shiftX }
     const result = parseSettingsBackup(JSON.stringify({
       ...backup,
       settings: {
@@ -203,14 +238,14 @@ describe('settings backup', () => {
     }))
     expect(result).toMatchObject({
       ok: true,
-      value: { settings: { bindings: { mute, cycleSubtitleTrack: { enabled: !enabled, key: shiftC } } } },
+      value: { settings: { bindings: { mute, cycleSubtitleTrack: { enabled: !enabled, key: shiftX } } } },
     })
   })
 
-  it.each([true, false])('preserves an existing Shift+X binding from v17 when enabled: %s', enabled => {
+  it.each([true, false])('preserves an existing Shift+Z binding from v17 when enabled: %s', enabled => {
     const backup = createSettingsBackup(DEFAULT_SETTINGS, { extensionVersion: '0.6.8', exportedAt })
-    const shiftX = DEFAULT_SETTINGS.bindings.previousSubtitleTrack.key
-    const mute = { enabled, key: shiftX }
+    const shiftZ = DEFAULT_SETTINGS.bindings.previousSubtitleTrack.key
+    const mute = { enabled, key: shiftZ }
     const result = parseSettingsBackup(JSON.stringify({
       ...backup,
       settings: {
@@ -222,7 +257,7 @@ describe('settings backup', () => {
     }))
     expect(result).toMatchObject({
       ok: true,
-      value: { settings: { bindings: { mute, previousSubtitleTrack: { enabled: !enabled, key: shiftX } } } },
+      value: { settings: { bindings: { mute, previousSubtitleTrack: { enabled: !enabled, key: shiftZ } } } },
     })
   })
 
@@ -327,7 +362,7 @@ describe('settings backup', () => {
         settings: {
           version: SHORTCUT_SETTINGS_VERSION,
           enabled: false,
-          speed: { min: 0.25, max: 4, step: 0.05 },
+          speed: { min: 0.25, max: 5, step: 0.05 },
           holdSpeed: { speed: 3 },
         },
       },

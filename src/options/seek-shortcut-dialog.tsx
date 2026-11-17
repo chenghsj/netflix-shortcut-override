@@ -17,11 +17,11 @@ import type { Locale, ShortcutSettings } from '@/shared/shortcut-types'
 import type { useSeekShortcutEditor } from './use-seek-shortcut-editor'
 
 const EDITOR_COPY: Record<Locale, { description: string; changed: string }> = {
-  en: { description: 'Set the value, then select each key field and press its shortcut.', changed: 'These settings changed. Close and reopen this dialog to edit the latest values.' },
-  'zh-TW': { description: '設定數值後，點選各按鍵欄位並按下要使用的快捷鍵。', changed: '設定已變更，請關閉後重新開啟此視窗以編輯最新設定。' },
-  'zh-CN': { description: '设置数值后，点击各按键栏位并按下要使用的快捷键。', changed: '设置已更改，请关闭后重新打开此窗口以编辑最新设置。' },
-  ja: { description: '数値を設定し、各キー欄を選んでショートカットを押してください。', changed: '設定が変更されました。この画面を閉じて開き直してください。' },
-  ko: { description: '값을 설정한 후 각 키 필드를 선택하고 사용할 단축키를 누르세요.', changed: '설정이 변경되었습니다. 창을 닫고 다시 열어 최신 설정을 편집하세요.' },
+  en: { description: 'Set the jump value. Shortcuts are optional.', changed: 'Settings changed. Reopen this editor.' },
+  'zh-TW': { description: '設定跳轉值，快捷鍵可留空。', changed: '設定已變更，請重新開啟視窗。' },
+  'zh-CN': { description: '设置跳转值，快捷键可留空。', changed: '设置已更改，请重新打开窗口。' },
+  ja: { description: '移動する値を設定します。キーは任意です。', changed: '設定が変わりました。編集画面を開き直してください。' },
+  ko: { description: '이동할 값을 설정하세요. 단축키는 선택 사항입니다.', changed: '설정이 변경되었습니다. 편집 창을 다시 여세요.' },
 }
 
 export function SeekShortcutDialog({ editor, settings, locale }: {
@@ -46,7 +46,7 @@ export function SeekShortcutDialog({ editor, settings, locale }: {
     <DialogContent onOpenAutoFocus={event => { event.preventDefault(); numberInput.current?.focus() }} onCloseAutoFocus={editor.restoreFocus}>
       <DialogHeader>
         <DialogTitle>{copy.recordTitle}</DialogTitle>
-        <DialogDescription>{EDITOR_COPY[locale].description} {copy.shortcutOptional}</DialogDescription>
+        <DialogDescription>{EDITOR_COPY[locale].description}</DialogDescription>
       </DialogHeader>
       <div className="flex flex-col gap-5">
         <div className="flex items-center justify-between gap-4">

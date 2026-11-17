@@ -7,7 +7,7 @@ import type { ShortcutSettings } from './shortcut-types'
 const settingsWithSpeeds = (): ShortcutSettings => {
   const settings: ShortcutSettings = structuredClone(DEFAULT_SETTINGS)
   settings.speed.preferred = 1.75
-  settings.preferredSpeedShortcuts = [{ id: 'preferred-speed:slow', speed: 0.75 }, { id: 'preferred-speed:fast', speed: 3.35 }]
+  settings.preferredSpeedShortcuts = [{ id: 'preferred-speed:slow', speed: 0.75 }, { id: 'preferred-speed:fast', speed: 5 }]
   settings.bindings['preferred-speed:slow'] = { enabled: false, key: null }
   settings.bindings['preferred-speed:fast'] = { enabled: true, key: { ...DEFAULT_SETTINGS.bindings.mute.key, code: 'Digit2', key: '2' } }
   return settings
@@ -34,7 +34,7 @@ describe('multiple preferred speeds', () => {
 
   it('rejects incomplete current backups and drops invalid stored entries with their bindings', () => {
     const settings = settingsWithSpeeds()
-    for (const preferredSpeedShortcuts of [undefined, [{ id: 'preferred-speed:bad', speed: 5 }], [{ id: 'preferred-speed:bad', speed: 1.23 }],
+    for (const preferredSpeedShortcuts of [undefined, [{ id: 'preferred-speed:bad', speed: 5.05 }], [{ id: 'preferred-speed:bad', speed: 1.23 }],
       [settings.preferredSpeedShortcuts[0], settings.preferredSpeedShortcuts[0]], [{ id: 'seek:wrong', speed: 2 }]]) {
       expect(parseSettingsForBackup({ ...settings, preferredSpeedShortcuts })).toEqual({ ok: false, error: 'invalidSettings' })
     }

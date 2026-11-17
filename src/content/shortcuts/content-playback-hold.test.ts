@@ -225,6 +225,50 @@ describe('content Play / Pause hold shortcuts', () => {
     window.removeEventListener('keyup', nativeKeyupHandler, true)
   })
 
+  it.each((['extension', 'hold speed', 'play/pause', 'binding change'] as const).flatMap(change =>
+    [false, true].map(active => ({ change, active })),
+  ))('cancels a hold after $change changes while active=$active', async ({ change, active }) => {
+    vi.useFakeTimers()
+    let paused = true
+    const video = document.createElement('video')
+    video.playbackRate = 1.25
+    Object.defineProperty(video, 'paused', { configurable: true, get: () => paused })
+    vi.spyOn(video, 'play').mockImplementation(async () => { paused = false })
+    vi.spyOn(video, 'pause').mockImplementation(() => { paused = true })
+    document.body.append(video)
+    const press = (type: string) => window.dispatchEvent(new KeyboardEvent(type, {
+      code: 'Space', key: ' ', bubbles: true, cancelable: true,
+    }))
+
+    press('keydown')
+    await vi.advanceTimersByTimeAsync(active ? 250 : 100)
+    if (active) {
+      expect(video.playbackRate).toBe(2)
+      expect(paused).toBe(false)
+    }
+
+    const settings = structuredClone(DEFAULT_SETTINGS)
+    if (change === 'extension') settings.enabled = false
+    if (change === 'hold speed') settings.holdSpeed.enabled = false
+    if (change === 'play/pause') settings.bindings.playPause.enabled = false
+    if (change === 'binding change') settings.bindings.playPause.key = {
+      code: 'KeyJ', key: 'j', ctrl: false, alt: false, shift: false, meta: false,
+    }
+    await saveSettings(settings)
+
+    expect(video.playbackRate).toBe(1.25)
+    expect(paused).toBe(true)
+    expect(document.getElementById('shortcut-override-hold-speed-hint')).toBeNull()
+    await vi.advanceTimersByTimeAsync(500)
+    expect(video.playbackRate).toBe(1.25)
+    expect(paused).toBe(true)
+    // Re-enabling must not turn the cancelled press into a tap on release.
+    await saveSettings(DEFAULT_SETTINGS)
+    press('keyup')
+    expect(video.playbackRate).toBe(1.25)
+    expect(paused).toBe(true)
+  })
+
   it('keeps a Space tap as play/pause and waits until keyup', () => {
     vi.useFakeTimers()
 

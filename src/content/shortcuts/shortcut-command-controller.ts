@@ -268,8 +268,9 @@ const audioTrackCommand = (
   if (!video) return false
   const watchPath = document.location.pathname
   const action = direction === -1 ? 'previousAudioTrack' : 'nextAudioTrack'
-  const isAvailable = () => getSettings().enabled && getSettings().bindings[action].enabled &&
-    document.location.pathname === watchPath && findVideo(context.targetDoc) === video
+  const isAvailable = () => !context.isCancelled() && getSettings().enabled && getSettings().bindings[action].enabled &&
+    document.location.pathname === watchPath && context.targetDoc.defaultView?.closed !== true &&
+    findVideo(context.targetDoc) === video
   const favorites = getActiveFavorites(context.settings, 'audioFavorites')
   void playbackSession.cycleAudioTrack(direction, isAvailable, favorites).then(({ failureLabel, noTracksAvailable, track }) => {
     if (!isAvailable() || !context.isCurrentAction()) return

@@ -18,13 +18,13 @@ export const SETTINGS_SEARCH_COPY = {
 
 export const SHORTCUT_CATEGORIES = ['playback', 'seeking', 'subtitles', 'volume', 'speed'] as const
 export type ShortcutCategory = typeof SHORTCUT_CATEGORIES[number]
-export type OptionsPage = ShortcutCategory | 'general' | 'automation' | 'backup'
+export type OptionsPage = ShortcutCategory | 'general' | 'automation' | 'backup' | 'help'
 
 export type OptionsLink = OptionsPage | 'subtitleNavigation'
 
 export const OPTIONS_PAGE_HASHES = {
   playback: '#playback', seeking: '#seeking', subtitles: '#subtitles', subtitleNavigation: '#subtitle-navigation',
-  volume: '#volume', speed: '#speed', general: '#general', automation: '#automation', backup: '#backup',
+  volume: '#volume', speed: '#speed', general: '#general', automation: '#automation', backup: '#backup', help: '#help',
 } as const satisfies Record<OptionsLink, string>
 
 export const getOptionsPageFromHash = (hash: string): OptionsPage => {

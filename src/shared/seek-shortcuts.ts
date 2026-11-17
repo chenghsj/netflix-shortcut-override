@@ -2,7 +2,8 @@ import { getSubtitleSizeShortcutLabel } from './subtitle-size-shortcuts'
 import { getCopy } from './i18n'
 import type { Locale, SeekShortcut, SeekShortcutAction, ShortcutAction, ShortcutSettings } from './shortcut-types'
 
-export const SEEK_SHORTCUT_LIMITS = { seconds: 3600, percentage: 100 } as const
+export const SEEK_SHORTCUT_LIMITS = { seconds: 300, percentage: 100 } as const
+const LEGACY_MAX_SEEK_SECONDS = 3600
 
 export const isSeekShortcutAction = (value: string): value is SeekShortcutAction =>
   /^seek:[a-zA-Z0-9-]{1,64}$/.test(value)
@@ -13,12 +14,12 @@ export const isLegacySeekShortcut = (value: unknown): value is SeekShortcut => {
   return typeof shortcut.id === 'string' && isSeekShortcutAction(shortcut.id) &&
     typeof shortcut.value === 'number' && Number.isInteger(shortcut.value) &&
     (shortcut.kind === 'relative'
-      ? shortcut.value !== 0 && Math.abs(shortcut.value) <= SEEK_SHORTCUT_LIMITS.seconds
+      ? shortcut.value !== 0 && Math.abs(shortcut.value) <= LEGACY_MAX_SEEK_SECONDS
       : shortcut.kind === 'percentage' && shortcut.value >= 0 && shortcut.value <= 100)
 }
 
 export const isSeekShortcut = (value: unknown): value is SeekShortcut =>
-  isLegacySeekShortcut(value) && (value.kind !== 'relative' || value.value > 0)
+  isLegacySeekShortcut(value) && (value.kind !== 'relative' || (value.value > 0 && value.value <= SEEK_SHORTCUT_LIMITS.seconds))
 
 export type SeekDirection = 'backward' | 'forward'
 
@@ -41,11 +42,11 @@ export const resolveSeekShortcut = (settings: ShortcutSettings, action: Shortcut
 }
 
 export const SEEK_SHORTCUT_COPY = {
-  en: { title: 'Custom seeking', type: 'Seek type', forward: 'Forward', backward: 'Rewind', percentage: 'Video progress (%)', seconds: 'Seconds', add: 'Add', remove: 'Remove {action}', relativeLabel: '{direction} {value} seconds', percentageLabel: '{value}%', empty: 'Add a time interval or a video percentage, then record its shortcut.', unavailable: 'Episode unavailable', episodeHint: 'Uses Netflix’s episode controls. Ctrl+N / Ctrl+P may be reserved by your browser; change the key if needed.' },
-  'zh-TW': { title: '自訂跳轉', type: '跳轉方式', forward: '前進', backward: '後退', percentage: '影片進度（%）', seconds: '秒數', add: '新增', remove: '刪除 {action}', relativeLabel: '{direction} {value} 秒', percentageLabel: '{value}%', empty: '選擇秒數或影片進度，再錄製快捷鍵來新增。', unavailable: '無法切換至該集', episodeHint: '使用 Netflix 的集數控制。Ctrl+N／Ctrl+P 可能被瀏覽器保留，若無法觸發請修改快捷鍵。' },
-  'zh-CN': { title: '自定义跳转', type: '跳转方式', forward: '前进', backward: '后退', percentage: '影片进度（%）', seconds: '秒数', add: '添加', remove: '删除 {action}', relativeLabel: '{direction} {value} 秒', percentageLabel: '{value}%', empty: '选择秒数或影片进度，再录制快捷键来添加。', unavailable: '无法切换至该集', episodeHint: '使用 Netflix 的集数控制。Ctrl+N／Ctrl+P 可能被浏览器保留，若无法触发请修改快捷键。' },
-  ja: { title: 'カスタムシーク', type: '移動方法', forward: '進む', backward: '戻る', percentage: '動画の再生位置（%）', seconds: '秒数', add: '追加', remove: '{action}を削除', relativeLabel: '{value}秒{direction}', percentageLabel: '{value}%', empty: '秒数または再生位置を選び、キーを記録して追加します。', unavailable: 'エピソードを切り替えられません', episodeHint: 'Netflix のエピソード操作を使用します。Ctrl+N / Ctrl+P はブラウザーに予約されている場合があります。必要に応じてキーを変更してください。' },
-  ko: { title: '사용자 지정 탐색', type: '탐색 방식', forward: '앞으로', backward: '뒤로', percentage: '동영상 위치 (%)', seconds: '초', add: '추가', remove: '{action} 삭제', relativeLabel: '{value}초 {direction}', percentageLabel: '{value}%', empty: '초 또는 동영상 위치를 선택한 후 단축키를 기록해 추가하세요.', unavailable: '에피소드를 전환할 수 없습니다', episodeHint: 'Netflix 에피소드 컨트롤을 사용합니다. Ctrl+N / Ctrl+P는 브라우저에서 예약할 수 있으므로 필요한 경우 키를 변경하세요.' },
+  en: { title: 'Custom seeking', type: 'Seek type', forward: 'Forward', backward: 'Rewind', percentage: 'Video progress (%)', seconds: 'Seconds', add: 'Add', remove: 'Remove {action}', relativeLabel: '{direction} {value} seconds', percentageLabel: '{value}%', empty: 'Add a time interval or a video percentage, then record its shortcut.', unavailable: 'Episode unavailable' },
+  'zh-TW': { title: '自訂跳轉', type: '跳轉方式', forward: '前進', backward: '後退', percentage: '影片進度（%）', seconds: '秒數', add: '新增', remove: '刪除 {action}', relativeLabel: '{direction} {value} 秒', percentageLabel: '{value}%', empty: '選擇秒數或影片進度，再錄製快捷鍵來新增。', unavailable: '無法切換至該集' },
+  'zh-CN': { title: '自定义跳转', type: '跳转方式', forward: '前进', backward: '后退', percentage: '影片进度（%）', seconds: '秒数', add: '添加', remove: '删除 {action}', relativeLabel: '{direction} {value} 秒', percentageLabel: '{value}%', empty: '选择秒数或影片进度，再录制快捷键来添加。', unavailable: '无法切换至该集' },
+  ja: { title: 'カスタムシーク', type: '移動方法', forward: '進む', backward: '戻る', percentage: '動画の再生位置（%）', seconds: '秒数', add: '追加', remove: '{action}を削除', relativeLabel: '{value}秒{direction}', percentageLabel: '{value}%', empty: '秒数または再生位置を選び、キーを記録して追加します。', unavailable: 'エピソードを切り替えられません' },
+  ko: { title: '사용자 지정 탐색', type: '탐색 방식', forward: '앞으로', backward: '뒤로', percentage: '동영상 위치 (%)', seconds: '초', add: '추가', remove: '{action} 삭제', relativeLabel: '{value}초 {direction}', percentageLabel: '{value}%', empty: '초 또는 동영상 위치를 선택한 후 단축키를 기록해 추가하세요.', unavailable: '에피소드를 전환할 수 없습니다' },
 } satisfies Record<Locale, Record<string, string>>
 
 export const SEEK_PAIR_COPY = {

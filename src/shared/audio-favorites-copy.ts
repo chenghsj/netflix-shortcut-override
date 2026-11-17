@@ -4,8 +4,8 @@ import type { Locale } from './shortcut-types'
 const translations = {
   en: {
     title: 'Favorite audio tracks',
-    description: 'The audio shortcuts cycle through these tracks in order. Unavailable tracks are skipped.',
-    emptyDescription: 'Add languages to limit the audio shortcuts to this list. An empty list cycles through all available tracks.',
+    description: 'Audio shortcuts follow this order and skip unavailable tracks. Opening a video does not automatically apply a favorite.',
+    emptyDescription: 'Add favorites to limit audio switching to your list; an empty list uses all available tracks. Opening a video does not automatically apply a favorite.',
     language: 'Audio tracks',
     chooseLanguage: 'Choose audio tracks',
     selectedCount: '{count} tracks selected',
@@ -17,8 +17,8 @@ const translations = {
   },
   'zh-TW': {
     title: '常用音軌',
-    description: '音軌快捷鍵會依序切換這些音軌。影片未提供的音軌會自動略過。',
-    emptyDescription: '加入語言後，音軌快捷鍵只會切換清單中的音軌；未加入時，會切換影片提供的所有音軌。',
+    description: '音軌快捷鍵依清單順序切換，略過不可用項目；開啟影片時不會自動套用。',
+    emptyDescription: '加入常用音軌可限制切換範圍；清單為空時切換全部可用音軌。開啟影片時不會自動套用。',
     language: '音軌',
     chooseLanguage: '選擇音軌',
     selectedCount: '已選 {count} 個音軌',
@@ -30,8 +30,8 @@ const translations = {
   },
   'zh-CN': {
     title: '常用音轨',
-    description: '音轨快捷键会依次切换这些音轨。影片未提供的音轨会自动跳过。',
-    emptyDescription: '添加语言后，音轨快捷键只会切换列表中的音轨；未添加时，会切换影片提供的所有音轨。',
+    description: '音轨快捷键依列表顺序切换，跳过不可用项目；打开视频时不会自动应用。',
+    emptyDescription: '添加常用音轨可限制切换范围；列表为空时切换全部可用音轨。打开视频时不会自动应用。',
     language: '音轨',
     chooseLanguage: '选择音轨',
     selectedCount: '已选 {count} 个音轨',
@@ -43,8 +43,8 @@ const translations = {
   },
   ja: {
     title: 'よく使う音声',
-    description: '音声ショートカットでこの順に切り替えます。利用できない音声はスキップします。',
-    emptyDescription: '言語を追加すると、リスト内の音声のみ切り替えます。空の場合は、利用可能なすべての音声を切り替えます。',
+    description: 'この順に音声を切り替え、利用できない項目は飛ばします。動画を開いたときに自動適用しません。',
+    emptyDescription: '追加した音声だけを切り替えます。空の場合は利用可能な音声をすべて使います。動画を開いたときに自動適用しません。',
     language: '音声',
     chooseLanguage: '音声を選択',
     selectedCount: '{count} 個の音声を選択中',
@@ -56,8 +56,8 @@ const translations = {
   },
   ko: {
     title: '자주 쓰는 오디오',
-    description: '오디오 단축키로 이 순서대로 전환합니다. 제공되지 않는 오디오는 건너뜁니다.',
-    emptyDescription: '언어를 추가하면 목록의 오디오만 전환합니다. 목록이 비어 있으면 제공되는 모든 오디오를 전환합니다.',
+    description: '이 순서대로 오디오를 전환하고 없는 항목은 건너뜁니다. 동영상을 열 때 자동 적용하지 않습니다.',
+    emptyDescription: '추가한 오디오만 전환하며 목록이 비어 있으면 사용 가능한 모든 오디오를 전환합니다. 동영상을 열 때 자동 적용하지 않습니다.',
     language: '오디오',
     chooseLanguage: '오디오 선택',
     selectedCount: '{count}개 오디오 선택됨',

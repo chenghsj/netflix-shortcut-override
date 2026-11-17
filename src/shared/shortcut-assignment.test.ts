@@ -1,11 +1,75 @@
 import { describe, expect, it } from 'vitest'
 import { applyShortcutAssignment, inspectShortcutAssignment, resetSubtitleNavigationBindings, type ShortcutAssignment } from './shortcut-assignment'
-import { DEFAULT_SETTINGS } from './shortcut-settings'
+import { DEFAULT_SETTINGS, normalizeSettings } from './shortcut-settings'
+import { keyBindingFromEvent } from './shortcut-bindings'
 import type { ShortcutSettings } from './shortcut-types'
 
 const options = { enabled: true, supportsSubtitlePreservingPip: true }
 
 describe('shortcut assignment', () => {
+  describe.each(['general', 'subtitleNavigation'] as const)('legacy unidentified keys in %s', group => {
+    const savedKey = { code: 'Unidentified', key: 'LaunchMediaPlayer', ctrl: false, alt: false, shift: false, meta: false }
+    const target = group === 'general'
+      ? { group, action: 'mute' as const } : { group, action: 'next' as const }
+    const bindingFor = (settings: ShortcutSettings) => target.group === 'general'
+      ? settings.bindings[target.action] : settings.subtitleNavigation.bindings[target.action]
+    const assignment = { ...target, savedKey, key: savedKey }
+
+    const createLegacySettings = () => {
+      const legacy = structuredClone(DEFAULT_SETTINGS)
+      legacy.version = 31
+      bindingFor(legacy).key = structuredClone(savedKey)
+      return normalizeSettings(legacy)
+    }
+
+    it('can disable the shortcut', () => {
+      const settings = createLegacySettings()
+      const disabled = applyShortcutAssignment(settings, [assignment], { ...options, enabled: false })
+      expect(bindingFor(disabled)).toEqual({ enabled: false, key: savedKey })
+    })
+
+    it.each([
+      { operation: 'clear', key: null },
+      { operation: 'replace', key: { ...savedKey, code: 'KeyJ', key: 'j' } },
+    ])('can $operation the saved key', ({ key }) => {
+      const settings = createLegacySettings()
+      const updated = applyShortcutAssignment(settings, [{ ...assignment, key }], options)
+      expect(bindingFor(updated)).toEqual({ enabled: true, key })
+    })
+
+    it.each([
+      { change: 'physical code', key: { ...savedKey, code: 'KeyJ', key: 'j' } },
+      { change: 'unknown key name', key: { ...savedKey, key: 'Sleep' } },
+      { change: 'modifier', key: { ...savedKey, alt: true } },
+    ])('rejects a stale edit after the $change changes', ({ key }) => {
+      const settings = createLegacySettings()
+      bindingFor(settings).key = key
+      expect(applyShortcutAssignment(settings, [assignment], { ...options, enabled: false })).toBe(settings)
+    })
+  })
+
+  it('requires transfer when a modern key name is already owned under a legacy media name', () => {
+    const settings = structuredClone(DEFAULT_SETTINGS)
+    settings.bindings.nextEpisode.key = { ...settings.bindings.mute.key, code: 'MediaNextTrack', key: 'MediaNextTrack' }
+    const assignment: ShortcutAssignment[] = [{ group: 'general', action: 'previousEpisode',
+      key: keyBindingFromEvent(new KeyboardEvent('keydown', { key: 'MediaTrackNext' })) }]
+    expect(inspectShortcutAssignment(settings, assignment, options).conflicts).toEqual(['nextEpisode'])
+    expect(applyShortcutAssignment(settings, assignment, options)).toBe(settings)
+    expect(applyShortcutAssignment(settings, assignment, { ...options, transfer: true }).bindings.nextEpisode.enabled).toBe(false)
+  })
+
+  it('detects the same media key across code variants while keeping next and previous distinct', () => {
+    const settings = structuredClone(DEFAULT_SETTINGS)
+    settings.bindings.nextEpisode.key = keyBindingFromEvent(new KeyboardEvent('keydown', { key: 'MediaTrackNext' }))
+    const assignment: ShortcutAssignment[] = [{ group: 'general', action: 'previousEpisode',
+      key: { ...settings.bindings.nextEpisode.key, code: 'Unidentified' } }]
+    expect(inspectShortcutAssignment(settings, assignment, options).conflicts).toEqual(['nextEpisode'])
+    expect(applyShortcutAssignment(settings, assignment, options)).toBe(settings)
+    assignment[0].key = keyBindingFromEvent(new KeyboardEvent('keydown', { key: 'MediaTrackPrevious' }))
+    expect(inspectShortcutAssignment(settings, assignment, options).conflicts).toEqual([])
+    expect(applyShortcutAssignment(settings, assignment, options).bindings.previousEpisode.key?.code).toBe('MediaTrackPrevious')
+  })
+
   it('leaves occupied subtitle defaults disabled when resetting all subtitle bindings', () => {
     const settings = structuredClone(DEFAULT_SETTINGS)
     settings.bindings.mute.key = { ...settings.subtitleNavigation.bindings.previous.key }

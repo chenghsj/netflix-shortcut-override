@@ -123,34 +123,44 @@ describe('OptionsApp', () => {
   it('adds two preferred speeds, edits and disables them independently, then removes a group', async () => {
     render(<OptionsApp />)
     await selectShortcutCategory('Playback speed')
-    for (const [speed, code, key] of [['2', 'Digit2', '2'], ['3.35', 'Digit3', '3']]) {
+    for (const [speed, code, key] of [['2', 'Digit2', '2'], ['5', 'Digit3', '3']]) {
       fireEvent.click(screen.getByRole('button', { name: 'Add preferred speed' }))
       const dialog = await screen.findByRole('dialog', { name: 'Preferred speed' })
-      fireEvent.change(within(dialog).getByLabelText('Preferred speed'), { target: { value: speed } })
+      fireEvent.change(within(dialog).getByLabelText('Speed'), { target: { value: speed } })
       fireEvent.keyDown(within(dialog).getByRole('group', { name: 'Key' }), { code, key })
       fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
       await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     }
-    await waitFor(async () => expect((await getSettings()).preferredSpeedShortcuts.map(item => item.speed)).toEqual([2, 3.35]))
+    await waitFor(async () => expect((await getSettings()).preferredSpeedShortcuts.map(item => item.speed)).toEqual([2, 5]))
     fireEvent.click(within(screen.getByRole('row', { name: 'Set preferred speed · 2×' })).getByRole('switch'))
     fireEvent.click(screen.getByRole('button', { name: 'Edit Set preferred speed · 2×' }))
     const dialog = await screen.findByRole('dialog', { name: 'Preferred speed' })
-    fireEvent.change(within(dialog).getByLabelText('Preferred speed'), { target: { value: '2.5' } })
+    fireEvent.change(within(dialog).getByLabelText('Speed'), { target: { value: '2.5' } })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
     await waitFor(async () => {
       const saved = await getSettings()
-      expect(saved.preferredSpeedShortcuts.map(item => item.speed)).toEqual([2.5, 3.35])
+      expect(saved.preferredSpeedShortcuts.map(item => item.speed)).toEqual([2.5, 5])
       expect(saved.bindings[saved.preferredSpeedShortcuts[0].id].enabled).toBe(false)
       expect(saved.speed.preferred).toBe(1.5)
     })
     fireEvent.click(screen.getByRole('button', { name: 'Remove preferred speed 2.5×' }))
+    let confirmation = await screen.findByRole('dialog', { name: 'Remove preferred speed 2.5×' })
+    const beforeDelete = await getSettings()
+    expect(beforeDelete.preferredSpeedShortcuts.map(item => item.speed)).toEqual([2.5, 5])
+    expect(within(confirmation).getByRole('button', { name: 'Cancel' })).toHaveFocus()
+    fireEvent.click(within(confirmation).getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(await getSettings()).toEqual(beforeDelete)
+    fireEvent.click(screen.getByRole('button', { name: 'Remove preferred speed 2.5×' }))
+    confirmation = await screen.findByRole('dialog', { name: 'Remove preferred speed 2.5×' })
+    fireEvent.click(within(confirmation).getByRole('button', { name: 'Delete' }))
     await waitFor(async () => {
       const saved = await getSettings()
-      expect(saved.preferredSpeedShortcuts.map(item => item.speed)).toEqual([3.35])
+      expect(saved.preferredSpeedShortcuts.map(item => item.speed)).toEqual([5])
       expect(Object.keys(saved.bindings).filter(action => action.startsWith('preferred-speed:'))).toHaveLength(1)
     })
-    fireEvent.change(screen.getByRole('searchbox'), { target: { value: '3.35' } })
-    expect(screen.getByRole('button', { name: 'Edit Set preferred speed · 3.35×' })).toBeVisible()
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: '5' } })
+    expect(screen.getByRole('button', { name: 'Edit Set preferred speed · 5×' })).toBeVisible()
   })
 
   it('cancels new preferred speeds, blocks key conflicts and rejects stale custom speed edits', async () => {
@@ -170,10 +180,10 @@ describe('OptionsApp', () => {
     expect((await getSettings()).preferredSpeedShortcuts).toHaveLength(1)
     fireEvent.click(screen.getByRole('button', { name: 'Edit Set preferred speed · 2×' }))
     const dialog = await screen.findByRole('dialog', { name: 'Preferred speed' })
-    fireEvent.change(within(dialog).getByLabelText('Preferred speed'), { target: { value: '2.5' } })
+    fireEvent.change(within(dialog).getByLabelText('Speed'), { target: { value: '2.5' } })
     await act(async () => { await saveSettings({ ...settings, preferredSpeedShortcuts: [{ id: 'preferred-speed:custom', speed: 3 }] }) })
     expect(within(dialog).getByRole('button', { name: 'Save' })).toBeDisabled()
-    expect(dialog).toHaveTextContent('Preferred speed changed elsewhere')
+    expect(dialog).toHaveTextContent('Settings changed. Reopen this editor.')
   })
 
   it.each(['Playback', 'Seeking and navigation', 'Subtitle language and size', 'Volume and audio', 'Playback speed', 'Sentence jumps and replay'])(
@@ -323,6 +333,13 @@ describe('OptionsApp', () => {
     fireEvent.click(screen.getByRole('switch', { name: '63% Enabled' }))
     await waitFor(async () => expect((await getSettings()).bindings[shortcut.id].enabled).toBe(false))
     fireEvent.click(screen.getByRole('button', { name: 'Remove 63%' }))
+    const confirmation = await screen.findByRole('dialog', { name: 'Remove 63%' })
+    expect((await getSettings()).bindings[shortcut.id]).toBeDefined()
+    fireEvent.keyDown(within(confirmation).getByRole('button', { name: 'Cancel' }), { key: 'Escape', code: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect((await getSettings()).bindings[shortcut.id]).toBeDefined()
+    fireEvent.click(screen.getByRole('button', { name: 'Remove 63%' }))
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Remove 63%' })).getByRole('button', { name: 'Delete' }))
     await waitFor(async () => expect((await getSettings()).bindings[shortcut.id]).toBeUndefined())
   })
 
@@ -332,7 +349,11 @@ describe('OptionsApp', () => {
     const relative = await screen.findByRole('group', { name: 'Forward / Rewind' })
     fireEvent.click(within(relative).getByRole('button', { name: 'Add seek pair' }))
     let dialog = await screen.findByRole('dialog', { name: 'Record shortcut' })
-    fireEvent.change(within(dialog).getByLabelText('Seconds'), { target: { value: '5' } })
+    const seconds = within(dialog).getByLabelText('Seconds')
+    expect(seconds).toHaveAttribute('max', '300')
+    fireEvent.change(seconds, { target: { value: '301' } })
+    expect(within(dialog).getByRole('button', { name: 'Save' })).toBeDisabled()
+    fireEvent.change(seconds, { target: { value: '300' } })
     fireEvent.keyDown(within(dialog).getByRole('group', { name: 'Rewind' }), { code: 'KeyJ', key: 'j' })
     fireEvent.keyDown(within(dialog).getByRole('group', { name: 'Forward' }), { code: 'KeyJ', key: 'j' })
     expect(within(dialog).getByRole('button', { name: 'Save' })).toBeDisabled()
@@ -342,14 +363,14 @@ describe('OptionsApp', () => {
     await waitFor(async () => expect((await getSettings()).seekShortcuts).toHaveLength(1))
     const shortcut = (await getSettings()).seekShortcuts[0]
     const backward = `${shortcut.id}-backward` as const, forward = `${shortcut.id}-forward` as const
-    let row = within(relative).getByRole('row', { name: 'Forward / Rewind 5 seconds' })
+    let row = within(relative).getByRole('row', { name: 'Forward / Rewind 300 seconds' })
     expect(within(relative).getAllByRole('table')).toHaveLength(1)
     expect(within(row).getAllByRole('switch')).toHaveLength(1)
     fireEvent.click(within(row).getByRole('switch'))
     await waitFor(async () => expect([(await getSettings()).bindings[backward].enabled, (await getSettings()).bindings[forward].enabled]).toEqual([false, false]))
     fireEvent.click(within(row).getByRole('switch'))
     await waitFor(async () => expect([(await getSettings()).bindings[backward].enabled, (await getSettings()).bindings[forward].enabled]).toEqual([true, true]))
-    fireEvent.click(within(row).getByRole('button', { name: 'Edit Forward / Rewind 5 seconds' }))
+    fireEvent.click(within(row).getByRole('button', { name: 'Edit Forward / Rewind 300 seconds' }))
     dialog = await screen.findByRole('dialog')
     fireEvent.change(within(dialog).getByLabelText('Seconds'), { target: { value: '20' } })
     fireEvent.keyDown(within(dialog).getByRole('group', { name: 'Rewind' }), { code: 'KeyL', key: 'l' })
@@ -361,6 +382,10 @@ describe('OptionsApp', () => {
     expect((await getSettings()).bindings[forward].key?.code).toBe('KeyJ')
     row = screen.getByRole('row', { name: 'Forward / Rewind 20 seconds' })
     fireEvent.click(within(row).getByRole('button', { name: 'Remove Forward / Rewind 20 seconds' }))
+    const confirmation = await screen.findByRole('dialog', { name: 'Remove Forward / Rewind 20 seconds' })
+    expect((await getSettings()).bindings[backward]).toBeDefined()
+    expect((await getSettings()).bindings[forward]).toBeDefined()
+    fireEvent.click(within(confirmation).getByRole('button', { name: 'Delete' }))
     await waitFor(async () => expect((await getSettings()).bindings[backward]).toBeUndefined())
     expect((await getSettings()).bindings[forward]).toBeUndefined()
   })
@@ -372,14 +397,15 @@ describe('OptionsApp', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Record shortcut' })
     const label = within(dialog).getByText('Seconds', { selector: 'label' })
     const input = within(dialog).getByLabelText('Seconds')
+    expect(input).toHaveAttribute('max', '300')
     fireEvent.pointerDown(label, { button: 0, clientX: 100, pointerId: 1 })
     fireEvent.pointerMove(label, { clientX: 124, pointerId: 1 })
     expect(input).toHaveValue(13)
     fireEvent.pointerCancel(label, { pointerId: 1 })
     expect(input).toHaveValue(10)
     fireEvent.pointerDown(label, { button: 0, clientX: 100, pointerId: 2 })
-    fireEvent.pointerMove(label, { clientX: 1000, pointerId: 2 })
-    expect(input).toHaveValue(60)
+    fireEvent.pointerMove(label, { clientX: 3000, pointerId: 2 })
+    expect(input).toHaveValue(300)
     fireEvent.pointerMove(label, { clientX: -1000, pointerId: 2 })
     expect(input).toHaveValue(1)
     fireEvent.pointerMove(label, { clientX: 116, pointerId: 2 })
@@ -411,7 +437,7 @@ describe('OptionsApp', () => {
     expect((await getSettings()).seek.seconds).toBe(10)
     fireEvent.click(edit)
     dialog = await screen.findByRole('dialog')
-    fireEvent.change(within(dialog).getByLabelText('Seconds'), { target: { value: '61' } })
+    fireEvent.change(within(dialog).getByLabelText('Seconds'), { target: { value: '301' } })
     expect(within(dialog).getByRole('button', { name: 'Save' })).toBeDisabled()
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
   })
@@ -509,7 +535,7 @@ describe('OptionsApp', () => {
     fireEvent.change(within(dialog).getByLabelText('Seconds'), { target: { value: '20' } })
     await act(async () => { await saveSettings({ ...DEFAULT_SETTINGS, seek: { seconds: 15 } }) })
     expect(within(dialog).getByRole('button', { name: 'Save' })).toBeDisabled()
-    expect(within(dialog).getByRole('alert')).toHaveTextContent('settings changed')
+    expect(within(dialog).getByRole('alert')).toHaveTextContent(/settings changed/i)
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
     expect((await getSettings()).seek.seconds).toBe(15)
   })
@@ -709,14 +735,14 @@ describe('OptionsApp', () => {
     settings.seekShortcuts = [{ id: 'seek:jump', kind: 'percentage', value: 37 }]
     settings.bindings['seek:jump'] = { enabled: true, key: { ...settings.bindings.mute.key, code: 'Digit5', key: '5' } }
     settings.subtitleSizeShortcuts = [{ id: 'subtitle-size:custom', kind: 'fixed', sizes: [150] }]
-    settings.bindings['subtitle-size:custom'] = { enabled: true, key: { ...settings.bindings.mute.key, code: 'KeyZ', key: 'z' } }
+    settings.bindings['subtitle-size:custom'] = { enabled: true, key: { ...settings.bindings.mute.key, code: 'KeyB', key: 'b' } }
     await saveSettings(settings)
     render(<OptionsApp />)
     const search = await screen.findByRole('searchbox')
     fireEvent.change(search, { target: { value: '37%' } })
     expect(screen.getByRole('button', { name: 'Edit 37%' })).toBeVisible()
     expect(screen.queryByRole('button', { name: 'Edit Forward / Rewind 10 seconds' })).not.toBeInTheDocument()
-    fireEvent.change(search, { target: { value: 'KeyZ' } })
+    fireEvent.change(search, { target: { value: 'KeyB' } })
     expect(screen.getByRole('button', { name: /Edit.*150%/ })).toBeVisible()
     expect(screen.queryByRole('button', { name: 'Edit Cycle subtitle size' })).not.toBeInTheDocument()
     settings.bindings['subtitle-size:custom'].key = { ...settings.bindings.mute.key, code: 'KeyY', key: 'y' }
@@ -804,11 +830,11 @@ describe('OptionsApp', () => {
   it.each(['general', 'seek', 'size'] as const)('returns focus to search when editing a %s key removes its result', async kind => {
     const settings = structuredClone(DEFAULT_SETTINGS)
     settings.subtitleSizeShortcuts = [{ id: 'subtitle-size:custom', kind: 'fixed', sizes: [150] }]
-    settings.bindings['subtitle-size:custom'] = { enabled: true, key: { ...settings.bindings.mute.key, code: 'KeyZ', key: 'z' } }
+    settings.bindings['subtitle-size:custom'] = { enabled: true, key: { ...settings.bindings.mute.key, code: 'KeyB', key: 'b' } }
     await saveSettings(settings)
     render(<OptionsApp />)
     const search = await screen.findByRole('searchbox')
-    fireEvent.change(search, { target: { value: kind === 'general' ? 'KeyM' : kind === 'seek' ? 'ArrowLeft' : 'KeyZ' } })
+    fireEvent.change(search, { target: { value: kind === 'general' ? 'KeyM' : kind === 'seek' ? 'ArrowLeft' : 'KeyB' } })
     fireEvent.click(screen.getByRole('button', { name: kind === 'general' ? 'Edit Mute' : kind === 'seek' ? 'Edit Forward / Rewind 10 seconds' : /Edit.*150%/ }))
     const dialog = await screen.findByRole('dialog')
     const field = kind === 'seek' ? within(dialog).getByRole('group', { name: 'Rewind' })
@@ -1765,7 +1791,7 @@ describe('OptionsApp', () => {
     expect(screen.getByLabelText('Highest speed')).toHaveValue(3)
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     const preferred = await openPreferredSpeed()
-    expect(within(preferred).getByLabelText('Preferred speed')).toHaveValue(1.5)
+    expect(within(preferred).getByLabelText('Speed')).toHaveValue(1.5)
     fireEvent.click(within(preferred).getByRole('button', { name: 'Cancel' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     const holdControls = await openHoldControls()
@@ -1857,15 +1883,19 @@ describe('OptionsApp', () => {
     expect(within(dialog).getByRole('button', { name: 'Save' })).not.toBeDisabled()
   })
 
-  it('persists step changes using 0.05 increments', async () => {
+  it.each([0.35, 5])('persists speed adjustment amount %sx', async step => {
     render(<OptionsApp />)
     await selectSpeedSettings()
 
     const stepInput = await screen.findByLabelText('Speed adjustment amount')
-    fireEvent.change(stepInput, { target: { value: '0.35' } })
+    expect(stepInput).toHaveAttribute('max', '5')
+    fireEvent.change(stepInput, { target: { value: String(step) } })
     fireEvent.blur(stepInput)
 
-    await waitFor(() => expect(stepInput).toHaveValue(0.35))
+    await waitFor(async () => {
+      expect(stepInput).toHaveValue(step)
+      expect((await getSettings()).speed.step).toBe(step)
+    })
   })
 
   it('persists numeric changes when dragging an input label', async () => {
@@ -1884,14 +1914,17 @@ describe('OptionsApp', () => {
     })
   })
 
-  it('saves the preferred speed and shortcut together, independently of the step range', async () => {
+  it.each([3.35, 5])('saves preferred speed %sx and its shortcut together, independently of the step range', async speed => {
     render(<OptionsApp />)
     const dialog = await openPreferredSpeed()
-    const input = within(dialog).getByLabelText('Preferred speed')
+    const input = within(dialog).getByLabelText('Speed')
     const keyField = within(dialog).getByRole('group', { name: 'Key' })
     const originalKey = keyField.textContent
     expect(input).toHaveFocus()
-    fireEvent.change(input, { target: { value: '3.35' } })
+    expect(input).toHaveAccessibleDescription('0.25–5 ×')
+    expect(within(dialog).queryByRole('button', { name: 'Speed info' })).not.toBeInTheDocument()
+    expect(input).toHaveAttribute('max', '5')
+    fireEvent.change(input, { target: { value: String(speed) } })
     fireEvent.keyDown(input, { code: 'Digit3', key: '3' })
     expect(keyField.textContent).toBe(originalKey)
     fireEvent.keyDown(keyField, { code: 'KeyQ', key: 'q' })
@@ -1900,23 +1933,23 @@ describe('OptionsApp', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
     await waitFor(async () => {
       const saved = await getSettings()
-      expect(saved.speed).toEqual({ ...DEFAULT_SETTINGS.speed, preferred: 3.35 })
+      expect(saved.speed).toEqual({ ...DEFAULT_SETTINGS.speed, preferred: speed })
       expect(saved.bindings.setPreferredSpeed).toMatchObject({ key: { code: 'KeyQ' }, enabled: true })
     })
-    expect(screen.getByRole('button', { name: 'Edit Set preferred speed' }).closest('tr')).toHaveTextContent('3.35×')
+    expect(screen.getByRole('button', { name: 'Edit Set preferred speed' }).closest('tr')).toHaveTextContent(`${speed}×`)
   })
 
   it('restores and clamps preferred-speed drafts without saving until confirmed', async () => {
     render(<OptionsApp />)
     const dialog = await openPreferredSpeed()
-    const input = within(dialog).getByLabelText('Preferred speed')
+    const input = within(dialog).getByLabelText('Speed')
     fireEvent.change(input, { target: { value: '' } })
     expect(within(dialog).getByRole('button', { name: 'Save' })).toBeDisabled()
     fireEvent.blur(input)
     expect(input).toHaveValue(1.5)
     fireEvent.change(input, { target: { value: '8' } })
     fireEvent.blur(input)
-    expect(input).toHaveValue(4)
+    expect(input).toHaveValue(5)
     fireEvent.change(input, { target: { value: '0.1' } })
     fireEvent.blur(input)
     expect(input).toHaveValue(0.25)
@@ -1928,7 +1961,7 @@ describe('OptionsApp', () => {
   it('restores both preferred-speed drafts and blocks conflicting shortcut assignments', async () => {
     render(<OptionsApp />)
     const dialog = await openPreferredSpeed()
-    const input = within(dialog).getByLabelText('Preferred speed')
+    const input = within(dialog).getByLabelText('Speed')
     const keyField = within(dialog).getByRole('group', { name: 'Key' })
     const originalKey = keyField.textContent
     fireEvent.change(input, { target: { value: '2.5' } })
@@ -1955,7 +1988,7 @@ describe('OptionsApp', () => {
       setPreferredSpeed: { ...DEFAULT_SETTINGS.bindings.setPreferredSpeed, enabled: false } } })
     render(<OptionsApp />)
     const dialog = await openPreferredSpeed()
-    fireEvent.change(within(dialog).getByLabelText('Preferred speed'), { target: { value: '2.5' } })
+    fireEvent.change(within(dialog).getByLabelText('Speed'), { target: { value: '2.5' } })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
     await waitFor(async () => {
       const saved = await getSettings()
@@ -1967,35 +2000,39 @@ describe('OptionsApp', () => {
   it('does not overwrite a preferred speed changed elsewhere while its editor is open', async () => {
     render(<OptionsApp />)
     const dialog = await openPreferredSpeed()
-    fireEvent.change(within(dialog).getByLabelText('Preferred speed'), { target: { value: '2.5' } })
+    fireEvent.change(within(dialog).getByLabelText('Speed'), { target: { value: '2.5' } })
     await act(async () => { await saveSettings({ ...DEFAULT_SETTINGS, speed: { ...DEFAULT_SETTINGS.speed, preferred: 3 } }) })
     expect(within(dialog).getByRole('button', { name: 'Save' })).toBeDisabled()
-    expect(within(dialog).getByRole('alert')).toHaveTextContent('Preferred speed changed elsewhere')
-    expect(within(dialog).getByLabelText('Preferred speed')).toHaveValue(2.5)
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('Settings changed. Reopen this editor.')
+    expect(within(dialog).getByLabelText('Speed')).toHaveValue(2.5)
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     const reopened = await openPreferredSpeed()
-    expect(within(reopened).getByLabelText('Preferred speed')).toHaveValue(3)
+    expect(within(reopened).getByLabelText('Speed')).toHaveValue(3)
     expect(within(reopened).getByRole('button', { name: 'Save' })).toBeEnabled()
   })
 
-  it('saves hold speed from its inline settings editor and restores focus to Edit', async () => {
+  it.each([0.5, 5])('saves hold speed %sx and restores focus to Edit', async speed => {
     render(<OptionsApp />)
     const holdInput = await openHoldSettings()
-    fireEvent.change(holdInput, { target: { value: '0.5' } })
+    expect(holdInput).toHaveAttribute('max', '5')
+    fireEvent.change(holdInput, { target: { value: String(speed) } })
     fireEvent.blur(holdInput)
     expect((await getSettings()).holdSpeed.speed).toBe(2)
     await saveHoldSettings()
-    await waitFor(async () => expect((await getSettings()).holdSpeed.speed).toBe(0.5))
-    expect(screen.getByRole('row', { name: 'Play / Pause hold speed' })).toHaveTextContent('0.5×')
+    await waitFor(async () => expect((await getSettings()).holdSpeed.speed).toBe(speed))
+    expect(screen.getByRole('row', { name: 'Play / Pause hold speed' })).toHaveTextContent(`${speed}×`)
     await waitFor(() => expect(screen.getByRole('button', { name: 'Edit Play / Pause hold speed' })).toHaveFocus())
   })
 
-  it('persists seek interval changes on modal Save', async () => {
+  it.each([61, 300])('persists a %i-second seek interval on modal Save', async seconds => {
     render(<OptionsApp />)
-    await setSeekInterval(15)
-    expect((await getSettings()).seek.seconds).toBe(15)
-    expect(screen.getByRole('row', { name: 'Forward / Rewind 15 seconds' })).toBeVisible()
+    await setSeekInterval(seconds)
+    expect((await getSettings()).seek.seconds).toBe(seconds)
+    expect(screen.getByRole('row', { name: `Forward / Rewind ${seconds} seconds` })).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: `Edit Forward / Rewind ${seconds} seconds` }))
+    const dialog = await screen.findByRole('dialog', { name: 'Record shortcut' })
+    expect(within(dialog).getByLabelText('Seconds')).toHaveValue(seconds)
   })
 
   it('persists language changes from the combobox', async () => {
@@ -2203,12 +2240,16 @@ describe('OptionsApp', () => {
     fireEvent.change(maxInput, { target: { value: '' } })
     expect(maxInput).toHaveValue(null)
 
-    fireEvent.change(maxInput, { target: { value: '4' } })
-    expect(maxInput).toHaveValue(4)
+    expect(maxInput).toHaveAttribute('max', '5')
+    fireEvent.change(maxInput, { target: { value: '5' } })
+    expect(maxInput).toHaveValue(5)
 
     fireEvent.blur(maxInput)
 
-    await waitFor(() => expect(maxInput).toHaveValue(4))
+    await waitFor(async () => {
+      expect(maxInput).toHaveValue(5)
+      expect((await getSettings()).speed.max).toBe(5)
+    })
   })
 
   it('restores the saved speed value when an empty number input loses focus', async () => {
@@ -2223,6 +2264,31 @@ describe('OptionsApp', () => {
     fireEvent.blur(maxInput)
 
     await waitFor(() => expect(maxInput).toHaveValue(3))
+  })
+
+  it.each([
+    { field: 'min', label: 'Lowest speed', saved: 0.25, draft: 0.5 },
+    { field: 'max', label: 'Highest speed', saved: 3, draft: 4 },
+    { field: 'step', label: 'Speed adjustment amount', saved: 0.25, draft: 0.5 },
+  ] as const)('discards $field speed edits with Escape and still saves the next blur', async ({ field, label, saved, draft }) => {
+    render(<OptionsApp />)
+    await selectSpeedSettings()
+    const input = screen.getByRole('spinbutton', { name: label })
+
+    act(() => input.focus())
+    fireEvent.change(input, { target: { value: String(draft) } })
+    fireEvent.keyDown(input, { key: 'Escape', code: 'Escape' })
+
+    expect(input).not.toHaveFocus()
+    await waitFor(async () => {
+      expect(input).toHaveValue(saved)
+      expect((await getSettings()).speed[field]).toBe(saved)
+    })
+
+    act(() => input.focus())
+    fireEvent.change(input, { target: { value: String(draft) } })
+    fireEvent.blur(input)
+    await waitFor(async () => expect((await getSettings()).speed[field]).toBe(draft))
   })
 
   it('resets all shortcut bindings without resetting global or speed settings', async () => {
@@ -2304,6 +2370,31 @@ describe('OptionsApp', () => {
     await confirmReset()
     await waitFor(() => expect(hold).toHaveTextContent('2×'))
     expect(await getSettings()).toEqual({ ...beforeHoldReset, holdSpeed: DEFAULT_SETTINGS.holdSpeed })
+  })
+
+  it.each([
+    ...['MediaTrackNext', 'MediaTrackPrevious', 'MediaPlayPause', 'MediaStop',
+      'AudioVolumeUp', 'AudioVolumeDown', 'AudioVolumeMute', 'BrowserBack', 'BrowserForward'].map(key => [key, key]),
+    ['MediaNextTrack', 'MediaTrackNext'], ['MediaPreviousTrack', 'MediaTrackPrevious'],
+    ['VolumeUp', 'AudioVolumeUp'], ['VolumeDown', 'AudioVolumeDown'], ['VolumeMute', 'AudioVolumeMute'],
+  ])('records and persists %s when the browser supplies no physical code', async (key, code) => {
+    render(<OptionsApp />)
+    await selectShortcutCategory('Seeking and navigation')
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Next episode' }))
+    const dialog = screen.getByRole('dialog', { name: 'Record shortcut' })
+    const recordingArea = within(dialog).getByRole('group', { name: 'Record shortcut' })
+    const pressed = createEvent.keyDown(recordingArea, { code: '', key })
+    fireEvent(recordingArea, pressed)
+    expect(pressed.defaultPrevented).toBe(true)
+    expect(within(dialog).getByText('No conflict detected.')).toBeVisible()
+    expect(within(dialog).getByRole('button', { name: 'Save' })).toBeEnabled()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect((await getSettings()).bindings.nextEpisode.key).toEqual({
+      code, key, ctrl: false, alt: false, shift: false, meta: false,
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Next episode' }))
+    expect(within(screen.getByRole('dialog')).getByRole('button', { name: 'Save' })).toBeEnabled()
   })
 
   it('keeps focus in the recording area while capturing a shortcut', async () => {

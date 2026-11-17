@@ -21,7 +21,31 @@ The same tests exercise legacy whole-object writes after a current-client save. 
 
 Schema v28 adds `audioFavorites` with an empty default. Each entry stores a canonical language and an explicit `audioDescription` boolean. Current backups require a normalized, duplicate-free array; v27 and earlier backups migrate to an empty list. A saved current snapshot retains the favorites when a v27 client omits the field. An explicit reset or imported legacy backup clears them.
 
-Schema v29 adds `preferredSpeedShortcuts`, an empty list by default. Each entry has a stable `preferred-speed:` ID, a speed from 0.25× to 4× in 0.05 increments, and an independent binding. The original `speed.preferred` and `setPreferredSpeed` binding remain intact. Current backups require the list and each entry's binding. Older-client saves retain omitted entries through the compatibility snapshot; resetting shortcuts removes the additional groups.
+Schema v29 adds `preferredSpeedShortcuts`, an empty list by default. Each entry has a stable `preferred-speed:` ID, a speed from 0.25× to 5× in 0.05 increments, and an independent binding. The original `speed.preferred` and `setPreferredSpeed` binding remain intact. Current backups require the list and each entry's binding. Older-client saves retain omitted entries through the compatibility snapshot; resetting shortcuts removes the additional groups.
+
+## Current numeric ranges
+
+| Setting | Current range | Default |
+| --- | --- | --- |
+| Built-in forward/rewind | 1–300 whole seconds | 10 seconds |
+| Additional forward/rewind pairs | 1–300 whole seconds | No entries |
+| Highest speed | 1–5x | 3x |
+| Built-in preferred speed | 0.25–5x, in 0.05x increments | 1.5x |
+| Additional preferred speeds | 0.25–5x, in 0.05x increments | No entries |
+| Speed adjustment amount | 0.05–5x, in 0.05x increments | 0.25x |
+| Play / Pause hold speed | 0.25–5x, in 0.05x increments | 2x |
+
+Schema v32 unifies relative seek limits. Previously valid v31 and earlier custom intervals above 300 seconds migrate to 300 on load or backup import, retaining IDs, order, bindings and enabled states. Signed v22 shortcuts are paired before their interval is capped. Current v32 backups reject out-of-range custom intervals. Percentage shortcuts retain the 0–100% range.
+
+Valid 5x maximum/preferred speeds and 300-second seek intervals survive storage and backup export/import. Older extension builds may clamp these expanded speed values or reject their backups; restore with a build that supports these ranges. The application version remains separate from the settings schema version.
+
+Run the numeric-boundary and migration regressions with:
+
+```sh
+npm test -- src/shared/seek-shortcuts.test.ts src/shared/shortcut-settings.test.ts src/shared/settings-backup.test.ts src/shared/preferred-speed-shortcuts.test.ts src/shared/settings-compatibility.test.ts src/shared/settings-upgrade.test.ts src/options/options-app.test.tsx
+```
+
+The real-browser checks are listed in [Chrome expanded-range acceptance](chrome-real-browser-test.md#expanded-seeking-and-speed-ranges) and apply to Firefox without PiP. Those checklists are not records of completed acceptance.
 
 ## Check an installed extension update
 

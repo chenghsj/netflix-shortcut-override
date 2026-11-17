@@ -8,6 +8,7 @@ import {
   type ShortcutSettings,
 } from './shortcut-types'
 import { getSeekShortcutActions } from './seek-shortcuts'
+import { getShortcutKeyCode } from './special-shortcut-keys'
 
 export const DEFAULT_KEY_BINDINGS: Record<BuiltinShortcutAction, KeyBinding> = {
   playPause: { code: 'Space', key: ' ', ctrl: false, alt: false, shift: false, meta: false },
@@ -19,11 +20,11 @@ export const DEFAULT_KEY_BINDINGS: Record<BuiltinShortcutAction, KeyBinding> = {
   volumeDown: { code: 'ArrowDown', key: 'ArrowDown', ctrl: false, alt: false, shift: false, meta: false },
   mute: { code: 'KeyM', key: 'm', ctrl: false, alt: false, shift: false, meta: false },
   toggleSubtitles: { code: 'KeyC', key: 'c', ctrl: false, alt: false, shift: false, meta: false },
-  cycleSubtitleTrack: { code: 'KeyC', key: 'C', ctrl: false, alt: false, shift: true, meta: false },
-  previousSubtitleTrack: { code: 'KeyX', key: 'X', ctrl: false, alt: false, shift: true, meta: false },
+  cycleSubtitleTrack: { code: 'KeyX', key: 'X', ctrl: false, alt: false, shift: true, meta: false },
+  previousSubtitleTrack: { code: 'KeyZ', key: 'Z', ctrl: false, alt: false, shift: true, meta: false },
   previousAudioTrack: { code: 'KeyA', key: 'A', ctrl: false, alt: false, shift: true, meta: false },
   nextAudioTrack: { code: 'KeyD', key: 'D', ctrl: false, alt: false, shift: true, meta: false },
-  cycleSubtitleSize: { code: 'KeyV', key: 'V', ctrl: false, alt: false, shift: true, meta: false },
+  cycleSubtitleSize: { code: 'KeyC', key: 'C', ctrl: false, alt: false, shift: true, meta: false },
   fullscreen: { code: 'KeyF', key: 'f', ctrl: false, alt: false, shift: false, meta: false },
   pictureInPicture: {
     code: 'KeyP',
@@ -98,7 +99,7 @@ export const isShortcutKey = (value: unknown): value is KeyBinding | null =>
   value === null || isKeyBinding(value)
 
 export const keyBindingFromEvent = (event: KeyEventLike): KeyBinding => ({
-  code: event.code,
+  code: getShortcutKeyCode(event),
   key: event.key,
   ctrl: event.ctrlKey,
   alt: event.altKey,
@@ -106,12 +107,18 @@ export const keyBindingFromEvent = (event: KeyEventLike): KeyBinding => ({
   meta: event.metaKey,
 })
 
-export const keyBindingsEqual = (a: KeyBinding | null | undefined, b: KeyBinding | null | undefined): boolean =>
-  !a || !b ? a === b : a.code === b.code &&
-  a.ctrl === b.ctrl &&
-  a.alt === b.alt &&
-  a.shift === b.shift &&
-  a.meta === b.meta
+export const keyBindingsEqual = (a: KeyBinding | null | undefined, b: KeyBinding | null | undefined): boolean => {
+  if (!a || !b) return a === b
+  if (a.ctrl !== b.ctrl || a.alt !== b.alt || a.shift !== b.shift || a.meta !== b.meta) return false
+
+  const aCode = getShortcutKeyCode(a)
+  const bCode = getShortcutKeyCode(b)
+  if (aCode || bCode) return aCode === bCode
+
+  // Legacy saved unknown keys must remain editable and round-trip in backups.
+  // Unknown events normalize to an empty code, so they cannot use this fallback.
+  return Boolean(a.code) && a.code === b.code && a.key === b.key
+}
 
 export const findActionForKey = (
   settings: ShortcutSettings,

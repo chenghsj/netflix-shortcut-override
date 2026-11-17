@@ -16,6 +16,22 @@ const overlappingSettings = () => {
 }
 
 describe('shortcut routing', () => {
+  it.each(['LaunchMediaPlayer', 'Unidentified', 'Dead', 'a'])('does not route unknown %s events to legacy unidentified bindings', key => {
+    const settings = structuredClone(DEFAULT_SETTINGS)
+    settings.subtitleNavigation.enabled = true
+    const saved = { code: 'Unidentified', key, ctrl: false, alt: false, shift: false, meta: false }
+    settings.bindings.mute.key = saved
+    settings.subtitleNavigation.bindings.next.key = saved
+    const subtitlesOnly = structuredClone(settings)
+    subtitlesOnly.bindings.mute.enabled = false
+
+    for (const code of ['', 'Unidentified']) {
+      const event = eventFor({ ...saved, code })
+      expect(resolvePlaybackShortcut(settings, event, true)).toBeNull()
+      expect(resolvePlaybackShortcut(subtitlesOnly, event, true)).toBeNull()
+    }
+  })
+
   it('keeps a supported custom shortcut ahead of subtitles even when unsupported PiP shares its key', () => {
     const settings = overlappingSettings()
     const key = settings.bindings.pictureInPicture.key

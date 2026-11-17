@@ -94,7 +94,7 @@ export function CompatibilityDiagnosticsDialog({
       <DialogContent className="w-[20rem] p-0">
         <DialogHeader className="sr-only">
           <DialogTitle>{copy.diagnosticsTitle}</DialogTitle>
-          <DialogDescription>{copy.diagnosticsChecking}</DialogDescription>
+          <DialogDescription>{copy.diagnosticsDescription}</DialogDescription>
         </DialogHeader>
         <CompatibilityDiagnosticsCard
           className="border-0 bg-transparent shadow-none [&>div:first-child]:pr-7"

@@ -158,7 +158,7 @@ Run these against the real Netflix watch page:
 
 ### Subtitle-track queue and settings checks
 
-- Press `Shift+C` or `Shift+X` rapidly while a subtitle switch is pending. Valid consecutive presses must execute in order. Before the pending switch finishes, separately test global disable, disabling the originating row, changing watch IDs, replacing the video, and closing the originating PiP window. Queued commands must not dispatch afterward or show a cancelled-command hint. Disabling and immediately re-enabling the global switch must not revive the old queue. Preserve the already-issued PiP command's confirmed fallback update. If the request completes too quickly to establish a queue, record that cancellation case as unverified.
+- Press `Shift+X` or `Shift+Z` rapidly while a subtitle switch is pending. Valid consecutive presses must execute in order. Before the pending switch finishes, separately test global disable, disabling the originating row, changing watch IDs, replacing the video, and closing the originating PiP window. Queued commands must not dispatch afterward or show a cancelled-command hint. Disabling and immediately re-enabling the global switch must not revive the old queue. Preserve the already-issued PiP command's confirmed fallback update. If the request completes too quickly to establish a queue, record that cancellation case as unverified.
 - In Options → Subtitles, confirm the Sentence jumps and replay heading has no information button or tooltip. Turn the global switch off and confirm inline prerequisite guidance remains visible and saved settings are retained. Restore the original settings.
 - Edit a percentage jump at 50% and drag its numeric label eight pixels to the right: it should preview 55%, without saving. Seconds editors advance by 1 over the same distance. Pointer cancellation restores the starting draft; dialog Cancel leaves persisted values unchanged. Direct percentage entry still accepts 51%.
 
@@ -359,3 +359,16 @@ Google Chrome 157.0.8103.52 in the user's real Chrome profile, local extension 0
 This controlled delay establishes the queue lifecycle on real Netflix; it does not measure how often ordinary Chrome timing produces a queue. No Firefox or PiP acceptance result is implied.
 
 Cleanup rebuilt and verified the ordinary Chromium and Firefox production outputs, with no temporary probe remaining in the bundles. The real Netflix tab was reloaded on episode 11, normal next/previous subtitle shortcuts were checked, and Netflix's native menu showed Traditional Chinese selected. The global extension switch was restored on; the original watch position was restored to 272.192 seconds (about 4:32), paused, muted and at 1× speed. Application source hashes were unchanged by the acceptance harness.
+
+## Expanded seeking and speed ranges
+
+These are acceptance instructions for the current source, not completed real-browser results. Record the browser/build and each outcome, then restore the original settings and playback position.
+
+1. In **Seeking and navigation**, open the built-in Forward / Rewind editor. Verify a 1–300 second range, reject 301 with Save disabled, save 300, reopen, and confirm 300 is retained. Repeat with **Add seek pair** and distinct unoccupied forward/rewind keys. Check both keyboard directions on a title with enough duration and playback position to move 300 seconds without hitting an endpoint. Repeat in PiP on Chrome/Edge.
+2. Drag a seconds label beyond either boundary and confirm it clamps to 1 or 300. Cancel a drag and then cancel the dialog to confirm saved settings are retained. Percentage editors still use 0–100%.
+3. Under **Playback speed → Range and step**, set Highest speed to 5 and save by blurring the field. Increase from near 5x, confirm it reaches 5x and cannot exceed that configured maximum, then decrease again.
+4. Set the built-in preferred speed to 5 and save. Add a separate preferred-speed shortcut at 5 with an unoccupied key. Reopen both editors, activate each shortcut on Netflix, and verify the playback rate and popup reference. Values above 5 normalize to 5; the default highest and preferred speeds remain 3x and 1.5x until edited.
+5. Export settings and import into a disposable current-build profile. Confirm the built-in interval, custom pair values and keys, highest speed, and both preferred-speed entries retain their saved values. Existing 300-second intervals and 5x preferences must survive the round trip.
+6. Upgrade a disposable installation with a valid older backup containing a custom interval above 300. Confirm it becomes 300 while retaining its ID, keys and enabled states. Verify a current-format backup containing a custom interval above 300 is rejected without replacing current settings. See [numeric migration details](settings-upgrade.md#current-numeric-ranges).
+
+The automated boundary, editor and backup regressions do not establish actual Netflix behavior at 5x; record live playback separately.

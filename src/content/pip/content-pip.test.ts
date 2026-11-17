@@ -48,7 +48,7 @@ describe('content PiP shortcuts', () => {
       await vi.waitFor(() => expect(pipWindow.document.querySelector('[data-pip-control="subtitles-button"]')).not.toBeNull())
       for (const size of [200, 150, 'medium', 200] as const) {
         pipWindow.document.body.dispatchEvent(new KeyboardEvent('keydown', {
-          code: 'KeyV', key: 'V', shiftKey: true, bubbles: true, cancelable: true,
+          code: 'KeyC', key: 'C', shiftKey: true, bubbles: true, cancelable: true,
         }))
         await vi.waitFor(async () => expect((await getSettings()).pip.subtitleSize).toBe(size))
         expect((await getSettings()).subtitleSize).toBe(175)
@@ -67,7 +67,7 @@ describe('content PiP shortcuts', () => {
       await vi.waitFor(() => expect(pipWindow.document.querySelector('[data-pip-control="subtitles-button"]')).not.toBeNull())
       for (const size of ['large', 'small', 'medium'] as const) {
         pipWindow.document.body.dispatchEvent(new KeyboardEvent('keydown', {
-          code: 'KeyV', key: 'V', shiftKey: true, bubbles: true, cancelable: true,
+          code: 'KeyC', key: 'C', shiftKey: true, bubbles: true, cancelable: true,
         }))
         await vi.waitFor(async () => expect((await getSettings()).pip.subtitleSize).toBe(size))
         expect((await getSettings()).subtitleSize).toBe('small')

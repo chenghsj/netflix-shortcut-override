@@ -1,12 +1,12 @@
 import { DEFAULT_SUBTITLE_SIZE_CYCLE, isSubtitleSize, isSubtitleSizeList, isSubtitleSizeShortcut } from './subtitle-size-shortcuts'
-import { isPreferredSpeedShortcut } from './preferred-speed-shortcuts'
+import { isPreferredSpeedShortcut, PREFERRED_SPEED_LIMITS } from './preferred-speed-shortcuts'
 import { getFeatureGroupActions, MANAGED_FEATURE_GROUPS, MANAGED_FAVORITES_FEATURES, type ManagedFeatureGroup, type ManagedFavoritesFeature } from './feature-management'
 import { DEFAULT_UI_STYLE, isUiStyle } from './ui-styles'
 import { DEFAULT_SUBTITLE_NAVIGATION_BINDINGS } from './subtitle-navigation'
 import { normalizeSubtitleFavorites, sameSubtitleFavorite } from './subtitle-favorites'
 import { normalizeAudioFavorites, sameAudioFavorite } from './audio-favorites'
 import { DEFAULT_KEY_BINDINGS, isKeyBinding, isShortcutKey, keyBindingsEqual } from './shortcut-bindings'
-import { isSeekShortcut, isLegacySeekShortcut, getSeekShortcutActions, getSeekPairAction } from './seek-shortcuts'
+import { isSeekShortcut, isLegacySeekShortcut, getSeekShortcutActions, getSeekPairAction, SEEK_SHORTCUT_LIMITS } from './seek-shortcuts'
 import {
   SUBTITLE_NAVIGATION_ACTIONS,
   LOCALES,
@@ -31,17 +31,17 @@ import {
 
 export const SPEED_LIMITS = {
   min: { min: 0.25, max: 1 },
-  max: { min: 1, max: 4 },
-  step: { min: 0.05, max: 4, inputStep: 0.05 },
-  preferred: { min: 0.25, max: 4, inputStep: 0.05 },
+  max: { min: 1, max: 5 },
+  step: { min: 0.05, max: 5, inputStep: 0.05 },
+  preferred: PREFERRED_SPEED_LIMITS,
 } as const
 
 export const HOLD_SPEED_LIMITS = {
-  speed: { min: 0.25, max: 4, inputStep: 0.05 },
+  speed: { min: 0.25, max: 5, inputStep: 0.05 },
 } as const
 
 export const SEEK_LIMITS = {
-  seconds: { min: 1, max: 60, inputStep: 1 },
+  seconds: { min: 1, max: SEEK_SHORTCUT_LIMITS.seconds, inputStep: 1 },
 } as const
 
 export const DEFAULT_SPEED_SETTINGS: SpeedSettings = {
@@ -67,7 +67,7 @@ export const DEFAULT_PIP_SETTINGS: PipSettings = {
   subtitleBackground: 'translucent',
 }
 
-export const SHORTCUT_SETTINGS_VERSION = 31
+export const SHORTCUT_SETTINGS_VERSION = 32
 export const MIN_SETTINGS_BACKUP_VERSION = 8
 
 const SHORTCUT_BINDING_MIGRATIONS: Partial<Record<ShortcutAction, {
@@ -120,6 +120,7 @@ const SETTINGS_ACTIONS_BY_VERSION: Record<number, readonly ShortcutAction[]> = {
   29: SHORTCUT_ACTIONS,
   30: SHORTCUT_ACTIONS,
   31: SHORTCUT_ACTIONS,
+  32: SHORTCUT_ACTIONS,
 }
 
 const LEGACY_PICTURE_IN_PICTURE_BINDING = {
@@ -184,6 +185,10 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const isKeyForVersion = (key: unknown, version: number): key is KeyBinding | null =>
   version >= 27 ? isShortcutKey(key) : isKeyBinding(key)
 
+const isSeekShortcutForVersion = (shortcut: unknown, version: number) =>
+  version >= 32 ? isSeekShortcut(shortcut)
+    : isLegacySeekShortcut(shortcut) && (version < 23 || shortcut.kind !== 'relative' || shortcut.value > 0)
+
 const hasFiniteNumber = (record: Record<string, unknown>, key: string): boolean =>
   typeof record[key] === 'number' && Number.isFinite(record[key])
 
@@ -219,7 +224,7 @@ const isCompleteSettingsForBackup = (
     (version >= 21 && typeof settings.autoNextEpisode !== 'boolean') ||
     (version >= 31 && typeof settings.hidePauseOverlay !== 'boolean') ||
     (version >= 22 && (!Array.isArray(settings.seekShortcuts) ||
-      !settings.seekShortcuts.every(version >= 23 ? isSeekShortcut : isLegacySeekShortcut) ||
+      !settings.seekShortcuts.every(shortcut => isSeekShortcutForVersion(shortcut, version)) ||
       new Set(settings.seekShortcuts.map(shortcut => shortcut.id)).size !== settings.seekShortcuts.length ||
       (version >= 23 && new Set(settings.seekShortcuts.flatMap(getSeekShortcutActions)).size !== settings.seekShortcuts.flatMap(getSeekShortcutActions).length) ||
       !settings.seekShortcuts.flatMap(shortcut => version >= 23 ? getSeekShortcutActions(shortcut) : [shortcut.id]).every(action => {
@@ -417,13 +422,13 @@ export const normalizeSettings = (raw: unknown): ShortcutSettings => {
   const candidates = Array.isArray(source.seekShortcuts) ? source.seekShortcuts : []
   const seekShortcuts: ShortcutSettings['seekShortcuts'] = []
   for (const shortcut of candidates) {
-    if (!(sourceVersion >= 23 ? isSeekShortcut(shortcut) : isLegacySeekShortcut(shortcut)) || seen.has(shortcut.id)) continue
+    if (!isSeekShortcutForVersion(shortcut, sourceVersion) || seen.has(shortcut.id)) continue
     if (sourceVersion < 23 && shortcut.kind === 'relative') {
       const saved = rawBindings[shortcut.id]
       if (!isKeyBinding(saved?.key)) continue
       const opposite = candidates.find(candidate => isLegacySeekShortcut(candidate) && candidate.kind === 'relative' &&
         candidate.value === -shortcut.value && !seen.has(candidate.id) && isKeyBinding(rawBindings[candidate.id]?.key))
-      const group = { ...shortcut, value: Math.abs(shortcut.value) }
+      const group = { ...shortcut, value: Math.min(Math.abs(shortcut.value), SEEK_SHORTCUT_LIMITS.seconds) }
       for (const direction of ['backward', 'forward'] as const) {
         const original = (direction === 'backward') === (shortcut.value < 0) ? saved : opposite ? rawBindings[opposite.id] : undefined
         bindings[getSeekPairAction(group, direction)] = { enabled: original?.enabled === true, key: original?.key ?? saved.key }
@@ -442,7 +447,8 @@ export const normalizeSettings = (raw: unknown): ShortcutSettings => {
       bindings[action] = { enabled: binding.enabled === true, key: binding.key! }
       reservedActions.add(action)
     }
-    seekShortcuts.push({ id: shortcut.id, kind: shortcut.kind, value: shortcut.value })
+    seekShortcuts.push({ id: shortcut.id, kind: shortcut.kind,
+      value: shortcut.kind === 'relative' ? Math.min(shortcut.value, SEEK_SHORTCUT_LIMITS.seconds) : shortcut.value })
   }
 
   const subtitleSizeShortcuts: ShortcutSettings['subtitleSizeShortcuts'] = []

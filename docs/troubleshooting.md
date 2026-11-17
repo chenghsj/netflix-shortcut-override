@@ -58,6 +58,12 @@ Check the browser console for shortcut bridge errors and run:
 npm test
 ```
 
+### Seeking or speed settings stop at an older limit
+
+The current build accepts 1–300 seconds for every built-in or custom forward/rewind pair, 1–5x for Highest speed, and 0.25–5x for preferred speeds. In Options, use **Seeking and navigation** to edit intervals and **Playback speed** to edit speed preferences. The highest-speed field saves on blur or Enter; preferred-speed and seek dialogs require **Save**.
+
+If you still see a 60-second or 4x limit in these fields, reload the updated extension and refresh Netflix. For an unpacked build, rebuild first and confirm the browser loaded the current output directory. Existing settings keep their saved values; set Highest speed to 5x to reach 5x with the speed-up key. Speed-step and hold-speed fields also allow up to 5x.
+
 ### Shortcut does not trigger
 
 Check the options page:

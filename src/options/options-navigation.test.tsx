@@ -113,9 +113,12 @@ describe('Options numbered navigation', () => {
     vi.spyOn(navigator, 'platform', 'get').mockReturnValue(platform)
     render(<OptionsApp />)
     await screen.findByRole('searchbox')
-    const buttons = within(screen.getByRole('navigation', { name: 'Settings navigation' })).getAllByRole('button')
+    const buttons = [
+      ...within(screen.getByRole('navigation', { name: 'Settings navigation' })).getAllByRole('button'),
+      screen.getByRole('button', { name: 'User guide' }),
+    ]
     const hints = buttons.map(button => button.querySelector('kbd')!)
-    expect(hints).toHaveLength(8)
+    expect(hints).toHaveLength(9)
     buttons.forEach((button, index) => expect(button).toHaveAttribute('aria-keyshortcuts', `${ariaModifier}+${index + 1}`))
     hints.forEach(hint => expect(hint).toBeEmptyDOMElement())
 
@@ -139,7 +142,7 @@ describe('Options numbered navigation', () => {
     const pages = [
       ['playback', 'Playback'], ['seeking', 'Seeking and navigation'], ['subtitles', 'Subtitles'],
       ['volume', 'Volume and audio'], ['speed', 'Playback speed'], ['general', 'General settings'],
-      ['automation', 'Playback automation'], ['backup', 'Backup and restore'],
+      ['automation', 'Playback automation'], ['backup', 'Backup and restore'], ['help', 'User guide'],
     ] as const
     pages.forEach(([page, label], index) => {
       fireEvent.change(search, { target: { value: 'subtitle' } })
@@ -177,7 +180,7 @@ describe('Options numbered navigation', () => {
     for (const modifiers of [{}, { ctrlKey: true }, { metaKey: true, ctrlKey: true }, { metaKey: true, altKey: true }, { metaKey: true, shiftKey: true }, { metaKey: true, isComposing: true }]) {
       expect(fireEvent.keyDown(window, { key: '2', code: 'Digit2', ...modifiers })).toBe(true)
     }
-    expect(fireEvent.keyDown(window, { key: '9', code: 'Digit9', metaKey: true })).toBe(true)
+    expect(fireEvent.keyDown(window, { key: '0', code: 'Digit0', metaKey: true })).toBe(true)
     fireEvent.keyDown(window, { key: '2', code: 'Digit2', metaKey: true, repeat: true })
     expect(screen.getByRole('button', { name: 'Playback' })).toHaveAttribute('aria-current', 'page')
     expect(window.location.hash).toBe('')
@@ -189,8 +192,8 @@ describe('Options numbered navigation', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Play / Pause' }))
     const dialog = await screen.findByRole('dialog', { name: 'Record shortcut' })
     const recorder = within(dialog).getByRole('group', { name: 'Record shortcut' })
-    fireEvent.keyDown(recorder, { key: '2', code: 'Digit2', metaKey: true })
-    expect(recorder).toHaveTextContent('⌘2')
+    fireEvent.keyDown(recorder, { key: '9', code: 'Digit9', metaKey: true })
+    expect(recorder).toHaveTextContent('⌘9')
     expect(dialog).toBeVisible()
     expect(window.location.hash).toBe('')
   })

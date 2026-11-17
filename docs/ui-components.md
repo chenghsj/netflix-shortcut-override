@@ -12,6 +12,8 @@ The palette, radius, and shadow tokens are application theme settings in `src/st
 
 Options shortcut subtables start expanded and sit flush inside their parent table or group. Their collapsible headings and rows share the outer frame, without a separate card border, radius, background, or margin. Favorite subtitles and Favorite audio tracks follow the same layout and also start expanded.
 
+`DeleteButton` confirms removal of custom seek, preferred-speed and subtitle-size shortcuts, and size entries inside the subtitle-size editor. It uses a non-modal popover matching `ResetButton`, with initial focus on Cancel and a destructive Delete action. Cancel, Escape and outside interaction dismiss it without removing anything. Confirmation copy follows the interface language.
+
 Favorite subtitles and Favorite audio tracks share `LanguageFavoritesCard` for multi-language selection, reordering and removal. The audio picker lists standard and Audio Description variants together as separate choices; description rows include an Audio Description label, while standard rows show only the language. The two favorites lists and subtitle-size rows share `useDragPreview` and `useDragReorder`. Drag previews inherit the surrounding background without a custom opacity. While dragging, neighboring rows slide into their preview positions for 200 ms and leave a gap for the dragged row. Hit testing uses the original row slots so moving rows cannot cause repeated swaps. Drop commits the order; cancellation restores it. Keyboard reordering uses `useReorderAnimation`. Both animation paths respect reduced motion.
 
 ## Interface styles
@@ -97,3 +99,9 @@ Interactive group headings highlight their full row on hover and keyboard focus 
 Page feature management includes the Favorite subtitles and Favorite audio tracks rows. Their visibility controls use the existing staged Apply/Cancel flow and preserve list contents, order, and Audio Description selections. Playback commands use active favorites only; a hidden favorites feature passes no filtering preferences to the playback session.
 
 Preferred speed is the last group in the playback-speed shortcut table, after Reset speed. Its add control uses a short localized Add label while preserving the descriptive accessible name. The checklist and popup use the same action order.
+
+The Traditional Chinese undo-edit action is labeled **還原**. Its tooltip explains that it restores the editor’s starting values and requires Save to apply.
+
+Preferred-speed editors use the seek editor's horizontal field layout: the draggable **Speed / 倍速** label with the visible `0.25–5 ×` range beneath it on the left, and a compact numeric input plus `×` unit on the right. The range describes the input for assistive technology. The field has no help-icon tooltip; autofocus, numeric stepping, label dragging and Save/Cancel behavior are retained for built-in and added preferred speeds.
+
+Modal descriptions use short, complete instructions in all five interface languages. Preferred speed says **設定倍速，快捷鍵可留空。**; seeking says **設定跳轉值，快捷鍵可留空。**; subtitle-size editors describe the size/order and optional key. Hold speed identifies the Play / Pause hold action. Import explicitly warns that all current settings will be replaced. Compatibility's screen-reader description identifies the results rather than announcing a permanent loading state. Range, validation and conflict messages stay next to their controls.

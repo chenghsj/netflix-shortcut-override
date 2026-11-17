@@ -1,6 +1,7 @@
 import { ResetButton } from '@/components/reset-button'
+import { DeleteButton } from '@/components/delete-button'
 import { RESET_SCOPE_COPY } from '@/shared/reset-scopes'
-import { PencilIcon, Trash2Icon } from 'lucide-react'
+import { PencilIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { KeyBindingKbd } from '@/components/key-binding-kbd'
 import { Button } from '@/components/app-ui/button'
@@ -36,11 +37,11 @@ export function SubtitleSizeShortcutRows({ settings, locale, editor, updateSetti
         <TableCell><div className="flex items-center justify-end gap-2">
           <Button variant="ghost" size="icon" className="text-muted-foreground focus-visible:text-foreground" aria-label={`${copy.edit} ${label}`} onClick={event => editor.open(shortcut.id, event.currentTarget)}><PencilIcon /></Button>
           {builtin ? <ResetButton locale={locale} variant="ghost" iconOnly className="text-muted-foreground focus-visible:text-foreground" label={RESET_SCOPE_COPY[locale].subtitleSizeCycleLabel} description={RESET_SCOPE_COPY[locale].subtitleSizeCycle} onClick={() => updateSettings(current => ({ ...current, subtitleSizeCycle: [...DEFAULT_SUBTITLE_SIZE_CYCLE] }))} />
-            : <Button variant="ghost" size="icon" className="text-muted-foreground focus-visible:text-foreground" aria-label={sizeCopy.remove.replace('{action}', label)} onClick={() => updateSettings(current => {
+            : <DeleteButton locale={locale} className="text-muted-foreground focus-visible:text-foreground" label={sizeCopy.remove.replace('{action}', label)} onClick={() => updateSettings(current => {
               const bindings = { ...current.bindings }
               delete bindings[shortcut.id as SubtitleSizeShortcutAction]
               return { ...current, bindings, subtitleSizeShortcuts: current.subtitleSizeShortcuts.filter(item => item.id !== shortcut.id) }
-            })}><Trash2Icon /></Button>}
+            })} />}
         </div></TableCell>
       </TableRow>
     })}

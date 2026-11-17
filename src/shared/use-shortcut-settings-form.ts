@@ -48,6 +48,7 @@ export const useShortcutSettingsForm = () => {
   const [speedDraft, setSpeedDraft] = useState<SpeedDraft>(() =>
     speedDraftFromSettings(DEFAULT_SETTINGS.speed)
   )
+  const discardingSpeedFieldRef = useRef<SpeedField | null>(null)
   const [loaded, setLoaded] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const latestSettingsRef = useRef<ShortcutSettings>(DEFAULT_SETTINGS)
@@ -142,6 +143,7 @@ export const useShortcutSettingsForm = () => {
   }
 
   const commitSpeedField = (field: SpeedField) => {
+    if (discardingSpeedFieldRef.current === field) return
     const draftValue = speedDraft[field].trim()
     const parsed = Number.parseFloat(draftValue)
 
@@ -176,8 +178,14 @@ export const useShortcutSettingsForm = () => {
     if (event.key === 'Escape') {
       const field = event.currentTarget.dataset.speedField as SpeedField | undefined
       if (!field) return
-      setSpeedDraftField(field, formatSpeedValue(settings.speed[field]))
-      event.currentTarget.blur()
+      setSpeedDraftField(field, formatSpeedValue(latestSettingsRef.current.speed[field]))
+      // React batches the reset, while blur synchronously sees the previous draft.
+      discardingSpeedFieldRef.current = field
+      try {
+        event.currentTarget.blur()
+      } finally {
+        discardingSpeedFieldRef.current = null
+      }
     }
   }
 

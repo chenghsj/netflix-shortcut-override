@@ -7,6 +7,9 @@ describe('playback speed', () => {
     expect(resolveNextPlaybackRate(1, 1, { min: 0.25, max: 1.1, step: 0.05 })).toBe(1.05)
     expect(resolveNextPlaybackRate(1.09, 1, { min: 0.25, max: 1.1, step: 0.05 })).toBe(1.1)
     expect(resolveNextPlaybackRate(1, -1, { min: 0.25, max: 3, step: 1.5 })).toBe(0.25)
+    expect(resolveNextPlaybackRate(4.9, 1, { min: 0.25, max: 5, step: 0.25 })).toBe(5)
+    expect(resolveNextPlaybackRate(5, 1, { min: 0.25, max: 5, step: 0.25 })).toBe(5)
+    expect(resolveNextPlaybackRate(5, -1, { min: 0.25, max: 5, step: 0.25 })).toBe(4.75)
   })
 
   it('does not skip across 1x when the speed step is large', () => {

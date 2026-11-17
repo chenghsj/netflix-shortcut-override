@@ -46,6 +46,7 @@ describe('custom seeking', () => {
     { id: 'seek:progress', kind: 'percentage', value: 1.5 },
     { id: 'seek:progress', kind: 'relative', value: 0 },
     { id: 'seek:progress', kind: 'relative', value: -15 },
+    { id: 'seek:progress', kind: 'relative', value: 301 },
     { id: 'seek:progress', kind: 'relative', value: 3601 },
     { id: 'seek:progress', kind: 'unknown', value: 50 },
     { id: 'playPause', kind: 'percentage', value: 50 },
@@ -65,6 +66,18 @@ describe('custom seeking', () => {
     }
   })
 
+  it.each([301, 3600])('migrates a legacy %i-second pair to 300 seconds without losing its bindings', seconds => {
+    const legacy = customSettings()
+    legacy.version = 31
+    legacy.seekShortcuts[1].value = seconds
+    const migrated = normalizeSettings(legacy)
+    expect(migrated.seekShortcuts[1]).toEqual({ ...legacy.seekShortcuts[1], value: 300 })
+    expect(migrated.bindings['seek:rewind-backward']).toEqual(legacy.bindings['seek:rewind-backward'])
+    expect(migrated.bindings['seek:rewind-forward']).toEqual(legacy.bindings['seek:rewind-forward'])
+    const backup = { ...createSettingsBackup(DEFAULT_SETTINGS, { extensionVersion: 'test' }), settings: legacy }
+    expect(parseSettingsBackup(JSON.stringify(backup))).toMatchObject({ ok: true, value: { settings: migrated } })
+  })
+
   it('requires both pair bindings and rejects overlapping action identities in a current backup', () => {
     const settings = customSettings()
     const backup = createSettingsBackup(settings, { extensionVersion: 'test' })
@@ -78,10 +91,10 @@ describe('custom seeking', () => {
     expect(parseSettingsBackup(JSON.stringify({ ...backup, settings: overlap }))).toEqual({ ok: false, error: 'invalidSettings' })
   })
 
-  it('migrates old opposite directions into one group and retains their keys and enabled states', () => {
+  it.each([15, 1800])('migrates old opposite %i-second directions and retains their keys and enabled states', seconds => {
     const legacy = { ...customSettings(), version: 22,
       subtitleNavigation: legacySubtitleNavigation(),
-      seekShortcuts: [{ id: 'seek:old-back' as const, kind: 'relative' as const, value: -15 }, { id: 'seek:progress' as const, kind: 'percentage' as const, value: 37 }, { id: 'seek:old-forward' as const, kind: 'relative' as const, value: 15 }],
+      seekShortcuts: [{ id: 'seek:old-back' as const, kind: 'relative' as const, value: -seconds }, { id: 'seek:progress' as const, kind: 'percentage' as const, value: 37 }, { id: 'seek:old-forward' as const, kind: 'relative' as const, value: seconds }],
       bindings: { ...DEFAULT_SETTINGS.bindings,
         'seek:old-back': { enabled: false, key: { code: 'KeyJ', key: 'j', ctrl: false, alt: false, shift: false, meta: false } },
         'seek:old-forward': { enabled: true, key: { code: 'KeyL', key: 'l', ctrl: false, alt: false, shift: false, meta: false } },
@@ -89,7 +102,7 @@ describe('custom seeking', () => {
       },
     }
     const migrated = normalizeSettings(legacy)
-    expect(migrated.seekShortcuts).toEqual([{ id: 'seek:old-back', kind: 'relative', value: 15 }, { id: 'seek:progress', kind: 'percentage', value: 37 }])
+    expect(migrated.seekShortcuts).toEqual([{ id: 'seek:old-back', kind: 'relative', value: Math.min(seconds, 300) }, { id: 'seek:progress', kind: 'percentage', value: 37 }])
     expect(migrated.bindings['seek:old-back-backward']).toEqual(legacy.bindings['seek:old-back'])
     expect(migrated.bindings['seek:old-back-forward']).toEqual(legacy.bindings['seek:old-forward'])
     expect(migrated.bindings['seek:old-back']).toBeUndefined()

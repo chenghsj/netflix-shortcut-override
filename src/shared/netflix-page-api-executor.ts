@@ -20,6 +20,9 @@ type NetflixPlayer = {
   play(): void
   pause(): void
   seek(time: number): void
+  getInternalPlayer?(): {
+    seek?(time: number, cause?: unknown, segmentId?: unknown, forcePreciseSeeking?: boolean): void
+  } | null
   getCurrentTime(): number
   getDuration?(): number
   getPaused?(): boolean
@@ -725,6 +728,19 @@ export const executeNetflixPageApi = (
         : closest
     })
   }
+  const seekPrecisely = (player: NetflixPlayer, targetTime: number): void => {
+    let internal: ReturnType<NonNullable<NetflixPlayer['getInternalPlayer']>> | undefined
+    try { internal = player.getInternalPlayer?.() }
+    catch { /* Older player implementations may not expose their internal transport. */ }
+    if (typeof internal?.seek === 'function') {
+      // The public facade forwards only the time argument. Cadmium's internal
+      // transport accepts a fourth precision flag; without it, some players
+      // align to an earlier subfragment and repeated subtitle/frame seeks stick.
+      internal.seek(targetTime, undefined, undefined, true)
+    } else {
+      player.seek(targetTime)
+    }
+  }
   const stepFrame = (page: NetflixWindow, player: NetflixPlayer, video: HTMLVideoElement | null): void => {
     if (!(player.getPaused?.() ?? video?.paused)) {
       page.__shortcutOverrideFrameStep?.clear()
@@ -760,7 +776,7 @@ export const executeNetflixPageApi = (
     const from = canContinue ? previous.targetTime : currentTime
     const targetTime = Math.max(0, Math.min(duration, from + (value === -1 ? -1 : 1) * frameDuration))
     previous?.clear()
-    player.seek(targetTime)
+    seekPrecisely(player, targetTime)
     result.currentTime = currentTime
     result.targetTime = targetTime
     result.seekCalled = true
@@ -901,7 +917,8 @@ export const executeNetflixPageApi = (
         const currentTime = player.getCurrentTime()
         result.currentTime = currentTime
         result.targetTime = action === 'seek' ? currentTime + value : value
-        player.seek(result.targetTime)
+        if (action === 'seekTo') seekPrecisely(player, result.targetTime)
+        else player.seek(result.targetTime)
         result.seekCalled = true
       } else if (action === 'setVolume' && value !== undefined) {
         player.setVolume(clampVolume(value))

@@ -12,6 +12,12 @@ const editDialog = async (label = 'Cycle subtitle size') => {
 const record = (dialog: HTMLElement, code: string, key: string) =>
   fireEvent.keyDown(within(dialog).getByRole('group', { name: 'Key' }), { code, key })
 
+async function confirmDelete(label: string) {
+  const confirmation = await screen.findByRole('dialog', { name: label })
+  fireEvent.click(within(confirmation).getByRole('button', { name: 'Delete' }))
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: label })).not.toBeInTheDocument())
+}
+
 const transfer = () => ({ effectAllowed: 'none', dropEffect: 'none', setData: vi.fn(), setDragImage: vi.fn() })
 const dragEvent = (kind: 'dragOver' | 'drop', row: HTMLElement, dataTransfer: ReturnType<typeof transfer>, after = false) => {
   const event = createEvent[kind](row, { dataTransfer })
@@ -32,6 +38,8 @@ describe('subtitle size editor', () => {
     fireEvent.click(add)
     expect(within(dialog).getAllByRole('spinbutton')).toHaveLength(6)
     fireEvent.click(within(dialog).getByRole('button', { name: 'Remove size 6' }))
+    expect(within(dialog).getAllByRole('spinbutton')).toHaveLength(6)
+    await confirmDelete('Remove size 6')
     expect(add).toBeEnabled()
     fireEvent.click(add)
     const sizes = within(dialog).getAllByRole('spinbutton').map(input => Number((input as HTMLInputElement).value))
@@ -174,6 +182,7 @@ describe('subtitle size editor', () => {
     fireEvent.pointerUp(secondLabel, { clientX: 116, pointerId: 2 })
     expect(within(dialog).getByLabelText('Size 2')).toHaveValue(102)
     fireEvent.click(within(dialog).getByRole('button', { name: 'Remove size 1' }))
+    await confirmDelete('Remove size 1')
     const remainingLabel = within(dialog).getByText('Size 1', { selector: 'label' })
     fireEvent.pointerDown(remainingLabel, { button: 0, clientX: 100, pointerId: 3 })
     fireEvent.pointerMove(remainingLabel, { clientX: 108, pointerId: 3 })
@@ -303,6 +312,7 @@ describe('subtitle size editor', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add size' }))
     expect(within(dialog).getByLabelText('Size 4')).toHaveValue(150)
     fireEvent.click(within(dialog).getByRole('button', { name: 'Remove size 3' }))
+    await confirmDelete('Remove size 3')
     record(dialog, 'KeyB', 'b')
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
     await waitFor(async () => expect((await getSettings()).subtitleSizeShortcuts[0].sizes).toEqual([200, 100, 150]))
@@ -311,6 +321,8 @@ describe('subtitle size editor', () => {
     expect(settings.bindings[entry.id]).toMatchObject({ enabled: true, key: { code: 'KeyB' } })
     expect(screen.getByRole('row', { name: 'Cycle sizes · 200% → 100% → 150%' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Remove Cycle sizes · 200% → 100% → 150%' }))
+    expect((await getSettings()).subtitleSizeShortcuts).toHaveLength(1)
+    await confirmDelete('Remove Cycle sizes · 200% → 100% → 150%')
     await waitFor(async () => expect((await getSettings()).subtitleSizeShortcuts).toEqual([]))
     expect((await getSettings()).bindings[entry.id]).toBeUndefined()
   })

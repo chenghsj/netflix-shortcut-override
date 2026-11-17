@@ -2,7 +2,7 @@ Customize Netflix playback shortcuts to suit the way you watch.
 
 - Customize shortcuts for play/pause, seeking, volume, mute, Netflix subtitles, fullscreen, skip intro, and playback speed.
 - Hold your configured Play / Pause key to temporarily use your selected hold speed. Release it to restore the previous speed and playback state.
-- Adjust seek intervals, speed steps, and preferred playback speed.
+- Set built-in and custom forward/rewind intervals from 1 to 300 seconds. Configure the highest speed up to 5x and add preferred-speed shortcuts from 0.25x to 5x.
 - Enable optional subtitle navigation to jump to the previous or next subtitle, replay the current subtitle, and toggle playback with customizable keys. Select a Netflix subtitle track and grant subtitle website access to use this feature.
 - Watch in Picture-in-Picture with Netflix subtitles and playback controls on Chrome and Edge. This feature is unavailable on Firefox.
 - Sync settings through your browser, export/import backups, and choose English, Traditional Chinese, Simplified Chinese, Japanese, or Korean.

@@ -1,6 +1,7 @@
 import { ResetButton } from '@/components/reset-button'
+import { DeleteButton } from '@/components/delete-button'
 import { RESET_SCOPE_COPY } from '@/shared/reset-scopes'
-import { PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react'
+import { PencilIcon, PlusIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Button } from '@/components/app-ui/button'
 import { TableCell, TableHead, TableHeader, TableRow } from '@/components/app-ui/table'
@@ -50,11 +51,11 @@ export function PreferredSpeedShortcutSettings({ settings, locale, editor, updat
       <TableCell><div className="flex items-center justify-end gap-2">
         <Button variant="ghost" size="icon" className="text-muted-foreground focus-visible:text-foreground" aria-label={`${copy.edit} ${label}`} onClick={event => editor.edit(target, event.currentTarget)}><PencilIcon /></Button>
         {builtin ? <ResetButton locale={locale} variant="ghost" iconOnly className="text-muted-foreground focus-visible:text-foreground" label={`${copy.reset} ${label}`} description={RESET_SCOPE_COPY[locale].preferredSpeed} onClick={() => editor.resetBinding(target)} />
-          : <Button variant="ghost" size="icon" className="text-muted-foreground focus-visible:text-foreground" aria-label={SPEED_SHORTCUT_COPY[locale].remove.replace('{speed}', `${shortcut.speed}×`)} onClick={() => updateSettings(current => {
+          : <DeleteButton locale={locale} className="text-muted-foreground focus-visible:text-foreground" label={speedCopy.remove.replace('{speed}', `${shortcut.speed}×`)} onClick={() => updateSettings(current => {
             const bindings = { ...current.bindings }
             delete bindings[shortcut.id as PreferredSpeedShortcutAction]
             return { ...current, bindings, preferredSpeedShortcuts: current.preferredSpeedShortcuts.filter(item => item.id !== shortcut.id) }
-          })}><Trash2Icon /></Button>}
+          })} />}
       </div></TableCell>
     </TableRow>
     })}

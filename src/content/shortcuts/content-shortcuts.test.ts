@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
+import { keyBindingFromEvent } from '@/shared/shortcut-bindings'
 import type { ShortcutSettings } from '@/shared/shortcut-types'
 import { getSettings, saveSettings } from '@/shared/storage'
 import { PipManager } from '@/content/pip/pip-manager'
@@ -10,11 +11,71 @@ import { setupContentIndexTests } from './content-script.test-support'
 describe('content media shortcuts', () => {
   setupContentIndexTests()
 
+  it.each([
+    { nextKey: 'MediaTrackNext', previousKey: 'MediaTrackPrevious' },
+    { nextKey: 'MediaNextTrack', previousKey: 'MediaPreviousTrack' },
+    { nextKey: 'BrowserForward', previousKey: 'BrowserBack' },
+  ].flatMap(keys => ['', 'Unidentified', 'native'].map(code => ({ ...keys, code }))))(
+    'runs $nextKey/$previousKey episode shortcuts with code $code and releases repeats, disabled shortcuts and typing', async ({ code, nextKey, previousKey }) => {
+      const settings: ShortcutSettings = structuredClone(DEFAULT_SETTINGS)
+      settings.bindings.nextEpisode.key = keyBindingFromEvent(new KeyboardEvent('keydown', { key: nextKey }))
+      settings.bindings.previousEpisode.key = keyBindingFromEvent(new KeyboardEvent('keydown', { key: previousKey }))
+      await saveSettings(settings)
+      document.body.innerHTML = '<video></video><input /><button data-uia="control-next">Next</button><div><button data-uia="episode-pane-item">Previous</button><button data-uia="episode-pane-item" aria-selected="true">Current</button></div>'
+      const next = vi.fn()
+      const previous = vi.fn()
+      document.querySelector('[data-uia="control-next"]')!.addEventListener('click', next)
+      document.querySelector('[data-uia="episode-pane-item"]')!.addEventListener('click', previous)
+      const press = (key: string, repeat = false) => {
+        const event = new KeyboardEvent('keydown', {
+          key, code: code === 'native' ? key : code, repeat, bubbles: true, cancelable: true,
+        })
+        window.dispatchEvent(event)
+        return event
+      }
+      expect(press(nextKey).defaultPrevented).toBe(true)
+      expect(next).toHaveBeenCalledOnce()
+      expect(previous).not.toHaveBeenCalled()
+      expect(press(previousKey).defaultPrevented).toBe(true)
+      expect(previous).toHaveBeenCalledOnce()
+      expect(press(nextKey, true).defaultPrevented).toBe(true)
+      expect(next).toHaveBeenCalledOnce()
+      const input = document.querySelector('input')!
+      input.focus()
+      expect(press(nextKey).defaultPrevented).toBe(false)
+      input.blur()
+      settings.bindings.nextEpisode.enabled = false
+      await saveSettings(settings)
+      expect(press(nextKey).defaultPrevented).toBe(false)
+      expect(next).toHaveBeenCalledOnce()
+      expect(previous).toHaveBeenCalledOnce()
+    },
+  )
+
+  it('only completes a code-less media play/pause press when that same media key is released', async () => {
+    const settings: ShortcutSettings = structuredClone(DEFAULT_SETTINGS)
+    settings.bindings.playPause.key = keyBindingFromEvent(new KeyboardEvent('keydown', { key: 'MediaPlayPause' }))
+    await saveSettings(settings)
+    document.body.innerHTML = '<video></video>'
+    vi.spyOn(document.querySelector('video')!, 'play').mockResolvedValue()
+    vi.mocked(chrome.runtime.sendMessage).mockClear()
+    const press = (type: string, key: string, code = '') => {
+      const event = new KeyboardEvent(type, { key, code, bubbles: true, cancelable: true })
+      window.dispatchEvent(event)
+      return event
+    }
+    expect(press('keydown', 'MediaPlayPause').defaultPrevented).toBe(true)
+    expect(press('keyup', 'MediaTrackNext').defaultPrevented).toBe(false)
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalled()
+    expect(press('keyup', 'MediaPlayPause', 'Unidentified').defaultPrevented).toBe(true)
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(expect.objectContaining({ action: 'play' }), expect.any(Function))
+  })
+
   it('does not revive queued subtitle changes after a global disable and re-enable', async () => {
     document.body.innerHTML = '<video></video>'
     vi.mocked(chrome.runtime.sendMessage).mockClear()
     for (let index = 0; index < 2; index += 1) {
-      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyC', key: 'C', shiftKey: true, bubbles: true, cancelable: true }))
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyX', key: 'X', shiftKey: true, bubbles: true, cancelable: true }))
     }
     expect(chrome.runtime.sendMessage).toHaveBeenCalledTimes(1)
     const reply = vi.mocked(chrome.runtime.sendMessage).mock.calls[0][1]
@@ -23,6 +84,25 @@ describe('content media shortcuts', () => {
     await saveSettings({ ...settings, enabled: false })
     await saveSettings(settings)
     reply({ success: true, result: { subtitlesEnabled: true } })
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledTimes(1)
+  })
+
+  it.each(['KeyA', 'KeyD'])('does not revive queued audio changes from %s after a global disable and re-enable', async code => {
+    document.body.innerHTML = '<video></video>'
+    vi.mocked(chrome.runtime.sendMessage).mockClear()
+    for (let index = 0; index < 2; index += 1) {
+      window.dispatchEvent(new KeyboardEvent('keydown', {
+        code, key: code.slice(-1), shiftKey: true, bubbles: true, cancelable: true,
+      }))
+    }
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledTimes(1)
+    const reply = vi.mocked(chrome.runtime.sendMessage).mock.calls[0][1]
+    if (typeof reply !== 'function') throw new Error('Expected audio response callback')
+    const settings = await getSettings()
+    await saveSettings({ ...settings, enabled: false })
+    await saveSettings(settings)
+    reply({ success: true, result: { audioTrackSwitchCalled: true, audioTrack: 'English' } })
     await new Promise(resolve => setTimeout(resolve, 0))
     expect(chrome.runtime.sendMessage).toHaveBeenCalledTimes(1)
   })
@@ -252,7 +332,7 @@ describe('content media shortcuts', () => {
     press('KeyG')
     await vi.waitFor(async () => expect((await getSettings()).subtitleSize).toBe('medium'))
     expect(document.getElementById('shortcut-override-subtitle-size')).toBeNull()
-    press('KeyV', { shiftKey: true, key: 'V' })
+    press('KeyC', { shiftKey: true, key: 'C' })
     await vi.waitFor(async () => expect((await getSettings()).subtitleSize).toBe(200))
     const input = document.createElement('input')
     document.body.append(input); input.focus()
@@ -269,7 +349,7 @@ describe('content media shortcuts', () => {
     document.body.append(document.createElement('video'))
     const press = (repeat = false) => {
       const event = new KeyboardEvent('keydown', {
-        code: 'KeyV', key: 'V', shiftKey: true, repeat, bubbles: true, cancelable: true,
+        code: 'KeyC', key: 'C', shiftKey: true, repeat, bubbles: true, cancelable: true,
       })
       window.dispatchEvent(event)
       return event
@@ -302,7 +382,7 @@ describe('content media shortcuts', () => {
     }
     expect(press().defaultPrevented).toBe(false)
     document.body.append(document.createElement('video'))
-    expect(press('KeyV').defaultPrevented).toBe(false)
+    expect(press('KeyC').defaultPrevented).toBe(false)
     const input = document.createElement('input')
     document.body.append(input)
     input.focus()
@@ -808,10 +888,10 @@ describe('content media shortcuts', () => {
   })
 
   it.each([
-    { key: 'C', locale: 'en', trackLanguage: 'ja', expected: 'Japanese (CC)' },
-    { key: 'C', locale: 'zh-TW', trackLanguage: 'ja', expected: '日文 (CC)' },
-    { key: 'C', locale: 'zh-TW', trackLanguage: 'not a language tag', expected: '日本語 (CC)' },
+    { key: 'X', locale: 'en', trackLanguage: 'ja', expected: 'Japanese (CC)' },
     { key: 'X', locale: 'zh-TW', trackLanguage: 'ja', expected: '日文 (CC)' },
+    { key: 'X', locale: 'zh-TW', trackLanguage: 'not a language tag', expected: '日本語 (CC)' },
+    { key: 'Z', locale: 'zh-TW', trackLanguage: 'ja', expected: '日文 (CC)' },
   ] as const)('cycles once per Shift+$key press and shows $expected in the $locale hint', async ({
     key, locale, trackLanguage, expected,
   }) => {
@@ -842,7 +922,7 @@ describe('content media shortcuts', () => {
       expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
         type: 'EXECUTE_NETFLIX_API',
         action: 'cycleSubtitleTrack',
-        value: key === 'X' ? -1 : undefined,
+        value: key === 'Z' ? -1 : undefined,
       }, expect.any(Function))
       expect(document.getElementById('shortcut-override-media-hint')).toHaveTextContent(expected)
     })
@@ -858,7 +938,7 @@ describe('content media shortcuts', () => {
     })
     document.body.append(document.createElement('video'))
     window.dispatchEvent(new KeyboardEvent('keydown', {
-      code: 'KeyC', key: 'C', shiftKey: true, bubbles: true, cancelable: true,
+      code: 'KeyX', key: 'X', shiftKey: true, bubbles: true, cancelable: true,
     }))
     await vi.waitFor(() => {
       expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
