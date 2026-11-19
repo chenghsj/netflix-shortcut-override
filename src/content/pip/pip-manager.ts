@@ -46,6 +46,7 @@ type PipManagerOptions = PipKeyboardHandlers & {
   commands?: Pick<ShortcutCommandController, 'execute' | 'setVolume'>
   settings?: ShortcutSettings
   onSettingsChange?: (settings: ShortcutSettings) => void
+  onUserSeek?: () => void
 }
 
 const getDocumentPictureInPicture = (sourceWindow: Window): DocumentPictureInPictureApi | null => {
@@ -75,6 +76,7 @@ export class PipManager {
   private readonly playbackSession: NetflixPlaybackSession
   private readonly commands: PipManagerOptions['commands']
   private readonly onSettingsChange: PipManagerOptions['onSettingsChange']
+  private readonly onUserSeek: PipManagerOptions['onUserSeek']
   private settings: ShortcutSettings
   private pipWindow: Window | null = null
 
@@ -95,6 +97,7 @@ export class PipManager {
     this.commands = options.commands
     this.keyboardHandlers = { onKeydown, onKeyup, onBlur, onClick }
     this.onSettingsChange = options.onSettingsChange
+    this.onUserSeek = options.onUserSeek
     this.settings = options.settings ?? DEFAULT_SETTINGS
   }
 
@@ -174,7 +177,10 @@ export class PipManager {
           commands: this.commands,
           settings: this.settings,
           onSettingsChange: this.onSettingsChange,
-          onUserSeek: () => this.recordUserSeek(),
+          onUserSeek: () => {
+            this.onUserSeek?.()
+            this.recordUserSeek()
+          },
         })
         const videoArea = this.adoptedVideoBinding.adopt(video)
         pipWin.document.body.appendChild(videoArea)

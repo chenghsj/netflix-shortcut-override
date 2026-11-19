@@ -10,10 +10,10 @@ describe('multilingual shortcut search', () => {
   it.each(LOCALES)('shares the simplified categories and keeps display actions in Playback in %s', locale => {
     const categories = getPopupShortcutCategories(DEFAULT_SETTINGS, locale)
     expect(categories).toHaveLength(5)
-    expect(categories.find(category => category.id === 'playback')!.rows.map(row => row.id)).toEqual(['playPause', 'holdSpeed', 'fullscreen', 'pictureInPicture'])
+    expect(categories.find(category => category.id === 'playback')!.rows.map(row => row.id)).toEqual(['playPause', 'holdSpeed', 'previousEpisode', 'nextEpisode', 'fullscreen', 'pictureInPicture'])
     const navigation = categories.find(category => category.id === 'seeking')!
     expect(navigation.label).toBe(OPTIONS_LAYOUT_COPY[locale].seeking)
-    expect(navigation.rows.map(row => row.id)).toEqual(expect.arrayContaining(['previousFrame', 'nextFrame', 'skipIntro', 'previousEpisode', 'nextEpisode', 'seekBackward', 'seekForward']))
+    expect(navigation.rows.map(row => row.id)).toEqual(expect.arrayContaining(['previousFrame', 'nextFrame', 'skipIntro', 'seekBackward', 'seekForward']))
     for (const oldLabel of ['Seeking and jumps', '快轉與跳轉', '快进与跳转', 'シーク・位置へ移動', '탐색 및 위치 이동']) {
       expect(navigation.rows.filter(row => matchesPopupShortcut(row, navigation.id, navigation.label, oldLabel)).map(row => row.id)).toContain('previousFrame')
     }

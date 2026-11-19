@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AlertCircleIcon, BookOpenIcon, Settings2Icon, StarIcon } from 'lucide-react'
+import { AlertCircleIcon, BookOpenIcon, CircleDotIcon, Settings2Icon, StarIcon } from 'lucide-react'
 import { HELP_UI_COPY } from '@/help/help-copy'
 import { GitHubIcon } from '@/components/github-icon'
 import { CompatibilityConnectionAlert } from '@/components/compatibility-connection-alert'
@@ -112,6 +112,13 @@ export function PopupApp() {
       <footer className="flex shrink-0 flex-col gap-2 border-t border-border px-3 py-2">
         <div className="flex items-center justify-center gap-2">
           <Tooltip>
+            <TooltipTrigger asChild><Button variant="outline" size="icon" aria-label={HELP_UI_COPY[locale].title}
+              onClick={() => openOptionsPage(suppressFocusRestoration, 'help')}>
+              <BookOpenIcon aria-hidden="true" />
+            </Button></TooltipTrigger>
+            <TooltipContent side="top">{HELP_UI_COPY[locale].title}</TooltipContent>
+          </Tooltip>
+          <Tooltip>
             <TooltipTrigger asChild><Button variant="outline" size="icon" asChild>
               <a href={EXTERNAL_LINKS.githubRepository} target="_blank" rel="noreferrer" aria-label={copy.githubRepositoryAriaLabel}
                 onClick={suppressFocusRestoration} onAuxClick={suppressFocusRestoration}>
@@ -120,16 +127,14 @@ export function PopupApp() {
             </Button></TooltipTrigger>
             <TooltipContent side="top">{copy.githubRepository}</TooltipContent>
           </Tooltip>
-          <OtherProjectsSelect iconOnly label={copy.otherProjects} ariaLabel={copy.otherProjectsAriaLabel}
-            streamDanmakuLabel={copy.streamDanmakuStore} streamDanmakuTitle={copy.streamDanmakuStoreAriaLabel}
-            className="rounded-[var(--ui-control-radius)]" tooltipSide="top"
-            onNavigate={suppressFocusRestoration} />
           <Tooltip>
-            <TooltipTrigger asChild><Button variant="outline" size="icon" aria-label={HELP_UI_COPY[locale].title}
-              onClick={() => openOptionsPage(suppressFocusRestoration, 'help')}>
-              <BookOpenIcon aria-hidden="true" />
+            <TooltipTrigger asChild><Button variant="outline" size="icon" asChild>
+              <a href={EXTERNAL_LINKS.githubNewIssue} target="_blank" rel="noreferrer" aria-label={copy.reportIssueAriaLabel}
+                onClick={suppressFocusRestoration} onAuxClick={suppressFocusRestoration}>
+                <CircleDotIcon aria-hidden="true" />
+              </a>
             </Button></TooltipTrigger>
-            <TooltipContent side="top">{HELP_UI_COPY[locale].title}</TooltipContent>
+            <TooltipContent side="top">{copy.reportIssue}</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild><Button variant="outline" size="icon" asChild>
@@ -140,6 +145,10 @@ export function PopupApp() {
             </Button></TooltipTrigger>
             <TooltipContent side="top">{copy.rateExtension}</TooltipContent>
           </Tooltip>
+          <OtherProjectsSelect iconOnly label={copy.otherProjects} ariaLabel={copy.otherProjectsAriaLabel}
+            streamDanmakuLabel={copy.streamDanmakuStore} streamDanmakuTitle={copy.streamDanmakuStoreAriaLabel}
+            className="rounded-[var(--ui-control-radius)]" tooltipSide="top"
+            onNavigate={suppressFocusRestoration} />
         </div>
         <SettingsSaveStatus error={saveError} errorLabel={copy.settingsSaveError} />
       </footer>

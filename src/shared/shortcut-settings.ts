@@ -5,7 +5,7 @@ import { DEFAULT_UI_STYLE, isUiStyle } from './ui-styles'
 import { DEFAULT_SUBTITLE_NAVIGATION_BINDINGS } from './subtitle-navigation'
 import { normalizeSubtitleFavorites, sameSubtitleFavorite } from './subtitle-favorites'
 import { normalizeAudioFavorites, sameAudioFavorite } from './audio-favorites'
-import { DEFAULT_KEY_BINDINGS, isKeyBinding, isShortcutKey, keyBindingsEqual } from './shortcut-bindings'
+import { DEFAULT_KEY_BINDINGS, bindingMatchesKey, isKeyBinding, isShortcutKey, keyBindingsEqual, MAX_SHORTCUT_KEYS } from './shortcut-bindings'
 import { isSeekShortcut, isLegacySeekShortcut, getSeekShortcutActions, getSeekPairAction, SEEK_SHORTCUT_LIMITS } from './seek-shortcuts'
 import {
   SUBTITLE_NAVIGATION_ACTIONS,
@@ -67,7 +67,7 @@ export const DEFAULT_PIP_SETTINGS: PipSettings = {
   subtitleBackground: 'translucent',
 }
 
-export const SHORTCUT_SETTINGS_VERSION = 32
+export const SHORTCUT_SETTINGS_VERSION = 33
 export const MIN_SETTINGS_BACKUP_VERSION = 8
 
 const SHORTCUT_BINDING_MIGRATIONS: Partial<Record<ShortcutAction, {
@@ -121,6 +121,7 @@ const SETTINGS_ACTIONS_BY_VERSION: Record<number, readonly ShortcutAction[]> = {
   30: SHORTCUT_ACTIONS,
   31: SHORTCUT_ACTIONS,
   32: SHORTCUT_ACTIONS,
+  33: SHORTCUT_ACTIONS,
 }
 
 const LEGACY_PICTURE_IN_PICTURE_BINDING = {
@@ -185,6 +186,29 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const isKeyForVersion = (key: unknown, version: number): key is KeyBinding | null =>
   version >= 27 ? isShortcutKey(key) : isKeyBinding(key)
 
+// Stored settings recover usable keys; backup validation below rejects invalid
+// lists instead of silently changing the file the user chose to restore.
+const normalizedAdditionalKeys = (binding: Partial<ShortcutBinding> | undefined, key: KeyBinding | null) => {
+  const keys: KeyBinding[] = []
+  if (key && Array.isArray(binding?.additionalKeys)) {
+    for (const candidate of binding.additionalKeys) {
+      if (keys.length >= MAX_SHORTCUT_KEYS - 1) break
+      if (isKeyBinding(candidate) && ![key, ...keys].some(other => keyBindingsEqual(candidate, other))) keys.push(candidate)
+    }
+  }
+  return keys.length ? { additionalKeys: keys } : {}
+}
+const validAdditionalKeys = (binding: Record<string, unknown>) => {
+  if (binding.additionalKeys === undefined) return true
+  if (!isKeyBinding(binding.key) || !Array.isArray(binding.additionalKeys) || binding.additionalKeys.length >= MAX_SHORTCUT_KEYS) return false
+  const keys: KeyBinding[] = [binding.key]
+  return binding.additionalKeys.every(key => {
+    if (!isKeyBinding(key) || keys.some(other => keyBindingsEqual(key, other))) return false
+    keys.push(key)
+    return true
+  })
+}
+
 const isSeekShortcutForVersion = (shortcut: unknown, version: number) =>
   version >= 32 ? isSeekShortcut(shortcut)
     : isLegacySeekShortcut(shortcut) && (version < 23 || shortcut.kind !== 'relative' || shortcut.value > 0)
@@ -200,6 +224,10 @@ const isCompleteSettingsForBackup = (
   const holdSpeedKey = version >= 10 ? 'holdSpeed' : 'spaceHold'
   // Backups through v13 used the former name for subtitle navigation.
   const subtitleNavigation = settings[version >= 14 ? 'subtitleNavigation' : 'subtitlePractice']
+  if (version >= 33) {
+    const all = [settings.bindings, isRecord(subtitleNavigation) ? subtitleNavigation.bindings : null]
+    if (all.some(group => !isRecord(group) || Object.values(group).some(binding => !isRecord(binding) || !validAdditionalKeys(binding)))) return false
+  }
   if (
     (version >= 11 && (!isRecord(subtitleNavigation) || typeof subtitleNavigation.enabled !== 'boolean')) ||
     (version >= 12 && (!isRecord(subtitleNavigation) || !isRecord(subtitleNavigation.bindings) || !SUBTITLE_NAVIGATION_ACTIONS.every(action => {
@@ -380,7 +408,8 @@ const hasMigratedDefaultConflict = (
   // Preserve the older migrations' treatment of disabled saved bindings.
   return [...Object.values(rawBindings), ...Object.values(subtitleBindings ?? {})].some(candidate => {
     if (migration.ignoreDisabledBindings && candidate?.enabled === false) return false
-    return isKeyBinding(candidate?.key) && keyBindingsEqual(candidate.key, key)
+    if (!isKeyBinding(candidate?.key)) return false
+    return bindingMatchesKey({ key: candidate.key, ...normalizedAdditionalKeys(candidate, candidate.key) }, key)
   })
 }
 
@@ -412,6 +441,7 @@ export const normalizeSettings = (raw: unknown): ShortcutSettings => {
         {
           enabled: !migratedDefaultConflicts && savedEnabled,
           key,
+          ...normalizedAdditionalKeys(rawBinding, key),
         },
       ]
     })
@@ -444,7 +474,7 @@ export const normalizeSettings = (raw: unknown): ShortcutSettings => {
     seen.add(shortcut.id)
     for (const action of actions) {
       const binding = rawBindings[action]!
-      bindings[action] = { enabled: binding.enabled === true, key: binding.key! }
+      bindings[action] = { enabled: binding.enabled === true, key: binding.key!, ...normalizedAdditionalKeys(binding, binding.key!) }
       reservedActions.add(action)
     }
     seekShortcuts.push({ id: shortcut.id, kind: shortcut.kind,
@@ -457,7 +487,7 @@ export const normalizeSettings = (raw: unknown): ShortcutSettings => {
     const binding = rawBindings[shortcut.id]
     if (!isKeyForVersion(binding?.key, sourceVersion)) continue
     subtitleSizeShortcuts.push({ ...shortcut, sizes: [...shortcut.sizes] })
-    bindings[shortcut.id] = { enabled: binding.enabled === true, key: binding.key }
+    bindings[shortcut.id] = { enabled: binding.enabled === true, key: binding.key, ...normalizedAdditionalKeys(binding, binding.key) }
   }
 
   const preferredSpeedShortcuts: ShortcutSettings['preferredSpeedShortcuts'] = []
@@ -466,7 +496,7 @@ export const normalizeSettings = (raw: unknown): ShortcutSettings => {
     const binding = rawBindings[shortcut.id]
     if (!isKeyForVersion(binding?.key, sourceVersion)) continue
     preferredSpeedShortcuts.push({ id: shortcut.id, speed: shortcut.speed })
-    bindings[shortcut.id] = { enabled: binding.enabled === true, key: binding.key }
+    bindings[shortcut.id] = { enabled: binding.enabled === true, key: binding.key, ...normalizedAdditionalKeys(binding, binding.key) }
   }
 
   return {
@@ -500,7 +530,9 @@ export const normalizeSettings = (raw: unknown): ShortcutSettings => {
       enabled: subtitleNavigation?.enabled === true,
       bindings: Object.fromEntries(SUBTITLE_NAVIGATION_ACTIONS.map(action => {
         const raw = subtitleNavigation?.bindings?.[action]
-        return [action, { enabled: typeof raw?.enabled === 'boolean' ? raw.enabled : DEFAULT_SUBTITLE_NAVIGATION_BINDINGS[action].enabled, key: isKeyForVersion(raw?.key, sourceVersion) ? raw.key : DEFAULT_SUBTITLE_NAVIGATION_BINDINGS[action].key }]
+        const key = isKeyForVersion(raw?.key, sourceVersion) ? raw.key : DEFAULT_SUBTITLE_NAVIGATION_BINDINGS[action].key
+        return [action, { enabled: typeof raw?.enabled === 'boolean' ? raw.enabled : DEFAULT_SUBTITLE_NAVIGATION_BINDINGS[action].enabled,
+          key, ...normalizedAdditionalKeys(raw, key) }]
       })) as ShortcutSettings['subtitleNavigation']['bindings'],
     },
     speed: normalizeSpeedSettings(source.speed),
@@ -531,6 +563,18 @@ const isCurrentSettingsNormalized = (
   normalized: ShortcutSettings
 ): boolean => {
   const settings = raw as unknown as ShortcutSettings
+
+  const bindingPairs = [
+    ...Object.keys(normalized.bindings).map(action => [
+      settings.bindings[action as ShortcutAction], normalized.bindings[action as ShortcutAction],
+    ]),
+    ...SUBTITLE_NAVIGATION_ACTIONS.map(action => [
+      settings.subtitleNavigation.bindings[action], normalized.subtitleNavigation.bindings[action],
+    ]),
+  ]
+  const additionalKeysUnchanged = bindingPairs.every(([saved, expected]) =>
+    JSON.stringify(saved?.additionalKeys ?? []) === JSON.stringify(expected?.additionalKeys ?? []))
+  if (!additionalKeysUnchanged) return false
 
   return (
     settings.version === normalized.version &&

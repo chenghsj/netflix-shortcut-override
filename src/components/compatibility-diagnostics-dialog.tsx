@@ -91,7 +91,7 @@ export function CompatibilityDiagnosticsDialog({
           )}
         </Button>
       </DialogTrigger>
-      <DialogContent className="w-[20rem] p-0">
+      <DialogContent size="compact" className="p-0">
         <DialogHeader className="sr-only">
           <DialogTitle>{copy.diagnosticsTitle}</DialogTitle>
           <DialogDescription>{copy.diagnosticsDescription}</DialogDescription>

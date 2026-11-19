@@ -82,7 +82,7 @@ For a production build of just one browser, use `npm run build:chromium` or `npm
 | `npm run build` | Clear `dist`, type-check with incremental caching, build both browser outputs concurrently, and verify background entry points. |
 | `npm run build:chromium` | Build the Chromium extension in `dist/chromium`. |
 | `npm run build:firefox` | Build the Firefox extension in `dist/firefox`. |
-| `npm run verify:build` | Verify both generated background loaders point to the background bundle and contain its message handlers. |
+| `npm run verify:build` | Verify both background entry points and the standalone, classic MAIN-world Media Session script in each browser build. |
 | `npm run lint:firefox` | Run `web-ext lint` against `dist/firefox`. |
 | `npm run lint` | Run ESLint. |
 | `npm test` | Run Vitest tests. |
@@ -125,13 +125,16 @@ Key areas:
 - `CONTEXT.md`: canonical domain terminology for playback, compatibility, and PiP behavior.
 - `docs/behavior-spec.md`: observable product requirements and recovery policies.
 - `src/content/index.ts`: keyboard interception and routing between the shortcut, PiP, and hint domains.
+- `src/content/media-session-routing.ts`: keyboard/media notification pairing, standalone deadlines, native acknowledgments and the watch observer/listener lifetime. The content entry point supplies settings, PiP state, command routing and request context.
 - `src/content/shortcuts/`: media command handling and Play / Pause hold interaction state.
+- `src/content/shortcuts/playback-request-arbiter.ts`: tentative media effects, confirmed cancellation barriers and deferred playback dispatch using original receipt order.
 - `src/content/hints/`: hint overlay rendering, layout, icons, and timing.
 - `src/content/pip/`: Document Picture-in-Picture lifecycle, subtitle mirroring, and PiP keyboard routing.
 - `src/content/pip/pip-video-handoff.ts`: candidate selection and explicit waiting, replacement, or episode decisions. Recovery timers and episode evidence remain in this owner.
 - `src/content/netflix-playback-session.ts`: playback commands and subtitle confirmation. Subtitle results expose confirmed state rather than raw transport data; successful subtitle commands invalidate older reads here. Timeline seeks also delegate playback restoration here, so newer transport intent supersedes an older seek completion; the timeline supplies only its current presentation lifetime. Adopted-video bindings guard their own presentation lifetime, while settings persistence stays with its existing owner.
 - Subtitle-track cycling accepts an availability predicate that the session evaluates immediately before dispatching a queued command. The shortcut controller owns checks for the global and originating row switches, watch path, video identity and originating window. Explicit cancellation uses a separate generation from latest-action feedback so rapid valid presses remain queued, while disable/re-enable cannot revive cancelled work. Discarded commands return no confirmed subtitle state or failure hint; already-issued PiP results retain the existing fallback-persistence contract.
 - `src/content/netflix-api-bridge.ts`: page-world bridge for Netflix player API access and selected subtitle metadata.
+- `src/content/media-session-bridge.iife.ts` and `media-session-bridge.ts`: synchronous MAIN-world installation before site scripts register handlers. Route configured play, pause, stop, seek and track controls to content and retain the latest Netflix handlers for fallback and restoration.
 - `src/content/subtitle-navigation.ts`: subtitle navigation, timing cache, loading feedback, and pending-action cancellation.
 - Subtitle navigation uses `subtitleNavigation` in settings and shortcut groups, and `SubtitleNavigation` / `SUBTITLE_NAVIGATION` in type and constant names. Settings schema v14 migrates the former `subtitlePractice` field from older settings and backups. Synced writes retain that field as an alias for older installations; current backups export only `subtitleNavigation`.
 - `src/shared/netflix-caption-events.ts`: JSON string message protocol for caption metadata across browser worlds.
@@ -142,6 +145,7 @@ Key areas:
 - `src/popup/popup-app.tsx`: toolbar popup for quick status, toggles, shortcut summary, and options entry.
 - `src/options/options-app.tsx`: extension options UI and subtitle-section navigation.
 - `src/options/use-shortcut-editor.ts`: mutually exclusive recording and conflict confirmation, saved-key checks, and recorder focus restoration.
+- `src/components/shortcut-keys-editor.tsx`: shared recording fields, add/remove controls and per-key feedback for up to three keys per action. General, seek and subtitle-size editors retain their own draft and save lifetimes.
 - `src/shared/shortcut-edit.ts`: shortcut-edit snapshots and one evaluation path for preview and authoritative save. It owns entry freshness, atomic assignment-plus-parameter changes, parameter validation, and quota preflight for preferred-speed, seek, and subtitle-size edits. Plain key edits preserve the latest enabled state and retain storage-owned quota errors. The three editors keep draft strings, dialogs, recording, and focus; settings writes remain in storage.
 - `src/shared/use-subtitle-activation.ts`: synchronous browser permission requests, duplicate-request prevention, and cancellation of stale approvals on disable or unmount.
 - `src/shared/shortcut-routing.ts`: shared shortcut support and general-shortcut precedence for Options, popup, editing, and playback routing. Playback-context readiness and event interception remain in content.
@@ -157,12 +161,31 @@ Key areas:
 
 ## How Shortcut Handling Works
 
-Chrome content scripts normally run in an isolated world, while Netflix player internals live on the page. The extension uses two content scripts:
+Chrome content scripts normally run in an isolated world, while Netflix player internals live on the page. The manifest registers three content scripts at `document_start`:
 
-- a `MAIN` world bridge, loaded at `document_start`
-- the main isolated content script, also loaded at `document_start`
+- the standalone `MAIN`-world Media Session bridge, bundled as a classic IIFE so registration starts synchronously before site scripts
+- the `MAIN`-world Netflix player API bridge
+- the main isolated content script for settings, keyboard handling and playback routing
 
 The isolated content script handles keyboard events and sends bridge requests for Netflix-specific actions such as seeking. This keeps shortcut logic in the extension while still using Netflix's player API for behavior that native video APIs may not handle correctly on Netflix. Chromium caption metadata requests and responses use JSON string event details with message identity and payload validation. Firefox routes playback commands and caption metadata through the background's MAIN-world execution path instead of depending on the page bridge. The injected function contains its runtime dependencies so serialization does not lose imported helpers. Caption documents are then downloaded through the background worker.
+
+The Media Session bridge runs in both browser builds. It routes configured play, pause, stop, seek-forward/backward and previous/next-track actions. Enabled supported media bindings are collected with their full Ctrl/Alt/Shift/Meta identity through the existing shortcut router. Every unmatched routed action waits up to 120ms, even with one plain binding and no modifier binding. Keyboard events resolve their exact key and modifiers immediately in either arrival order; playback transport can wait for classification of a newer possible canceller. Pending requests retain the complete original MEDIA_SESSION_KEYS candidate list; binding filters select only the standalone fallback. Thus an unassigned separate MediaPlay/MediaPause event can consume a pending request even when only MediaPlayPause is configured. A standalone control uses separate unmodified MediaPlay/MediaPause assignments before unmodified MediaPlayPause; if no plain binding exists, it is released to Netflix without guessing modifiers. The pending action is discarded after binding/master changes, blur, watch/video replacement, a closed originating window or typing. PiP availability follows the same actual support/active-state check during registration, selection and keyboard routing.
+
+Bridge requests carry JSON string details with a unique request ID and action. Content returns a JSON string result identifying a consumed or released request. The bridge retains each request's original browser details, so a deferred release invokes Netflix's latest handler exactly once with the original seek offset and other fields. Results for completed or unknown IDs have no effect. A one-second cleanup discards orphaned requests without replaying stale actions; abort clears requests and restores handlers. While any media routing is active, existing Netflix Play/Pause/Stop and relative-seek handlers are observed, including between a keyboard-first receipt and its later media partner. Unassigned native controls still reach Netflix once unless an older paired action was superseded. Their exact handlers are restored when routing is disabled or the bridge aborts. Direct action-name strings remain accepted by content for local fixtures.
+
+A playback binding uses the controller's explicit paused-state operation, so repeated Play cannot become Pause and synthetic media controls do not enter hold speed. Unmatched notifications remain independent and match the oldest compatible partner by monotonic receipt order. Expired notifications and completed pairs cannot consume the next command.
+
+`playback-request-arbiter.ts` owns tentative effects, confirmed cancellation barriers and deferred playback. An unmatched media request registers all possible playback/seek effects, without committing its guessed plain-key fallback. Routing and settlement are batched: an actual custom action withdraws its tentative effect before blocked work resumes. Confirmed opposing playback, toggles and seeks cancel older playback; same-direction repeats remain independent. Classification can hold older transport past its own pairing deadline until a newer request settles, while keyboard matching still expires at the original 120ms deadline. The latest confirmed barrier of each kind is retained for delayed callbacks; older redundant barriers are pruned. Custom seek classification uses `resolveSeekShortcut`, the same resolver as command dispatch, so both direction-suffixed relative actions and percentage actions register a seek effect.
+
+Each `ShortcutRequest` carries its original time and monotonic receipt order. Routing passes it explicitly into the command context, playback dispatcher and seek callbacks. The hold controller stores the request with its initiating key and reuses it for activation and short-press release; input-based cancellation compares the incoming request there. The content entry point keeps no ambient request scope or parallel hold-origin state. One `createPlaybackDispatcher` hook handles playback cancellation and deferred execution, with the arbiter confirming the playback intent during dispatch. A hold still records its toggle intent at keydown before its transport is activated. Playback cancellation uses order rather than timestamps. Subtitle requests invalidate older playback before caption loading and retain the same barrier at the eventual seek. Manual Skip Intro reports a seek before clicking Netflix's button, just as automatic skips and PiP timeline seeks do. Deferred playback rechecks the originating watch, video, window, typing state and global switch. Binding/master changes, blur, watch transitions and teardown discard deferred work. A hold waiting for arbitration restores playback/rate only after its effect has actually been applied.
+
+See [event flow and regression matrix](review-event-matrix.md) for the source-order, modifier, cancellation, async and lifecycle cases used to review the working tree.
+
+Handled PiP-toggle receipts use the source watch document as their pairing context. Their unexpired receipts survive blur during opening/closing, allowing a partner delivered to the active PiP or source document to complete the pair. Other notifications remain document-scoped and are cleared on blur. Binding/master changes and content teardown clear every receipt, including PiP toggles.
+
+Keyboard receipts retain whether the exact delivered binding was handled. A matched handled receipt consumes its media partner; an unhandled combination releases that partner to Netflix. Before routing a keyboard partner, detach its pending media request so the command's own cancellation hooks cannot leave a second receipt for an already completed pair. Ordinary keyboard combinations and volume-key routing keep their existing behavior.
+
+Unhandled actions go to Netflix's latest registered handler. Disabling routing restores those handlers; reinjection retains their registrations. Unassigned and unsupported Media Session actions stay under Netflix's control. Shared event names, supported actions and candidate key names live in `src/shared/media-session-events.ts`. Volume keys still depend on keyboard events, and recording a key still requires a keyboard event in the Options recorder.
 
 ## Testing
 

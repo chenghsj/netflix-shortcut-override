@@ -35,7 +35,7 @@ Schema v29 adds `preferredSpeedShortcuts`, an empty list by default. Each entry 
 | Speed adjustment amount | 0.05–5x, in 0.05x increments | 0.25x |
 | Play / Pause hold speed | 0.25–5x, in 0.05x increments | 2x |
 
-Schema v32 unifies relative seek limits. Previously valid v31 and earlier custom intervals above 300 seconds migrate to 300 on load or backup import, retaining IDs, order, bindings and enabled states. Signed v22 shortcuts are paired before their interval is capped. Current v32 backups reject out-of-range custom intervals. Percentage shortcuts retain the 0–100% range.
+Schema v32 unifies relative seek limits. Previously valid v31 and earlier custom intervals above 300 seconds migrate to 300 on load or backup import, retaining IDs, order, bindings and enabled states. Signed v22 shortcuts are paired before their interval is capped. Backups using schema v32 or newer reject out-of-range custom intervals. Percentage shortcuts retain the 0–100% range.
 
 Valid 5x maximum/preferred speeds and 300-second seek intervals survive storage and backup export/import. Older extension builds may clamp these expanded speed values or reject their backups; restore with a build that supports these ranges. The application version remains separate from the settings schema version.
 
@@ -65,7 +65,7 @@ Use a disposable browser profile. Keep the same extension ID and storage across 
 
 `shortcutSettings` retains the functional settings object, its inline `uiStyle`, and the older `spaceHold` alias. Older clients may replace that object.
 
-`shortcutSettingsCompatibility` retains a validated current-format snapshot under a separate synchronized key that older clients leave alone. Saves write both records in one storage call. Startup seeds this record from complete supported stored settings without rewriting the original object. When upgrading an older compatibility snapshot, startup first recovers the preferences it retained, so a legacy client's last write cannot erase newer settings during the schema upgrade. Reads of an older settings version recover fields it omitted, while honoring its shared fields and legacy aliases. Numeric subtitle sizes and unassigned keys also survive older clients that normalize unsupported values to defaults. Recovered new shortcuts yield to enabled keys assigned by an older client. Current-format records remain authoritative, including empty lists and resets. Each synchronized item is checked against the storage byte limit before saving.
+`shortcutSettingsCompatibilityV33` retains a validated current-format snapshot under a synchronized key. Clients through beta.2 write to `shortcutSettingsCompatibility`. The current build reads that older key during migration and writes recovery snapshots to the v33 key. Saves write both records in one storage call. Startup seeds this record from complete supported stored settings without rewriting the original object. When upgrading an older compatibility snapshot, startup first recovers the preferences it retained, so a legacy client's last write cannot erase newer settings during the schema upgrade. Reads of an older settings version recover fields it omitted, while honoring its shared fields and legacy aliases. Numeric subtitle sizes and unassigned keys also survive older clients that normalize unsupported values to defaults. Recovered new shortcuts yield to enabled keys assigned by an older client. Current-format records remain authoritative, including empty lists and resets. Each synchronized item is checked against the storage byte limit before saving.
 
 `shortcutUiStyle` stores the current client's synchronized appearance selection. `saveSettings` writes it together with the functional settings object. Older clients do not write this key.
 
@@ -83,8 +83,22 @@ Chrome sync remains last-writer-wins between concurrent new-client saves. An inl
 
 Schema v30 adds `hiddenFeatures`, an empty list for earlier settings. Entries identify hidden general or subtitle-navigation actions, or hold speed. Only existing disabled features may remain hidden; enabling or deleting a feature clears its hidden entry during normalization. Current backups validate this list, and compatibility recovery preserves it when an older client omits it. The feature checklist previews visibility locally and persists changes only on Apply.
 
-Schema v31 adds the boolean `hidePauseOverlay` preference under General settings. It defaults to false for fresh settings and older records/backups. Explicit on and off choices survive saves and backups; compatibility recovery also retains the choice when an older client replaces the shared settings object without this field. Current backups require a boolean value. Both this preference and the global extension switch must be on to hide the overlay; disabling the extension preserves the preference.
+Schema v31 adds the boolean `hidePauseOverlay` preference under Playback preferences → Pause screen. It defaults to false for fresh settings and older records/backups. Explicit on and off choices survive saves and backups; compatibility recovery also retains the choice when an older client replaces the shared settings object without this field. Current backups require a boolean value. Both this preference and the global extension switch must be on to hide the overlay; disabling the extension preserves the preference.
 
 `hiddenFeatures` also accepts `group:seek`, `group:percentage`, and `group:preferredSpeed`. A group marker is retained only while every current member is hidden and disabled; empty groups retain their explicit marker. Enabling a member clears the parent marker during normalization.
 
 `hiddenFeatures` also accepts `subtitleFavorites` and `audioFavorites`, including for empty lists. These markers disable favorite filtering and hide the corresponding settings panel without changing either saved list. Backups and older-client compatibility recovery retain the markers and saved preferences.
+
+## Multiple shortcuts (schema v33)
+
+Each binding keeps its existing `key` and may add up to two `additionalKeys`, for a maximum of three keys per action. Old single-key settings retain their keys, enabled states and values. All keys are normalized, checked for conflicts, stored and exported together; current-version backups reject malformed, duplicate, excessive or orphan additional keys. Empty draft rows are discarded on save. Resetting an action restores its default key and removes additional keys; disabling or hiding it retains its whole list.
+
+When an older client omits additional keys from synced settings, compatibility recovery restores them from the validated snapshot. If that client clears the primary key, the first recovered additional key becomes primary. Enabled legacy assignments take precedence over recovered keys; a conflict disables the recovered key's action and both directions when it belongs to a seek pair, without deleting its saved keys. A current-client save, confirmed import or Restore defaults replaces the compatibility snapshot so removed keys cannot return later.
+
+Run the multiple-key storage, backup, ownership and stale-editor regressions with:
+
+```sh
+npm test -- src/shared/multiple-shortcuts.test.ts src/shared/settings-compatibility.test.ts src/shared/shortcut-assignment.test.ts src/shared/shortcut-edit.test.ts src/options/options-app.test.tsx
+```
+
+See the [multiple-shortcut and media-control acceptance checklist](chrome-real-browser-test.md#multiple-shortcuts-and-media-track-controls) for installed-browser checks, including backup round trips. Firefox uses the same checklist without PiP. Physical media-key delivery must be recorded separately from simulated events.

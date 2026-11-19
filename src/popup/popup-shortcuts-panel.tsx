@@ -101,7 +101,7 @@ export function PopupShortcutsPanel({ settings, locale, supportsSubtitlePreservi
           {!row.enabled && <Badge variant="secondary" className="rounded-[var(--ui-key-radius)]">{copy.disabledStatus}</Badge>}
         </> : !supported ? <Badge variant="secondary" className="rounded-[var(--ui-key-radius)]" title={copy.pictureInPictureUnsupported}>{copy.diagnosticsUnsupportedValue}</Badge>
           : !row.enabled ? <Badge variant="secondary" className="rounded-[var(--ui-key-radius)]">{copy.disabledStatus}</Badge>
-            : <KeyBindingKbd binding={row.key} emptyLabel={copy.unassignedShortcut} className="flex-wrap justify-end" />}
+            : <KeyBindingKbd binding={row.key} additionalKeys={row.additionalKeys} emptyLabel={copy.unassignedShortcut} className="flex-wrap justify-end" />}
         {overridingAction && <Badge variant="secondary" className="rounded-[var(--ui-key-radius)] whitespace-normal text-right" aria-label={subtitleCopy.overriddenBy.replace('{action}', labels[overridingAction])}>{subtitleCopy.overridden}</Badge>}
       </span>
     if (children.length) return <PopupShortcutGroup key={row.id} label={row.label} value={value}
@@ -148,7 +148,7 @@ export function PopupShortcutsPanel({ settings, locale, supportsSubtitlePreservi
   return <section aria-label={copy.shortcuts} className="app-popup-shortcuts flex flex-col gap-3 font-normal">
     <InputGroup>
       <InputGroupAddon><SearchIcon aria-hidden="true" /></InputGroupAddon>
-      <InputGroupInput ref={input} type="text" role="searchbox" enterKeyHint="search" className="text-sm" aria-label={browserCopy.search} placeholder={browserCopy.search} aria-keyshortcuts={searchShortcut.ariaKeyShortcuts}
+      <InputGroupInput ref={input} autoFocus type="text" role="searchbox" enterKeyHint="search" className="text-sm" aria-label={browserCopy.search} placeholder={browserCopy.search} aria-keyshortcuts={searchShortcut.ariaKeyShortcuts}
         value={query} onChange={event => onQueryChange(event.target.value)} onKeyDown={event => { if (event.key === 'Escape') onQueryChange('') }} />
       <InputGroupAddon align="inline-end" className="pr-3 has-[>kbd]:mr-0"><kbd aria-hidden="true" className="whitespace-nowrap font-sans text-xs font-normal text-muted-foreground">{searchShortcut.label}</kbd></InputGroupAddon>
       {query && <InputGroupAddon align="inline-end"><Button type="button" variant="ghost" size="icon-sm" aria-label={browserCopy.clear}

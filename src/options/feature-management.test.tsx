@@ -164,7 +164,7 @@ describe('page feature checklist', () => {
       expect(checkbox).toBeChecked()
       expect(screen.getByRole('button', { name: 'Edit Mute' })).toBeVisible()
       expect(screen.getByRole('switch', { name: 'Mute Enabled' })).not.toBeChecked()
-      expect(screen.queryByRole('button', { name: 'Use for Mute' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Use this key' })).not.toBeInTheDocument()
       const saved = await getSettings()
       expect(saved.hiddenFeatures).toContain('general:mute')
       expect(saved.bindings.fullscreen.enabled).toBe(true)
@@ -277,7 +277,7 @@ describe('page feature checklist', () => {
     fireEvent.click(toggle)
     expect(toggle).not.toBeChecked()
     expect((await getSettings()).bindings.fullscreen.enabled).toBe(true)
-    fireEvent.click(await screen.findByRole('button', { name: 'Use for Mute' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Use this key' }))
     await waitFor(async () => {
       const saved = await getSettings()
       expect(saved.bindings.mute.enabled).toBe(true)
@@ -390,7 +390,7 @@ describe('page feature checklist', () => {
     expect(within(checklist).getByRole('checkbox', { name: 'Show Forward / Rewind 10 seconds' })).toBeChecked()
     expect(screen.getByRole('switch', { name: 'Forward / Rewind 10 seconds Enabled' })).not.toBeChecked()
     expect(screen.getByRole('switch', { name: 'Forward / Rewind 30 seconds Enabled' })).toBeChecked()
-    expect(screen.queryByRole('button', { name: 'Use for Forward / Rewind' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Use this key' })).not.toBeInTheDocument()
     expect((await getSettings()).hiddenFeatures).toContain('group:seek')
     expect((await getSettings()).bindings['seek:custom-forward'].enabled).toBe(false)
     apply(checklist)
@@ -422,7 +422,7 @@ describe('page feature checklist', () => {
     fireEvent.click(within(checklist).getByRole('checkbox', { name: `Show ${label}` }))
     expect(screen.getByRole('row', { name: label })).toBeVisible()
     expect(screen.getByRole('switch', { name: `${label} Enabled` })).not.toBeChecked()
-    expect(screen.queryByRole('button', { name: `Use for ${label}` })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Use this key' })).not.toBeInTheDocument()
     apply(checklist)
     await waitFor(async () => {
       const saved = await getSettings()
@@ -511,8 +511,8 @@ describe('page feature checklist', () => {
   })
 
   it.each([
-    ['Playback', ['Play / Pause', 'Play / Pause hold speed', 'Fullscreen', 'Picture-in-Picture']],
-    ['Seeking and navigation', ['Previous frame', 'Next frame', 'Skip intro', 'Previous episode', 'Next episode', 'Forward / Rewind', 'Forward / Rewind 10 seconds', 'Forward / Rewind 20 seconds', 'Jump to position', '50%']],
+    ['Playback', ['Play / Pause', 'Play / Pause hold speed', 'Previous episode', 'Next episode', 'Fullscreen', 'Picture-in-Picture']],
+    ['Seeking and navigation', ['Previous frame', 'Next frame', 'Skip intro', 'Forward / Rewind', 'Forward / Rewind 10 seconds', 'Forward / Rewind 20 seconds', 'Jump to position', '50%']],
     ['Subtitles', ['Toggle subtitles', 'Cycle subtitle size', 'Next subtitle language', 'Previous subtitle language', 'Set size · 150%', 'Favorite subtitles']],
     ['Volume and audio', ['Volume up', 'Volume down', 'Mute', 'Previous audio language', 'Next audio language', 'Favorite audio tracks']],
     ['Playback speed', ['Increase speed', 'Decrease speed', 'Preferred speed', 'Set preferred speed', 'Set preferred speed · 2×', 'Reset speed']],

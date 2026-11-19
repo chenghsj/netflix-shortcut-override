@@ -144,7 +144,7 @@ function OptionsLayoutContent({ locale, pages, activePage, onPageChange, query, 
         {isMobile && <Card size="sm" aria-label={appCopy.enabled}>
           <CardContent>{globalControl}</CardContent>
         </Card>}
-        <InputGroup className={cn('h-10', readingHelp && 'max-w-3xl')}>
+        <InputGroup className="h-10">
           <InputGroupAddon><SearchIcon aria-hidden="true" /></InputGroupAddon>
           <InputGroupInput ref={input} id="shortcut-search" type="text" role="searchbox" enterKeyHint="search" value={query} aria-label={searchLabel} placeholder={searchLabel} aria-keyshortcuts={searchShortcut.ariaKeyShortcuts}
             onChange={event => onQueryChange(event.target.value)} onKeyDown={event => { if (event.key === 'Escape') onQueryChange('') }} />

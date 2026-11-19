@@ -1,5 +1,6 @@
 import { DEFAULT_SETTINGS, normalizeSettings, parseSettingsForBackup } from './shortcut-settings'
-import { DEFAULT_KEY_BINDINGS, keyBindingsEqual } from './shortcut-bindings'
+import { DEFAULT_KEY_BINDINGS, getBindingKeys, keyBindingsEqual } from './shortcut-bindings'
+import { createShortcutCatalog } from './shortcut-catalog'
 import { DEFAULT_SUBTITLE_NAVIGATION_BINDINGS } from './subtitle-navigation'
 import { SUBTITLE_NAVIGATION_ACTIONS, type ShortcutAction, type ShortcutSettings } from './shortcut-types'
 
@@ -59,14 +60,55 @@ export const recoverCompatibleSettings = (raw: unknown, saved: unknown): Shortcu
   const rawBindings = isRecord(raw.bindings) ? raw.bindings : {}
   const rawSubtitles = isRecord(canonicalRaw.subtitleNavigation) && isRecord(canonicalRaw.subtitleNavigation.bindings)
     ? canonicalRaw.subtitleNavigation.bindings : {}
-  const owners = [
-    ...Object.entries(restored.bindings).filter(([action]) => action in rawBindings).map(([, binding]) => binding),
-    ...SUBTITLE_NAVIGATION_ACTIONS.filter(action => action in rawSubtitles).map(action => restored.subtitleNavigation.bindings[action]),
-  ].filter(binding => binding.enabled && binding.key)
-  for (const [action, binding] of Object.entries(restored.bindings)) {
-    if (!(action in rawBindings) && owners.some(owner => keyBindingsEqual(owner.key, binding.key))) {
-      binding.enabled = false
+  const bindings = [
+    ...Object.entries(restored.bindings).map(([action, binding]) => ({
+      generalAction: action as ShortcutAction, binding, rawBinding: rawBindings[action],
+    })),
+    ...SUBTITLE_NAVIGATION_ACTIONS.map(action => ({
+      generalAction: undefined, binding: restored.subtitleNavigation.bindings[action], rawBinding: rawSubtitles[action],
+    })),
+  ]
+  const keySources = bindings.filter(({ binding }) => binding?.enabled).map(({ generalAction, binding, rawBinding }) => {
+    const legacy = isRecord(rawBinding) ? rawBinding : {}
+    const hasLegacyPrimary = legacy.key !== undefined
+    const hasLegacyAdditional = legacy.additionalKeys !== undefined
+    return {
+      generalAction,
+      binding,
+      legacyKeys: getBindingKeys({
+        key: hasLegacyPrimary ? binding.key : null,
+        additionalKeys: hasLegacyAdditional ? binding.additionalKeys : undefined,
+      }),
+      recoveredKeys: getBindingKeys({
+        key: hasLegacyPrimary ? null : binding.key,
+        additionalKeys: hasLegacyAdditional ? undefined : binding.additionalKeys,
+      }),
     }
+  })
+
+  // An old client can claim a recovered key even when it knows the action that
+  // previously owned it. Collect claims before disabling any bindings.
+  const legacyClaims = keySources.flatMap(({ binding, legacyKeys }) => legacyKeys.map(key => ({ binding, key })))
+  const { seekPairFor } = createShortcutCatalog(restored)
+  for (const { generalAction, binding, recoveredKeys } of keySources) {
+    const conflicts = recoveredKeys.some(key => legacyClaims.some(claim =>
+      claim.binding !== binding && keyBindingsEqual(claim.key, key)))
+    if (!conflicts) continue
+    binding.enabled = false
+    const pair = generalAction ? seekPairFor(generalAction) : undefined
+    if (!pair) continue
+    for (const action of Object.values(pair.actions)) {
+      const direction = restored.bindings[action]
+      if (direction) direction.enabled = false
+    }
+  }
+  // Older clients can clear the primary field without seeing the other keys.
+  // Promote after resolving conflicts so the promoted key remains a recovered key.
+  for (const { binding } of bindings) {
+    if (binding?.key !== null || !binding.additionalKeys?.length) continue
+    const [key, ...additionalKeys] = binding.additionalKeys
+    binding.key = key
+    binding.additionalKeys = additionalKeys
   }
   return normalizeSettings(restored)
 }

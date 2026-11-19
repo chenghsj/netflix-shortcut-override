@@ -6,7 +6,8 @@ import { getCopy } from '@/shared/i18n'
 import { recoverCompatibleSettings } from '@/shared/settings-compatibility'
 
 export const SETTINGS_STORAGE_KEY = 'shortcutSettings'
-export const SETTINGS_COMPATIBILITY_KEY = 'shortcutSettingsCompatibility'
+export const SETTINGS_COMPATIBILITY_KEY = 'shortcutSettingsCompatibilityV33'
+const LEGACY_SETTINGS_COMPATIBILITY_KEY = 'shortcutSettingsCompatibility'
 export const UI_STYLE_STORAGE_KEY = 'shortcutUiStyle'
 export const UI_STYLE_DEFAULT_KEY = 'shortcutUiStyleDefault'
 const SYNC_ITEM_LIMIT_BYTES = 8192
@@ -14,6 +15,7 @@ type StorageValues = Record<string, unknown>
 type SettingsSnapshot = {
   functional?: unknown
   compatibility?: unknown
+  legacyCompatibility?: unknown
   selection?: unknown
   syncedDefault?: unknown
   localDefault?: unknown
@@ -21,6 +23,7 @@ type SettingsSnapshot = {
 const storageFields = [
   { area: 'sync', key: SETTINGS_STORAGE_KEY, field: 'functional' },
   { area: 'sync', key: SETTINGS_COMPATIBILITY_KEY, field: 'compatibility' },
+  { area: 'sync', key: LEGACY_SETTINGS_COMPATIBILITY_KEY, field: 'legacyCompatibility' },
   { area: 'sync', key: UI_STYLE_STORAGE_KEY, field: 'selection' },
   { area: 'sync', key: UI_STYLE_DEFAULT_KEY, field: 'syncedDefault' },
   { area: 'local', key: UI_STYLE_DEFAULT_KEY, field: 'localDefault' },
@@ -61,6 +64,7 @@ const readSnapshot = async (): Promise<SettingsSnapshot> => {
     return {
       functional: sync[SETTINGS_STORAGE_KEY],
       compatibility: sync[SETTINGS_COMPATIBILITY_KEY],
+      legacyCompatibility: sync[LEGACY_SETTINGS_COMPATIBILITY_KEY],
       selection: sync[UI_STYLE_STORAGE_KEY],
       syncedDefault: sync[UI_STYLE_DEFAULT_KEY],
     }
@@ -72,6 +76,7 @@ const readSnapshot = async (): Promise<SettingsSnapshot> => {
   return {
     functional: sync[SETTINGS_STORAGE_KEY],
     compatibility: sync[SETTINGS_COMPATIBILITY_KEY],
+    legacyCompatibility: sync[LEGACY_SETTINGS_COMPATIBILITY_KEY],
     selection: sync[UI_STYLE_STORAGE_KEY],
     syncedDefault: sync[UI_STYLE_DEFAULT_KEY],
     localDefault: local[UI_STYLE_DEFAULT_KEY],
@@ -104,7 +109,10 @@ const styleForInitialization = (
 }
 
 const projectSettings = (snapshot: SettingsSnapshot): ShortcutSettings => {
-  const settings = recoverCompatibleSettings(snapshot.functional ?? DEFAULT_SETTINGS, snapshot.compatibility)
+  const settings = recoverCompatibleSettings(
+    snapshot.functional ?? DEFAULT_SETTINGS,
+    snapshot.compatibility ?? snapshot.legacyCompatibility,
+  )
   const style = styleForRead(snapshot)
   return style ? { ...settings, uiStyle: style } : settings
 }
@@ -180,7 +188,7 @@ export const initializeSettingsCompatibility = (): Promise<void> => withStableSn
   }
   const parsed = parseSettingsForBackup(raw as Record<string, unknown>)
   if (!parsed.ok) return
-  const settings = recoverCompatibleSettings(raw, saved)
+  const settings = recoverCompatibleSettings(raw, saved ?? snapshot.legacyCompatibility)
   if (!fitsSettingsStorageLimit(settings)) return
   if (hasChromeStorage()) await writeArea('sync', { [SETTINGS_COMPATIBILITY_KEY]: settings })
   else globalThis.localStorage?.setItem(SETTINGS_COMPATIBILITY_KEY, JSON.stringify(settings))

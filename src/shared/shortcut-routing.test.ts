@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_SETTINGS } from './shortcut-settings'
 import { getShortcutAvailability, getSubtitleNavigationAvailability, resolvePlaybackShortcut } from './shortcut-routing'
-import type { KeyBinding } from './shortcut-types'
+import type { KeyBinding, ShortcutSettings } from './shortcut-types'
 
 const eventFor = (key: KeyBinding) => ({
   code: key.code, key: key.key,
@@ -16,6 +16,43 @@ const overlappingSettings = () => {
 }
 
 describe('shortcut routing', () => {
+  it.each(['MediaTrackNext', 'MediaNextTrack'])('routes the saved additional episode shortcut %s', key => {
+    const settings: ShortcutSettings = structuredClone(DEFAULT_SETTINGS)
+    settings.bindings.nextEpisode.additionalKeys = [{ code: 'MediaTrackNext', key: 'MediaTrackNext', ctrl: false, alt: false, shift: false, meta: false }]
+    for (const code of ['', 'Unidentified', key]) {
+      expect(resolvePlaybackShortcut(settings, new KeyboardEvent('keydown', { key, code }), true)).toMatchObject({ action: 'nextEpisode' })
+    }
+    expect(resolvePlaybackShortcut(settings, eventFor(settings.bindings.nextEpisode.key!), true)).toMatchObject({ action: 'nextEpisode' })
+    for (const modifier of ['ctrlKey', 'altKey', 'shiftKey', 'metaKey']) {
+      expect(resolvePlaybackShortcut(settings, new KeyboardEvent('keydown', { key, [modifier]: true }), true)).toBeNull()
+    }
+    settings.bindings.nextEpisode.enabled = false
+    expect(resolvePlaybackShortcut(settings, new KeyboardEvent('keydown', { key }), true)).toBeNull()
+    settings.bindings.nextEpisode.enabled = true
+    settings.bindings.nextEpisode.additionalKeys = []
+    settings.bindings.nextEpisode.key = null
+    expect(resolvePlaybackShortcut(settings, new KeyboardEvent('keydown', { key }), true)).toBeNull()
+    settings.bindings.nextEpisode.key = DEFAULT_SETTINGS.bindings.nextEpisode.key
+    settings.enabled = false
+    expect(resolvePlaybackShortcut(settings, new KeyboardEvent('keydown', { key }), true)).toBeNull()
+  })
+
+  it('releases an unassigned media key and preserves physical function-key assignments', () => {
+    const settings = structuredClone(DEFAULT_SETTINGS)
+    const event = new KeyboardEvent('keydown', { key: 'MediaTrackNext' })
+    const key = { code: 'MediaTrackNext', key: 'MediaTrackNext', ctrl: false, alt: false, shift: false, meta: false }
+    settings.bindings.mute.key = key
+    expect(resolvePlaybackShortcut(settings, event, true)).toMatchObject({ group: 'general', action: 'mute' })
+    settings.bindings.mute.enabled = false
+    settings.subtitleNavigation.enabled = true
+    settings.subtitleNavigation.bindings.next.key = key
+    expect(resolvePlaybackShortcut(settings, event, true)).toMatchObject({ group: 'subtitleNavigation', action: 'next' })
+    settings.subtitleNavigation.bindings.next.enabled = false
+    expect(resolvePlaybackShortcut(settings, event, true)).toBeNull()
+    settings.bindings.mute = { enabled: true, key: { ...key, code: 'F9' } }
+    expect(resolvePlaybackShortcut(settings, new KeyboardEvent('keydown', { key: 'MediaTrackNext', code: 'F9' }), true)).toMatchObject({ action: 'mute' })
+  })
+
   it.each(['LaunchMediaPlayer', 'Unidentified', 'Dead', 'a'])('does not route unknown %s events to legacy unidentified bindings', key => {
     const settings = structuredClone(DEFAULT_SETTINGS)
     settings.subtitleNavigation.enabled = true

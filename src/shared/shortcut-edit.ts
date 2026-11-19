@@ -1,5 +1,5 @@
 import { applyShortcutAssignment, inspectShortcutAssignment } from './shortcut-assignment'
-import { isShortcutKey } from './shortcut-bindings'
+import { getBindingKeys, isShortcutKey, MAX_SHORTCUT_KEYS } from './shortcut-bindings'
 import { createShortcutCatalog } from './shortcut-catalog'
 import { getSeekShortcutActions, SEEK_SHORTCUT_LIMITS } from './seek-shortcuts'
 import { normalizeSpeedSettings, SEEK_LIMITS } from './shortcut-settings'
@@ -25,6 +25,7 @@ export type ShortcutEditSnapshot = {
 export type ShortcutEditDraft = {
   snapshot: ShortcutEditSnapshot
   keys: Partial<Record<ShortcutTarget['action'], KeyBinding | null>>
+  additionalKeys?: Partial<Record<ShortcutTarget['action'], readonly (KeyBinding | null)[]>>
   enabled: boolean | 'preserve'
   value?: number | string | readonly number[]
   transfer?: boolean
@@ -72,9 +73,9 @@ const readEntry = (settings: ShortcutSettings, target: ShortcutEditTarget) => {
   // protect the entire entry, including its enabled state and metadata.
   const physicalKey = (key: KeyBinding | null | undefined) => key && [key.code, key.ctrl, key.alt, key.shift, key.meta]
   const identity = JSON.stringify(target.kind === 'binding'
-    ? { exists, key: physicalKey(bindings[0]?.key) }
+    ? { exists, keys: getBindingKeys(bindings[0]).map(physicalKey) }
     : { exists, value, bindings: target.kind === 'subtitleSize' ? bindings
-      : bindings.map(binding => binding && { enabled: binding.enabled, key: physicalKey(binding.key) }) })
+      : bindings.map(binding => binding && { enabled: binding.enabled, keys: getBindingKeys(binding).map(physicalKey) }) })
   return { targets, bindings, value, exists, identity }
 }
 
@@ -96,10 +97,13 @@ export function evaluateShortcutEdit(settings: ShortcutSettings, draft: Shortcut
   const { target } = snapshot
   const entry = readEntry(settings, target)
   const enabled = draft.enabled === 'preserve' ? entry.bindings.some(binding => binding?.enabled) : draft.enabled
-  const assignments = entry.targets.map(item => ({ ...item, key: keys[item.action] ?? null }))
+  const assignments = entry.targets.map(item => ({ ...item, key: keys[item.action] ?? null,
+    additionalKeys: (draft.additionalKeys?.[item.action] ?? bindingFor(settings, item)?.additionalKeys ?? [])
+      .filter((key): key is KeyBinding => key !== null) }))
   const analysis = inspectShortcutAssignment(settings, assignments, { enabled, supportsSubtitlePreservingPip })
   const stale = !isShortcutEditCurrent(settings, snapshot)
   let valid = entry.targets.every(item => isShortcutKey(keys[item.action]))
+  valid &&= assignments.every(item => getBindingKeys(item).length <= MAX_SHORTCUT_KEYS && item.additionalKeys.every(isShortcutKey))
   if (target.kind === 'preferredSpeed') valid &&= typeof value === 'number' && Number.isFinite(value)
   if (target.kind === 'seek') {
     const percentage = target.shortcut?.kind === 'percentage'
@@ -144,9 +148,8 @@ export function evaluateShortcutEdit(settings: ShortcutSettings, draft: Shortcut
       }
     }
   }
-  // Plain key edits retain their existing storage error handling. Parameter edits
-  // additionally expose quota preflight so their dialogs can retain the draft.
-  const storageFull = !blocked && target.kind !== 'binding' && !fitsSettingsStorageLimit(next)
+  // Check quota before saving so every editor can retain an oversized draft.
+  const storageFull = !blocked && !fitsSettingsStorageLimit(next)
   return { settings: blocked || storageFull ? settings : next, stale, storageFull,
     canSave: !blocked && !storageFull, analysis }
 }

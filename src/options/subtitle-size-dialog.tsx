@@ -4,7 +4,7 @@ import { RESET_SCOPE_COPY } from '@/shared/reset-scopes'
 import { GripVerticalIcon, PlusIcon } from 'lucide-react'
 import { useLayoutEffect, useRef } from 'react'
 import { DragHandle } from '@/components/drag-handle'
-import { ShortcutRecordingArea } from '@/components/shortcut-recording-area'
+import { ShortcutKeysEditor } from '@/components/shortcut-keys-editor'
 import { Alert, AlertTitle } from '@/components/app-ui/alert'
 import { Button } from '@/components/app-ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/app-ui/dialog'
@@ -13,9 +13,9 @@ import { Label } from '@/components/app-ui/label'
 import { Separator } from '@/components/app-ui/separator'
 import { getCopy } from '@/shared/i18n'
 import { getShortcutLabels } from '@/shared/seek-shortcuts'
-import { keyBindingFromEvent } from '@/shared/shortcut-bindings'
 import { getSubtitleSizeEditLimit, isSubtitleSizePercent, SUBTITLE_SIZE_COPY, SUBTITLE_SIZE_LIMITS } from '@/shared/subtitle-size-shortcuts'
 import type { Locale, ShortcutSettings } from '@/shared/shortcut-types'
+import { SUBTITLE_NAVIGATION_COPY } from '@/shared/subtitle-navigation'
 import { useNumericLabelDrag } from '@/shared/use-numeric-label-drag'
 import { useDragPreview } from '@/shared/use-drag-preview'
 import { useDragReorder } from '@/shared/use-drag-reorder'
@@ -37,6 +37,7 @@ export function SubtitleSizeDialog({ editor, settings, locale }: {
   const { dialog } = editor
   const copy = getCopy(locale)
   const sizeCopy = SUBTITLE_SIZE_COPY[locale]
+  const labels: Record<string, string> = { ...getShortcutLabels(settings, locale), ...SUBTITLE_NAVIGATION_COPY[locale] }
   const firstInput = useRef<HTMLInputElement>(null)
   const keyboardGrip = useRef<HTMLButtonElement | null>(null)
   const { setDragPreview, removeDragPreview } = useDragPreview()
@@ -53,7 +54,7 @@ export function SubtitleSizeDialog({ editor, settings, locale }: {
     keyboardGrip.current = null
   }, [dialog?.sizes])
   return <Dialog open={Boolean(dialog)} onOpenChange={open => { if (!open) editor.close() }}>
-    <DialogContent className="flex max-h-[90dvh] flex-col overflow-hidden sm:max-w-lg" onOpenAutoFocus={event => { event.preventDefault(); firstInput.current?.focus() }} onCloseAutoFocus={editor.restoreFocus}>
+    <DialogContent size="wide" className="flex flex-col overflow-hidden" onOpenAutoFocus={event => { event.preventDefault(); firstInput.current?.focus() }} onCloseAutoFocus={editor.restoreFocus}>
       <DialogHeader className="shrink-0"><DialogTitle>{sizeCopy.edit}</DialogTitle><DialogDescription>{dialog?.kind === 'fixed' ? sizeCopy.fixedDescription : sizeCopy.description}</DialogDescription></DialogHeader>
       <div className="-mx-2 flex min-h-0 min-w-0 flex-col gap-5 overflow-y-auto px-2 pt-1 pb-2">
         <fieldset className="min-w-0 space-y-3" aria-describedby="subtitle-size-range">
@@ -100,17 +101,10 @@ export function SubtitleSizeDialog({ editor, settings, locale }: {
           {!editor.validSizes && dialog && <p id="subtitle-size-error" role="alert" className="text-sm text-destructive">{sizeCopy.invalid}</p>}
         </fieldset>
         <Separator />
-        <div className="space-y-2">
-          <Label id="subtitle-size-key-label">{copy.key}</Label>
-          <ShortcutRecordingArea binding={dialog?.key} placeholder={copy.pressKey} idlePlaceholder={copy.shortcutPlaceholder} aria-labelledby="subtitle-size-key-label"
-            onClear={() => editor.capture(null)} clearLabel={copy.clearShortcut}
-            tabIndex={0} aria-invalid={Boolean(editor.conflict)} aria-describedby={editor.conflict ? 'subtitle-size-conflict' : undefined}
-            onClick={event => event.currentTarget.focus()} onKeyDown={event => {
-              if (event.key === 'Tab' || event.key === 'Escape' || ['Shift', 'Control', 'Alt', 'Meta'].includes(event.key)) return
-              event.preventDefault(); event.stopPropagation(); editor.capture(keyBindingFromEvent(event))
-            }} />
-        </div>
-        {editor.conflict && <Alert id="subtitle-size-conflict" variant="destructive"><AlertTitle>{copy.conflict.replace('{action}', getShortcutLabels(settings, locale)[editor.conflict])}</AlertTitle></Alert>}
+        <ShortcutKeysEditor bindings={[dialog?.key ?? null, ...(dialog?.additionalKeys ?? [])]} locale={locale}
+          onChange={editor.captureKeys} aria-label={copy.key} clearLabel={copy.clearShortcut}
+          tabIndex={0} conflicts={editor.keyConflicts} actionLabel={action => labels[action]}
+          onClick={event => event.currentTarget.focus()} />
         {editor.stale && <Alert variant="destructive"><AlertTitle>{sizeCopy.changed}</AlertTitle></Alert>}
         {editor.storageFull && <Alert variant="destructive"><AlertTitle>{copy.settingsStorageFull}</AlertTitle></Alert>}
       </div>

@@ -97,9 +97,18 @@ type Copy = {
   importInvalidSettings: string
   importUnsupportedSettingsVersion: string
   importSaveError: string
+  resetDefaults: string
+  resetDefaultsDesc: string
+  resetDefaultsDialogTitle: string
+  resetDefaultsDialogDesc: string
+  resetDefaultsSuccess: string
+  resetDefaultsSaveError: string
+  resettingDefaults: string
   openOptions: string
   githubRepository: string
   githubRepositoryAriaLabel: string
+  reportIssue: string
+  reportIssueAriaLabel: string
   rateExtension: string
   rateExtensionAriaLabel: string
   otherProjects: string
@@ -225,7 +234,6 @@ type Copy = {
   cancel: string
   save: string
   conflict: string
-  noConflict: string
   replacedNetflixKeys: string
   willReplaceNetflixKeys: string
   actions: Record<BuiltinShortcutAction, string>
@@ -269,9 +277,18 @@ export const COPY: Record<Locale, Copy> = {
     importInvalidSettings: 'This backup contains incomplete or invalid settings.',
     importUnsupportedSettingsVersion: 'This backup was created by a newer settings version.',
     importSaveError: 'Settings could not be imported: {message}',
+    resetDefaults: 'Restore defaults',
+    resetDefaultsDesc: 'Restore all settings to their defaults, removing custom shortcuts and favorite languages.',
+    resetDefaultsDialogTitle: 'Restore all default settings?',
+    resetDefaultsDialogDesc: 'This resets shortcuts, playback settings, hidden features, language, theme and interface style, and clears favorite subtitles and audio tracks. Export a backup first if you want to keep your current settings.',
+    resetDefaultsSuccess: 'All settings have been restored to their defaults.',
+    resetDefaultsSaveError: 'Defaults could not be restored. Try again. ({message})',
+    resettingDefaults: 'Restoring…',
     openOptions: 'Open options',
     githubRepository: 'GitHub',
     githubRepositoryAriaLabel: 'Open GitHub repository',
+    reportIssue: 'Report an issue',
+    reportIssueAriaLabel: 'Open a new GitHub issue',
     rateExtension: 'Rate this extension',
     rateExtensionAriaLabel: 'Rate this extension in the extension store',
     otherProjects: 'Other products',
@@ -408,7 +425,6 @@ export const COPY: Record<Locale, Copy> = {
     cancel: 'Cancel',
     save: 'Save',
     conflict: 'This shortcut is already used by {action}.',
-    noConflict: 'No conflict detected.',
     replacedNetflixKeys: 'Replaces Netflix: {keys}',
     willReplaceNetflixKeys: 'Saving will disable the Netflix keys: {keys}',
     actions: {
@@ -474,9 +490,18 @@ export const COPY: Record<Locale, Copy> = {
     importInvalidSettings: '備份中的設定不完整或無效。',
     importUnsupportedSettingsVersion: '此備份由較新的設定版本建立，無法匯入。',
     importSaveError: '無法匯入設定：{message}',
+    resetDefaults: '還原預設值',
+    resetDefaultsDesc: '將所有設定恢復預設，並清除自訂快捷鍵與語言收藏。',
+    resetDefaultsDialogTitle: '確定還原所有預設值？',
+    resetDefaultsDialogDesc: '這會重設快捷鍵、播放設定、隱藏功能、語言、主題與介面風格，並清空收藏字幕與音軌。如需保留目前設定，請先匯出備份。',
+    resetDefaultsSuccess: '所有設定已還原為預設值。',
+    resetDefaultsSaveError: '無法還原預設值，請重試。（{message}）',
+    resettingDefaults: '還原中…',
     openOptions: '開啟設定頁',
     githubRepository: 'GitHub',
     githubRepositoryAriaLabel: '開啟 GitHub repo',
+    reportIssue: '回報問題',
+    reportIssueAriaLabel: '在 GitHub 回報問題',
     rateExtension: '為這個擴充功能評分',
     rateExtensionAriaLabel: '在擴充功能商店為這個擴充功能評分',
     otherProjects: '其他產品',
@@ -631,7 +656,6 @@ export const COPY: Record<Locale, Copy> = {
     cancel: '取消',
     save: '儲存',
     conflict: '這組快捷鍵已被「{action}」使用。',
-    noConflict: '沒有偵測到衝突。',
     replacedNetflixKeys: '已取代 Netflix：{keys}',
     willReplaceNetflixKeys: '儲存後將停用 Netflix 原生按鍵：{keys}',
     actions: {
@@ -697,9 +721,18 @@ export const COPY: Record<Locale, Copy> = {
     importInvalidSettings: '备份中的设置不完整或无效。',
     importUnsupportedSettingsVersion: '此备份由较新的设置版本创建，无法导入。',
     importSaveError: '无法导入设置：{message}',
+    resetDefaults: '恢复默认值',
+    resetDefaultsDesc: '将所有设置恢复默认，并清除自定义快捷键与语言收藏。',
+    resetDefaultsDialogTitle: '确定恢复所有默认值？',
+    resetDefaultsDialogDesc: '这会重置快捷键、播放设置、隐藏功能、语言、主题与界面风格，并清空收藏字幕与音轨。如需保留当前设置，请先导出备份。',
+    resetDefaultsSuccess: '所有设置已恢复为默认值。',
+    resetDefaultsSaveError: '无法恢复默认值，请重试。（{message}）',
+    resettingDefaults: '恢复中…',
     openOptions: '打开设置页',
     githubRepository: 'GitHub',
     githubRepositoryAriaLabel: '打开 GitHub repo',
+    reportIssue: '反馈问题',
+    reportIssueAriaLabel: '在 GitHub 反馈问题',
     rateExtension: '为这个扩展程序评分',
     rateExtensionAriaLabel: '在扩展程序商店为这个扩展程序评分',
     otherProjects: '其他产品',
@@ -854,7 +887,6 @@ export const COPY: Record<Locale, Copy> = {
     cancel: '取消',
     save: '保存',
     conflict: '这组快捷键已被“{action}”使用。',
-    noConflict: '没有检测到冲突。',
     replacedNetflixKeys: '已取代 Netflix：{keys}',
     willReplaceNetflixKeys: '保存后将停用 Netflix 原生按键：{keys}',
     actions: {
@@ -920,9 +952,18 @@ export const COPY: Record<Locale, Copy> = {
     importInvalidSettings: 'バックアップの設定が不完全か無効です。',
     importUnsupportedSettingsVersion: '新しい設定バージョンで作成されたため、読み込めません。',
     importSaveError: '設定を読み込めませんでした：{message}',
+    resetDefaults: '初期設定に戻す',
+    resetDefaultsDesc: 'すべての設定を初期値に戻し、カスタムショートカットとお気に入りの言語を削除します。',
+    resetDefaultsDialogTitle: 'すべての設定を初期値に戻しますか？',
+    resetDefaultsDialogDesc: 'ショートカット、再生設定、非表示の機能、言語、テーマ、表示スタイルをリセットし、お気に入りの字幕と音声を削除します。現在の設定を残すには、先にバックアップを書き出してください。',
+    resetDefaultsSuccess: 'すべての設定を初期値に戻しました。',
+    resetDefaultsSaveError: '初期設定に戻せませんでした。もう一度お試しください。（{message}）',
+    resettingDefaults: '復元中…',
     openOptions: '設定を開く',
     githubRepository: 'GitHub',
     githubRepositoryAriaLabel: 'GitHub リポジトリを開く',
+    reportIssue: '問題を報告',
+    reportIssueAriaLabel: 'GitHub で新しい Issue を作成',
     rateExtension: 'この拡張機能を評価',
     rateExtensionAriaLabel: '拡張機能ストアでこの拡張機能を評価',
     otherProjects: '他の製品',
@@ -1080,7 +1121,6 @@ export const COPY: Record<Locale, Copy> = {
     cancel: 'キャンセル',
     save: '保存',
     conflict: 'このショートカットは「{action}」で使用されています。',
-    noConflict: '競合はありません。',
     replacedNetflixKeys: 'Netflix のキーを置換：{keys}',
     willReplaceNetflixKeys: '保存すると Netflix のキーが無効になります：{keys}',
     actions: {
@@ -1146,9 +1186,18 @@ export const COPY: Record<Locale, Copy> = {
     importInvalidSettings: '백업 설정이 불완전하거나 올바르지 않습니다.',
     importUnsupportedSettingsVersion: '더 새로운 설정 버전에서 만든 백업이라 가져올 수 없습니다.',
     importSaveError: '설정을 가져올 수 없습니다: {message}',
+    resetDefaults: '기본값으로 복원',
+    resetDefaultsDesc: '모든 설정을 기본값으로 복원하고 사용자 지정 단축키와 즐겨찾는 언어를 삭제합니다.',
+    resetDefaultsDialogTitle: '모든 설정을 기본값으로 복원할까요?',
+    resetDefaultsDialogDesc: '단축키, 재생 설정, 숨긴 기능, 언어, 테마, 인터페이스 스타일을 초기화하고 즐겨찾는 자막과 음성을 삭제합니다. 현재 설정을 보관하려면 먼저 백업을 내보내세요.',
+    resetDefaultsSuccess: '모든 설정을 기본값으로 복원했습니다.',
+    resetDefaultsSaveError: '기본값을 복원할 수 없습니다. 다시 시도하세요. ({message})',
+    resettingDefaults: '복원 중…',
     openOptions: '설정 열기',
     githubRepository: 'GitHub',
     githubRepositoryAriaLabel: 'GitHub 저장소 열기',
+    reportIssue: '문제 제보',
+    reportIssueAriaLabel: 'GitHub에서 새 이슈 작성',
     rateExtension: '이 확장 프로그램 평가하기',
     rateExtensionAriaLabel: '확장 프로그램 스토어에서 이 확장 프로그램 평가하기',
     otherProjects: '다른 제품',
@@ -1305,7 +1354,6 @@ export const COPY: Record<Locale, Copy> = {
     cancel: '취소',
     save: '저장',
     conflict: '이 단축키는 이미 “{action}”에서 사용 중입니다.',
-    noConflict: '충돌이 없습니다.',
     replacedNetflixKeys: 'Netflix 키 대체: {keys}',
     willReplaceNetflixKeys: '저장하면 Netflix 기본 키가 비활성화됩니다: {keys}',
     actions: {

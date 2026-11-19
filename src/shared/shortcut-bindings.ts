@@ -120,6 +120,36 @@ export const keyBindingsEqual = (a: KeyBinding | null | undefined, b: KeyBinding
   return Boolean(a.code) && a.code === b.code && a.key === b.key
 }
 
+export const MAX_SHORTCUT_KEYS = 3
+
+export const getBindingKeys = (
+  binding: Partial<Pick<ShortcutBinding, 'key' | 'additionalKeys'>> | undefined,
+): KeyBinding[] =>
+  binding ? [binding.key, ...(binding.additionalKeys ?? [])].filter((key): key is KeyBinding => Boolean(key)) : []
+
+export const bindingMatchesKey = (
+  binding: Pick<ShortcutBinding, 'key' | 'additionalKeys'> | undefined,
+  key: KeyBinding | null | undefined,
+): boolean =>
+  Boolean(key && getBindingKeys(binding).some(candidate => keyBindingsEqual(candidate, key)))
+
+export const keyListsEqual = (
+  left: readonly (KeyBinding | null)[],
+  right: readonly (KeyBinding | null)[],
+): boolean =>
+  left.length === right.length && left.every((key, index) => keyBindingsEqual(key, right[index]))
+
+// Editors may contain empty recording fields. Saving removes those fields and
+// promotes the first remaining key to the backward-compatible primary field.
+export const bindingWithKeys = (enabled: boolean, keys: readonly (KeyBinding | null)[]): ShortcutBinding => {
+  const assigned = keys.filter((key): key is KeyBinding => Boolean(key))
+  return {
+    enabled,
+    key: assigned[0] ?? null,
+    ...(assigned.length > 1 ? { additionalKeys: assigned.slice(1) } : {}),
+  }
+}
+
 export const findActionForKey = (
   settings: ShortcutSettings,
   event: KeyEventLike
@@ -127,7 +157,7 @@ export const findActionForKey = (
   const pressed = keyBindingFromEvent(event)
   const match = getShortcutActions(settings).find(action => {
     const binding = settings.bindings[action]
-    return binding.enabled && keyBindingsEqual(binding.key, pressed)
+    return binding.enabled && bindingMatchesKey(binding, pressed)
   })
 
   return match ?? null
@@ -146,7 +176,7 @@ export const getReplacedNetflixNativeKeyBindings = (
   }
 
   const nativeAction = action as (typeof NETFLIX_NATIVE_SHORTCUT_ACTIONS)[number]
-  if (!binding.enabled || !binding.key || keyBindingsEqual(binding.key, DEFAULT_KEY_BINDINGS[nativeAction])) {
+  if (!binding.enabled || !getBindingKeys(binding).length || bindingMatchesKey(binding, DEFAULT_KEY_BINDINGS[nativeAction])) {
     return []
   }
 

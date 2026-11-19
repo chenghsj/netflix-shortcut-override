@@ -1,4 +1,4 @@
-import { findActionForKey, getShortcutActions, keyBindingFromEvent, keyBindingsEqual } from './shortcut-bindings'
+import { bindingMatchesKey, findActionForKey, getBindingKeys, getShortcutActions, keyBindingFromEvent } from './shortcut-bindings'
 import {
   SUBTITLE_NAVIGATION_ACTIONS,
   type KeyBinding,
@@ -16,7 +16,7 @@ const subtitleActionForKey = (settings: ShortcutSettings, key: KeyBinding) => {
   if (!settings.enabled || !settings.subtitleNavigation.enabled) return undefined
   return SUBTITLE_NAVIGATION_ACTIONS.find(action => {
     const binding = settings.subtitleNavigation.bindings[action]
-    return binding.enabled && keyBindingsEqual(binding.key, key)
+    return binding.enabled && bindingMatchesKey(binding, key)
   })
 }
 
@@ -39,7 +39,7 @@ export const resolvePlaybackShortcut = (
   if (!settings.enabled) return null
   const key = keyBindingFromEvent(event)
   const supportedAction = getShortcutActions(settings).find(action =>
-    settings.bindings[action].enabled && keyBindingsEqual(settings.bindings[action].key, key) &&
+    settings.bindings[action].enabled && bindingMatchesKey(settings.bindings[action], key) &&
     getShortcutAvailability(settings, action, supportsSubtitlePreservingPip).supported)
   if (supportedAction) return { group: 'general', action: supportedAction, supported: true }
   const subtitleAction = subtitleActionForKey(settings, key)
@@ -54,11 +54,10 @@ export const getSubtitleNavigationAvailability = (
   supportsSubtitlePreservingPip: boolean,
 ) => {
   const binding = settings.subtitleNavigation.bindings[action]
-  const resolved = binding.key && binding.enabled && settings.subtitleNavigation.enabled
-    ? resolvePlaybackShortcut(settings, {
-        ...binding.key, ctrlKey: binding.key.ctrl, altKey: binding.key.alt,
-        shiftKey: binding.key.shift, metaKey: binding.key.meta,
-      }, supportsSubtitlePreservingPip)
+  const resolved = binding.enabled && settings.subtitleNavigation.enabled
+    ? getBindingKeys(binding).map(key => resolvePlaybackShortcut(settings, {
+        ...key, ctrlKey: key.ctrl, altKey: key.alt, shiftKey: key.shift, metaKey: key.meta,
+      }, supportsSubtitlePreservingPip)).find(match => match?.group === 'general' && match.supported)
     : null
   return { overridingAction: resolved?.group === 'general' && resolved.supported ? resolved.action : undefined }
 }

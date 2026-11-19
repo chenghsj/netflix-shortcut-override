@@ -1,5 +1,5 @@
 import type { OptionsLink } from '@/shared/options-navigation'
-import { matchesShortcutSearch } from '@/shared/shortcut-search'
+import { matchesSearchText } from '@/shared/search'
 import { RESET_SCOPE_COPY } from '@/shared/reset-scopes'
 import { LOCALES, type Locale } from '@/shared/shortcut-types'
 import { EN_HELP_TOPICS, HELP_UI_COPY, type HelpTopicId, type HelpTopicText } from './help-copy'
@@ -63,6 +63,6 @@ export function createHelpTopics(locale: Locale) {
 export type HelpTopic = ReturnType<typeof createHelpTopics>[number]
 
 export const matchesHelpTopic = (topic: HelpTopic, query: string) =>
-  matchesShortcutSearch(topic.keywords, null, query)
+  matchesSearchText(topic.keywords, query)
 
 export const getHelpCategoryLabel = (category: HelpCategory, locale: Locale) => HELP_UI_COPY[locale].categories[HELP_CATEGORY_IDS.indexOf(category)]

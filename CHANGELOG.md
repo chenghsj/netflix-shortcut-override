@@ -2,13 +2,28 @@
 
 ## Unreleased
 
+- Preserve additional shortcuts when an older beta updates synchronized settings.
+- Leave media keys with Netflix while the source page has text focus and Picture-in-Picture is open. Make Previous subtitle use the visible cue near the next cue's start.
+- Let regional subtitle and audio favorites use same-language tracks without a region tag. General audio and Audio Description match within their own track types.
+- Move episode shortcuts to Playback and the pause overlay switch to Playback preferences.
+
+- Focus search when the toolbar popup opens, allowing immediate typing. Keep Options page/section focus and preserve the selected control during popup updates.
+
+- Add up to three shortcut keys per action, with individual removal, conflict checks, complete lists in Options/popup/search, and storage/backup migration to settings v33. Existing keys remain assigned.
+- Support configured browser Media Session play, pause, stop, forward/rewind and track controls. Match keyboard/media notifications once in either order, preserving the actual key and Ctrl/Alt/Shift/Meta combination. Unmatched configured controls allow a 120ms pairing window; standalone controls use plain assignments or Netflix's latest handler with the original browser details.
+- Preserve explicit Play/Pause/Stop direction and physical-key tap/hold behavior. Resolve overlapping controls using confirmed actions, so custom combinations remain usable and older playback cannot override newer playback or seeking, including custom forward/rewind intervals, manual Skip Intro, subtitle jumps and PiP timeline seeks. Retain original order through key release, hold activation and delayed captions.
+- Allow assigned media keys to open or close supported PiP once across document/focus changes. Discard stale deferred playback after lifecycle changes.
+- Correctly label existing/imported Markdown settings while keeping Markdown hidden after switching to another style.
+- Keep subtitle end times so Previous subtitle returns to the immediately preceding sentence when playback is paused between subtitles, including after the last sentence. Refresh Netflix's stale native subtitle cache after paused seeks so the selected text is visible without starting playback.
+- Add confirmed Restore defaults in Backup and restore, with retryable save errors and success feedback beside the button. Add Report an issue links in Options and the popup.
+
 - Split the full in-app guide into short paragraphs, numbered setup steps and separate option lists in all five languages. Shorten the Traditional Chinese instructions while retaining settings ranges, permissions and reset consequences.
 
-- Recognize legacy next/previous-track and volume key names, and allow delivered BrowserBack/BrowserForward keys to be recorded without a physical key code. Add searchable lists of supported special key names in the in-app guide in all five languages, grouped into media, volume and browser navigation, with collapsible legacy names.
+- Restore CapsLock recording in primary and additional shortcut fields. Recognize legacy next/previous-track and volume key names, and allow delivered BrowserBack/BrowserForward keys to be recorded without a physical key code. Add searchable lists of supported special key names in the in-app guide in all five languages, grouped into media, volume and browser navigation, with collapsible legacy names.
 
 - Fix recording and playback matching for media and volume keys whose keyboard events omit a physical key code, including next/previous track, play/pause, stop and volume controls. Keep distinct media keys separate during conflict checks and Play / Pause release handling.
 
-- Add a searchable, categorized user guide inside Options, with collapsible sections, current shortcut keys, feature states and links to settings in all five interface languages. Add entry points in the Options sidebar and popup footer.
+- Add a searchable, categorized user guide inside Options, with 11 concise topics, collapsible sections and links to settings in all five interface languages. Add entry points in the Options sidebar and popup footer.
 
 - Allow 1–300 seconds for every built-in and custom forward/rewind interval. Existing custom intervals above 300 seconds migrate to 300 while retaining their keys and enabled states.
 - Raise the configurable highest speed, preferred speeds, speed adjustment amount and hold speed to `5x`. Valid `5x` entries survive settings saves and backup export/import.

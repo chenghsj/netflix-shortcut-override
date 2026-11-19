@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { DEFAULT_SETTINGS, SEEK_LIMITS } from '@/shared/shortcut-settings'
-import { keyBindingsEqual } from '@/shared/shortcut-bindings'
 import { getSeekShortcutActions, SEEK_SHORTCUT_LIMITS } from '@/shared/seek-shortcuts'
 import { applyShortcutAssignment } from '@/shared/shortcut-assignment'
 import { captureShortcutEdit, evaluateShortcutEdit, isShortcutEditCurrent, type ShortcutEditSnapshot } from '@/shared/shortcut-edit'
@@ -14,23 +13,26 @@ const actionsFor = (target: SeekEditorTarget): ShortcutAction[] => target.kind =
 const valueFor = (settings: ShortcutSettings, target: SeekEditorTarget) => target.kind === 'builtin'
   ? settings.seek.seconds : settings.seekShortcuts.find(item => item.id === target.shortcut.id && item.kind === target.shortcut.kind)?.value
 
-type Snapshot = { value: number | undefined; keys: Partial<Record<ShortcutAction, KeyBinding | null>>; edit: ShortcutEditSnapshot }
+type Snapshot = { value: number | undefined; keys: Partial<Record<ShortcutAction, KeyBinding | null>>;
+  additionalKeys: Partial<Record<ShortcutAction, KeyBinding[]>>; edit: ShortcutEditSnapshot }
 export type SeekDialogState = {
   target: SeekEditorTarget
   isNew: boolean
   value: string
   keys: Partial<Record<ShortcutAction, KeyBinding | null>>
+  additionalKeys: Partial<Record<ShortcutAction, (KeyBinding | null)[]>>
   saved: Snapshot
   enableOnSave: boolean
 }
 const snapshot = (settings: ShortcutSettings, target: SeekEditorTarget, isNew = false): Snapshot => ({
   value: valueFor(settings, target),
   keys: Object.fromEntries(actionsFor(target).map(action => [action, settings.bindings[action]?.key ?? null])),
+  additionalKeys: Object.fromEntries(actionsFor(target).map(action => [action, settings.bindings[action]?.additionalKeys ?? []])),
   edit: captureShortcutEdit(settings, { kind: 'seek', shortcut: target.kind === 'custom' ? target.shortcut : null, isNew }),
 })
 
 const evaluateDraft = (settings: ShortcutSettings, dialog: SeekDialogState, supportsSubtitlePreservingPip: boolean) =>
-  evaluateShortcutEdit(settings, { snapshot: dialog.saved.edit, keys: dialog.keys, value: dialog.value,
+  evaluateShortcutEdit(settings, { snapshot: dialog.saved.edit, keys: dialog.keys, additionalKeys: dialog.additionalKeys, value: dialog.value,
     enabled: dialog.isNew || dialog.enableOnSave ? true : 'preserve' }, supportsSubtitlePreservingPip)
 
 export function useSeekShortcutEditor({ settings, updateSettings, supportsSubtitlePreservingPip }: Pick<ReturnType<typeof useShortcutSettingsForm>, 'settings' | 'updateSettings'> & {
@@ -45,12 +47,12 @@ export function useSeekShortcutEditor({ settings, updateSettings, supportsSubtit
     returnFocus.current = button
     setPending(null)
     setDialog({ target, isNew, saved, enableOnSave, value: String(isNew && target.kind === 'custom' ? target.shortcut.value : saved.value),
-      keys: saved.keys,
+      keys: saved.keys, additionalKeys: saved.additionalKeys,
     })
   }
   const validPending = pending && isShortcutEditCurrent(settings, pending.saved.edit) ? pending : null
   const pendingEvaluation = validPending ? evaluateShortcutEdit(settings, {
-    snapshot: validPending.saved.edit, keys: validPending.saved.keys, value: validPending.saved.value,
+    snapshot: validPending.saved.edit, keys: validPending.saved.keys, additionalKeys: validPending.saved.additionalKeys, value: validPending.saved.value,
     enabled: true,
   }, supportsSubtitlePreservingPip) : null
   const actions = dialog ? actionsFor(dialog.target) : []
@@ -59,19 +61,22 @@ export function useSeekShortcutEditor({ settings, updateSettings, supportsSubtit
   const max = percentage ? 100 : dialog?.target.kind === 'builtin' ? SEEK_LIMITS.seconds.max : SEEK_SHORTCUT_LIMITS.seconds
   const evaluation = dialog ? evaluateDraft(settings, dialog, supportsSubtitlePreservingPip) : null
   const stale = evaluation?.stale ?? false
-  const fieldConflicts = (evaluation?.analysis.fieldConflicts ?? {}) as Partial<Record<ShortcutAction, ShortcutAction>>
+  const keyConflicts = evaluation?.analysis.keyConflicts ?? {}
   const storageFull = evaluation?.storageFull ?? false
   const canSave = Boolean(dialog?.value.trim() && evaluation?.canSave)
 
   return {
-    dialog, actions, percentage, min, max, stale, fieldConflicts, canSave, storageFull,
+    dialog, actions, percentage, min, max, stale, keyConflicts, canSave, storageFull,
     open,
     add: (kind: SeekShortcut['kind'], button: HTMLButtonElement) => open({ kind: 'custom', shortcut: { id: `seek:${crypto.randomUUID()}`, kind, value: kind === 'relative' ? 10 : 50 } }, button, true),
     setValue: (value: string) => setDialog(current => current && { ...current, value }),
     capture: (action: ShortcutAction, key: KeyBinding | null) => setDialog(current => current && { ...current, keys: { ...current.keys, [action]: key } }),
+    captureKeys: (action: ShortcutAction, keys: (KeyBinding | null)[]) => setDialog(current => current && { ...current,
+      keys: { ...current.keys, [action]: keys[0] ?? null }, additionalKeys: { ...current.additionalKeys, [action]: keys.slice(1) } }),
     restore: () => setDialog(current => current && { ...current,
       value: String(current.isNew && current.target.kind === 'custom' ? current.target.shortcut.value : current.saved.value),
       keys: current.saved.keys,
+      additionalKeys: current.saved.additionalKeys,
     }),
     close: () => setDialog(null),
     restoreFocus: (event: Event) => {
@@ -86,27 +91,27 @@ export function useSeekShortcutEditor({ settings, updateSettings, supportsSubtit
       setDialog(null)
     },
     pairConflict: validPending && { target: validPending.target, actions: pendingEvaluation!.analysis.conflicts,
-      affectedActions: pendingEvaluation!.analysis.affectedActions, keys: pendingEvaluation!.analysis.conflictingKeys },
+      affectedTargets: pendingEvaluation!.analysis.affectedTargets, keys: pendingEvaluation!.analysis.conflictingKeys },
     dismissConflict: () => setPending(null),
     changeConflictKeys: (button: HTMLButtonElement | null) => { if (validPending) open(validPending.target, button, false, true) },
     setPairEnabled: (target: SeekEditorTarget, next: boolean, button: HTMLButtonElement | null = null) => {
       const actions = actionsFor(target)
       const saved = snapshot(settings, target)
       const keys = Object.fromEntries(actions.map(action => [action, settings.bindings[action].key]))
-      if (next && keys[actions[0]] && keyBindingsEqual(keys[actions[0]], keys[actions[1]])) { open(target, button, false, true); return }
-      const draft = { snapshot: saved.edit, keys, value: saved.value, enabled: next }
+      const draft = { snapshot: saved.edit, keys, additionalKeys: saved.additionalKeys, value: saved.value, enabled: next }
+      if (next && evaluateShortcutEdit(settings, draft, supportsSubtitlePreservingPip).analysis.hasDuplicateKeys) { open(target, button, false, true); return }
       if (next && evaluateShortcutEdit(settings, draft, supportsSubtitlePreservingPip).analysis.conflicts.length) {
         setPending({ target, saved }); return
       }
       updateSettings(current => isShortcutEditCurrent(current, saved.edit)
-        ? applyShortcutAssignment(current, actions.map(action => ({ group: 'general', action, key: keys[action] })),
+        ? applyShortcutAssignment(current, actions.map(action => ({ group: 'general', action, key: keys[action], additionalKeys: saved.additionalKeys[action] })),
           { enabled: next, supportsSubtitlePreservingPip }) : current)
     },
     confirmTransfer: () => {
       if (!validPending) return
       updateSettings(current => isShortcutEditCurrent(current, validPending.saved.edit)
         ? applyShortcutAssignment(current, actionsFor(validPending.target).map(action => ({ group: 'general', action,
-          key: validPending.saved.keys[action] ?? null })), { enabled: true, transfer: true, supportsSubtitlePreservingPip }) : current)
+          key: validPending.saved.keys[action] ?? null, additionalKeys: validPending.saved.additionalKeys[action] })), { enabled: true, transfer: true, supportsSubtitlePreservingPip }) : current)
       setPending(null)
     },
     resetBuiltin: () => updateSettings(current => ({ ...current, seek: DEFAULT_SETTINGS.seek })),

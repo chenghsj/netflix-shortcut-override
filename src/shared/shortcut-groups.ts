@@ -1,8 +1,10 @@
 import type { ShortcutAction } from './shortcut-types'
 
+export const DISPLAY_SHORTCUT_ACTIONS = ['fullscreen', 'pictureInPicture'] as const
+
 export const SHORTCUT_GROUPS = [
-  { title: 'playback', actions: ['playPause', 'fullscreen', 'pictureInPicture'] },
-  { title: 'seeking', actions: ['previousFrame', 'nextFrame', 'skipIntro', 'previousEpisode', 'nextEpisode'] },
+  { title: 'playback', actions: ['playPause', 'previousEpisode', 'nextEpisode', ...DISPLAY_SHORTCUT_ACTIONS] },
+  { title: 'seeking', actions: ['previousFrame', 'nextFrame', 'skipIntro'] },
   { title: 'subtitles', actions: ['toggleSubtitles', 'cycleSubtitleSize', 'cycleSubtitleTrack', 'previousSubtitleTrack'] },
   { title: 'volume', actions: ['volumeUp', 'volumeDown', 'mute', 'previousAudioTrack', 'nextAudioTrack'] },
   { title: 'speed', actions: ['speedUp', 'speedDown', 'speedReset', 'setPreferredSpeed'] },

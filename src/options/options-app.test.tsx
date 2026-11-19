@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { OptionsApp } from '@/options/options-app'
 import { SUBTITLE_ACTIVATION_COPY } from '@/options/subtitle-activation-copy'
+import { OPTIONS_SECTION_COPY } from '@/shared/options-navigation'
 import { EXTERNAL_LINKS } from '@/shared/external-links'
 import { SUBTITLE_NAVIGATION_COPY } from '@/shared/subtitle-navigation'
 import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
@@ -77,6 +78,131 @@ async function openPreferredSpeed() {
 }
 
 describe('OptionsApp', () => {
+  it('labels an existing Markdown selection correctly and hides it after changing away', async () => {
+    await saveSettings({ ...DEFAULT_SETTINGS, uiStyle: 'markdown' })
+    render(<OptionsApp />)
+    await selectShortcutCategory('General settings')
+    const style = await screen.findByRole('combobox', { name: 'Interface style' })
+    expect(style).toHaveTextContent('Markdown')
+    expect(document.documentElement).toHaveAttribute('data-ui-style', 'markdown')
+    fireEvent.click(style)
+    fireEvent.click(await screen.findByRole('option', { name: 'Classic' }))
+    await waitFor(async () => expect((await getSettings()).uiStyle).toBe('classic'))
+    expect(style).toHaveTextContent('Classic')
+    fireEvent.click(style)
+    expect(screen.queryByRole('option', { name: 'Markdown' })).not.toBeInTheDocument()
+  })
+
+  it.each(['primary', 'additional'] as const)('records CapsLock in the %s shortcut field', async field => {
+    render(<OptionsApp />)
+    await selectShortcutCategory('Playback')
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Next episode' }))
+    const dialog = screen.getByRole('dialog')
+    if (field === 'additional') fireEvent.click(within(dialog).getByRole('button', { name: 'Add shortcut' }))
+    const areas = within(dialog).getAllByRole('group', { name: 'Record shortcut' })
+    fireEvent.keyDown(areas[field === 'additional' ? 1 : 0], { key: 'CapsLock', code: 'CapsLock' })
+    expect(areas[field === 'additional' ? 1 : 0]).toHaveTextContent('Caps')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    const binding = (await getSettings()).bindings.nextEpisode
+    expect(field === 'additional' ? binding.additionalKeys?.[0] : binding.key).toMatchObject({ code: 'CapsLock', key: 'CapsLock' })
+  })
+
+  it.each([
+    { action: 'nextEpisode', label: 'Next episode', mediaKey: 'MediaTrackNext' },
+    { action: 'previousEpisode', label: 'Previous episode', mediaKey: 'MediaTrackPrevious' },
+  ] as const)('records $mediaKey as an additional $label shortcut', async ({ action, label, mediaKey }) => {
+    render(<OptionsApp />)
+    await selectShortcutCategory('Playback')
+    fireEvent.click(screen.getByRole('button', { name: `Edit ${label}` }))
+    const dialog = screen.getByRole('dialog')
+    expect(dialog).toHaveAttribute('data-size', 'compact')
+    expect(within(dialog).queryByRole('combobox')).not.toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add shortcut' }))
+    const areas = within(dialog).getAllByRole('group', { name: 'Record shortcut' })
+    expect(areas).toHaveLength(2)
+    fireEvent.keyDown(areas[1], { key: mediaKey, code: '' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add shortcut' }))
+    expect(within(dialog).getAllByRole('group', { name: 'Record shortcut' })).toHaveLength(3)
+    expect(within(dialog).getByRole('button', { name: 'Add shortcut' })).toBeDisabled()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Remove shortcut 3' }))
+    expect(within(dialog).getByRole('button', { name: 'Add shortcut' })).toBeEnabled()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    const binding = (await getSettings()).bindings[action]
+    expect(binding.key).toEqual(DEFAULT_SETTINGS.bindings[action].key)
+    expect(binding.additionalKeys).toEqual([{ code: mediaKey, key: mediaKey, ctrl: false, alt: false, shift: false, meta: false }])
+    fireEvent.click(screen.getByRole('button', { name: `Edit ${label}` }))
+    expect(within(screen.getByRole('dialog')).getAllByRole('group', { name: 'Record shortcut' })).toHaveLength(2)
+  })
+
+  it('lists every occupied key before enabling a shortcut with multiple conflicts', async () => {
+    const settings = structuredClone(DEFAULT_SETTINGS)
+    settings.bindings.nextEpisode = {
+      enabled: false, key: settings.bindings.mute.key,
+      additionalKeys: [settings.bindings.fullscreen.key!],
+    }
+    await saveSettings(settings)
+    render(<OptionsApp />)
+    await selectShortcutCategory('Playback')
+    fireEvent.click(screen.getByRole('switch', { name: 'Next episode Enabled' }))
+    expect(await screen.findByRole('dialog', { name: /M · F.*Mute.*Fullscreen/ })).toBeVisible()
+  })
+
+  it('removes, restores and cancels extra shortcut drafts, and rejects duplicates and occupied keys', async () => {
+    const settings: ShortcutSettings = structuredClone(DEFAULT_SETTINGS)
+    settings.bindings.nextEpisode.additionalKeys = [{ code: 'MediaTrackNext', key: 'MediaTrackNext', ctrl: false, alt: false, shift: false, meta: false }]
+    await saveSettings(settings)
+    render(<OptionsApp />)
+    await selectShortcutCategory('Playback')
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Next episode' }))
+    const dialog = screen.getByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Remove shortcut 2' }))
+    expect(within(dialog).getAllByRole('group', { name: 'Record shortcut' })).toHaveLength(1)
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Undo edits' }))
+    expect(within(dialog).getAllByRole('group', { name: 'Record shortcut' })).toHaveLength(2)
+    const extra = within(dialog).getAllByRole('group', { name: 'Record shortcut' })[1]
+    fireEvent.keyDown(extra, { code: 'KeyN', key: 'n', ctrlKey: true })
+    expect(extra).toHaveAccessibleDescription('This key is already recorded here.')
+    expect(within(dialog).getByRole('button', { name: 'Save' })).toBeDisabled()
+    fireEvent.keyDown(extra, { code: 'KeyM', key: 'm' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add shortcut' }))
+    const [first, second, third] = within(dialog).getAllByRole('group', { name: 'Record shortcut' })
+    fireEvent.keyDown(third, { code: 'KeyC', key: 'c' })
+    expect(first).not.toHaveAttribute('aria-invalid')
+    expect(second).toHaveAccessibleDescription('This shortcut is already used by Mute.')
+    expect(third).toHaveAccessibleDescription('This shortcut is already used by Toggle subtitles.')
+    fireEvent.click(within(dialog).getAllByRole('button', { name: 'Clear shortcut' })[0])
+    expect(within(dialog).getByText('This shortcut is already used by Mute.')).toBeVisible()
+    expect(within(dialog).getByText('This shortcut is already used by Toggle subtitles.')).toBeVisible()
+    expect(within(dialog).getByRole('button', { name: 'Save' })).toBeDisabled()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+    expect((await getSettings()).bindings.nextEpisode).toEqual(settings.bindings.nextEpisode)
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Next episode' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Remove shortcut 1' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect((await getSettings()).bindings.nextEpisode).toEqual({ enabled: true, key: settings.bindings.nextEpisode.additionalKeys![0] })
+  })
+
+  it('saves extra seek keys with the value and keeps them when toggling the pair', async () => {
+    render(<OptionsApp />)
+    await selectShortcutCategory('Seeking and navigation')
+    const pair = await screen.findByRole('group', { name: 'Forward / Rewind' })
+    fireEvent.click(within(pair).getByRole('button', { name: /^Edit Forward \/ Rewind/ }))
+    const dialog = screen.getByRole('dialog')
+    fireEvent.click(within(dialog).getAllByRole('button', { name: 'Add shortcut' })[0])
+    fireEvent.keyDown(within(dialog).getAllByRole('group', { name: 'Forward' })[1], { code: 'F20', key: 'F20' })
+    fireEvent.change(within(dialog).getByLabelText('Seconds'), { target: { value: '15' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    const saved = await getSettings()
+    expect(saved.seek.seconds).toBe(15)
+    expect(saved.bindings.seekForward.additionalKeys?.[0].code).toBe('F20')
+    fireEvent.click(within(pair).getByRole('switch'))
+    await waitFor(async () => expect((await getSettings()).bindings.seekForward.enabled).toBe(false))
+    expect((await getSettings()).bindings.seekForward.additionalKeys).toEqual(saved.bindings.seekForward.additionalKeys)
+  })
   it('expands hold settings from Play / Pause and restores the collapsed state after search', async () => {
     render(<OptionsApp />)
     const controls = await openHoldControls()
@@ -308,6 +434,7 @@ describe('OptionsApp', () => {
     let dialog = await screen.findByRole('dialog', { name: 'Record shortcut' })
     const progress = within(dialog).getByLabelText('Video progress (%)')
     fireEvent.change(progress, { target: { value: '37' } })
+    expect(within(dialog).queryByText('Key', { selector: 'label' })).not.toBeInTheDocument()
     const keyField = within(dialog).getByRole('group', { name: 'Key' })
     fireEvent.keyDown(keyField, { code: 'ArrowRight', key: 'ArrowRight' })
     expect(within(dialog).getByRole('button', { name: 'Save' })).toBeDisabled()
@@ -316,6 +443,7 @@ describe('OptionsApp', () => {
     fireEvent.change(progress, { target: { value: '101' } })
     expect(within(dialog).getByRole('button', { name: 'Save' })).toBeDisabled()
     fireEvent.change(progress, { target: { value: '37' } })
+    expect(within(dialog).queryByText('No conflict detected.')).not.toBeInTheDocument()
     expect((await getSettings()).seekShortcuts).toEqual([])
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
     await waitFor(async () => expect((await getSettings()).seekShortcuts).toHaveLength(1))
@@ -456,11 +584,40 @@ describe('OptionsApp', () => {
     expect(toggle).not.toBeChecked()
     expect((await getSettings()).bindings.mute.enabled).toBe(true)
     expect((await getSettings()).bindings.fullscreen.enabled).toBe(true)
-    fireEvent.click(screen.getByRole('button', { name: 'Use for Forward / Rewind 10 seconds' }))
+    const popover = screen.getByRole('dialog')
+    expect(within(popover).getByRole('link', { name: 'Mute' })).toHaveAttribute('href', '#volume')
+    expect(within(popover).getByRole('link', { name: 'Fullscreen' })).toHaveAttribute('href', '#playback')
+    fireEvent.click(within(popover).getByRole('button', { name: 'Use this key' }))
     await waitFor(async () => expect((await getSettings()).bindings.seekForward.enabled).toBe(true))
     expect((await getSettings()).bindings.seekBackward.enabled).toBe(true)
     expect((await getSettings()).bindings.mute.enabled).toBe(false)
     expect((await getSettings()).bindings.fullscreen.enabled).toBe(false)
+  })
+
+  it('clears search and focuses a collapsed seek row when following its conflict link', async () => {
+    const settings = structuredClone(DEFAULT_SETTINGS)
+    settings.bindings.seekForward.enabled = true
+    settings.bindings.mute = { enabled: false, key: settings.bindings.seekForward.key }
+    const saved = await saveSettings(settings)
+    render(<OptionsApp />)
+    await selectShortcutCategory('Seeking and navigation')
+    fireEvent.click(await screen.findByRole('button', { name: 'Forward / Rewind', expanded: true }))
+    expect(screen.queryByRole('row', { name: 'Forward / Rewind 10 seconds' })).not.toBeInTheDocument()
+
+    const search = screen.getByRole('searchbox')
+    fireEvent.change(search, { target: { value: 'Mute' } })
+    fireEvent.click(await screen.findByRole('switch', { name: 'Mute Enabled' }))
+    const popover = await screen.findByRole('dialog')
+    expect(popover).toHaveTextContent(/This will disable .*Rewind.*Forward/)
+    expect(within(popover).getAllByRole('link')).toHaveLength(1)
+    fireEvent.click(within(popover).getByRole('link', { name: 'Forward' }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(search).toHaveValue('')
+    expect(screen.getByRole('button', { name: 'Forward / Rewind', expanded: true })).toBeVisible()
+    expect(screen.getByRole('row', { name: 'Forward / Rewind 10 seconds' })).toHaveFocus()
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({ block: 'center', inline: 'nearest' })
+    expect(await getSettings()).toEqual(saved)
   })
 
   it('dismisses pair conflicts permanently after another view updates settings', async () => {
@@ -550,7 +707,7 @@ describe('OptionsApp', () => {
     const toggle = await screen.findByRole('switch', { name: '25% Enabled' })
     fireEvent.click(toggle)
     expect(toggle).not.toBeChecked()
-    fireEvent.click(await screen.findByRole('button', { name: 'Use for 25%' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Use this key' }))
     await waitFor(async () => {
       const next = await getSettings()
       expect(next.bindings['seek:percent'].enabled).toBe(true)
@@ -706,6 +863,7 @@ describe('OptionsApp', () => {
     ['主題', 'combobox', 'Theme'],
     ['語言', 'combobox', 'Language'],
     ['自動播放與略過', 'switch', 'Intro'],
+    ['逐句模式', 'button', 'Edit Play / pause'],
     ['匯出設定', 'button', 'Export settings'],
     ['Show speed hint', 'switch', 'Play / Pause hold speed: Show speed hint'],
     ['Enable subtitle navigation shortcuts', 'switch', 'Enable subtitle navigation shortcuts'],
@@ -852,8 +1010,8 @@ describe('OptionsApp', () => {
     expect(within(screen.getByRole('navigation', { name: 'Settings' })).getByRole('link', { name: 'General settings' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('combobox', { name: 'Language' })).toBeVisible()
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
-    await selectShortcutCategory('Playback automation')
-    expect(within(screen.getByRole('navigation', { name: 'Settings' })).getByRole('link', { name: 'Playback automation' })).toHaveAttribute('aria-current', 'page')
+    await selectShortcutCategory('Playback preferences')
+    expect(within(screen.getByRole('navigation', { name: 'Settings' })).getByRole('link', { name: 'Playback preferences' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('switch', { name: 'Intro' })).toBeVisible()
     expect(screen.queryByRole('combobox', { name: 'Language' })).not.toBeInTheDocument()
     await selectShortcutCategory('Backup and restore')
@@ -1012,7 +1170,7 @@ describe('OptionsApp', () => {
 
   it('saves the intro and recap preferences independently', async () => {
     render(<OptionsApp />)
-    await selectShortcutCategory('Playback automation')
+    await selectShortcutCategory('Playback preferences')
     const group = await screen.findByRole('group', { name: 'Playback automation' })
     const intro = within(group).getByRole('switch', { name: 'Intro' })
     const recap = within(group).getByRole('switch', { name: 'Recap' })
@@ -1029,12 +1187,13 @@ describe('OptionsApp', () => {
     await waitFor(async () => expect((await getSettings()).autoSkip).toEqual({ intro: true, recap: true }))
   })
 
-  it.each(LOCALES)('saves the pause overlay setting in General settings and retains it on reopening in %s', async locale => {
+  it.each(LOCALES)('saves the pause overlay setting in Playback preferences and retains it on reopening in %s', async locale => {
     await saveSettings({ ...DEFAULT_SETTINGS, locale })
     const copy = getCopy(locale)
     const first = render(<OptionsApp />)
-    await selectShortcutCategory(copy.quickSettings)
-    const toggle = screen.getByRole('switch', { name: copy.hidePauseOverlay })
+    await selectShortcutCategory(OPTIONS_SECTION_COPY[locale].playbackPreferences)
+    const pauseScreen = screen.getByRole('group', { name: OPTIONS_SECTION_COPY[locale].pauseScreen })
+    const toggle = within(pauseScreen).getByRole('switch', { name: copy.hidePauseOverlay })
     expect(toggle).not.toBeChecked()
     expect(screen.queryByText(copy.hidePauseOverlayDescription)).not.toBeInTheDocument()
     const help = screen.getByRole('button', { name: `${copy.hidePauseOverlay} info` })
@@ -1045,7 +1204,7 @@ describe('OptionsApp', () => {
     await waitFor(async () => expect((await getSettings()).hidePauseOverlay).toBe(true))
     first.unmount()
     render(<OptionsApp />)
-    await selectShortcutCategory(copy.quickSettings)
+    await selectShortcutCategory(OPTIONS_SECTION_COPY[locale].playbackPreferences)
     expect(screen.getByRole('switch', { name: copy.hidePauseOverlay })).toBeChecked()
   })
 
@@ -1201,7 +1360,7 @@ describe('OptionsApp', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect((await getSettings()).bindings.skipIntro.enabled).toBe(true)
     fireEvent.click(screen.getByRole('switch', { name: 'Replay current subtitle Enabled' }))
-    fireEvent.click(await screen.findByRole('button', { name: 'Use for Replay current subtitle' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Use this key' }))
     await waitFor(async () => expect((await getSettings()).subtitleNavigation.bindings.replay.enabled).toBe(true))
     expect((await getSettings()).bindings.skipIntro.enabled).toBe(false)
     expect((await getSettings()).bindings.mute).toEqual(settings.bindings.mute)
@@ -1311,6 +1470,20 @@ describe('OptionsApp', () => {
     return settings
   }
 
+  it('moves focus to the conflict owner in the same table and leaves the keys assigned', async () => {
+    const saved = await saveSettings(subtitleOverlap())
+    render(<OptionsApp />)
+    await selectShortcutCategory('Sentence jumps and replay')
+    fireEvent.click(await screen.findByRole('switch', { name: 'Play / pause Enabled' }))
+    const popover = await screen.findByRole('dialog')
+    fireEvent.click(within(popover).getByRole('link', { name: 'Next subtitle' }))
+
+    const owner = screen.getByRole('switch', { name: 'Next subtitle Enabled' }).closest('tr')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(owner).toHaveFocus()
+    expect(await getSettings()).toEqual(saved)
+  })
+
   it('allows reusing a disabled subtitle key and asks before enabling its former owner', async () => {
     const settings = structuredClone(DEFAULT_SETTINGS)
     settings.subtitleNavigation.enabled = true
@@ -1351,7 +1524,7 @@ describe('OptionsApp', () => {
     const popover = await screen.findByRole('dialog')
     expect(popover).toHaveTextContent(`This will disable ${other}.`)
     expect(chrome.storage.sync.set).not.toHaveBeenCalled()
-    fireEvent.click(within(popover).getByRole('button', { name: `Use for ${action}` }))
+    fireEvent.click(within(popover).getByRole('button', { name: 'Use this key' }))
     await waitFor(() => expect(toggle).toHaveAttribute('aria-checked', 'true'))
     const next = await getSettings()
     if (group === 'subtitleNavigation') {
@@ -1435,7 +1608,7 @@ describe('OptionsApp', () => {
     await confirmReset()
     const popover = await screen.findByRole('dialog', { name: 'W is used by Next subtitle' })
     expect(await getSettings()).toEqual(saved)
-    fireEvent.click(within(popover).getByRole('button', { name: 'Use for Play / pause' }))
+    fireEvent.click(within(popover).getByRole('button', { name: 'Use this key' }))
     await waitFor(async () => expect((await getSettings()).subtitleNavigation.bindings.playback.key?.code).toBe('KeyW'))
     expect((await getSettings()).subtitleNavigation.bindings.next.enabled).toBe(false)
   })
@@ -1713,6 +1886,7 @@ describe('OptionsApp', () => {
 
   it('keeps the global switch at the top of the sidebar while grouping appearance controls on their page', async () => {
     render(<OptionsApp />)
+    expect(await screen.findByRole('searchbox')).not.toHaveFocus()
     await selectShortcutCategory('General settings')
     const title = within(screen.getByRole('navigation', { name: 'Settings' })).getByRole('link', { name: 'General settings' })
     const card = title.closest('[data-slot="card"]')
@@ -1745,6 +1919,7 @@ describe('OptionsApp', () => {
     render(<OptionsApp />)
     expect(await screen.findByText('Shortcut Override for Netflix')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Open GitHub repository' })).toHaveAttribute('href', EXTERNAL_LINKS.githubRepository)
+    expect(screen.getByRole('link', { name: 'Open a new GitHub issue' })).toHaveAttribute('href', EXTERNAL_LINKS.githubNewIssue)
     expect(screen.getByRole('link', { name: 'Rate this extension in the extension store' })).toHaveAttribute('href', EXTERNAL_LINKS.shortcutOverrideChromeWebStore)
     expect(screen.getByRole('combobox', { name: 'Other products' })).toBeInTheDocument()
     await selectShortcutCategory('General settings')
@@ -1879,7 +2054,7 @@ describe('OptionsApp', () => {
       shiftKey: true,
     })
 
-    expect(dialog).toHaveTextContent('No conflict detected.')
+    expect(within(dialog).queryByText('No conflict detected.')).not.toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Save' })).not.toBeDisabled()
   })
 
@@ -1917,6 +2092,8 @@ describe('OptionsApp', () => {
   it.each([3.35, 5])('saves preferred speed %sx and its shortcut together, independently of the step range', async speed => {
     render(<OptionsApp />)
     const dialog = await openPreferredSpeed()
+    expect(dialog).toHaveAttribute('data-size', 'standard')
+    expect(within(dialog).queryByText('Key', { selector: 'label' })).not.toBeInTheDocument()
     const input = within(dialog).getByLabelText('Speed')
     const keyField = within(dialog).getByRole('group', { name: 'Key' })
     const originalKey = keyField.textContent
@@ -2171,6 +2348,51 @@ describe('OptionsApp', () => {
     expect(screen.getByRole('row', { name: '前進／後退 20 秒' })).toBeVisible()
   })
 
+  it('finds restore defaults across languages and persists all defaults after confirmation', async () => {
+    const custom: ShortcutSettings = structuredClone(DEFAULT_SETTINGS)
+    custom.enabled = false
+    custom.locale = 'zh-TW'
+    custom.theme = 'dark'
+    custom.uiStyle = 'markdown'
+    custom.speed = { min: 0.5, max: 4, step: 0.5, preferred: 2.5 }
+    custom.seek.seconds = 20
+    custom.holdSpeed.speed = 3
+    custom.subtitleNavigation.enabled = true
+    custom.subtitleFavorites = [{ language: 'ja' }]
+    custom.audioFavorites = [{ language: 'en', audioDescription: false }]
+    custom.hiddenFeatures = ['group:preferredSpeed']
+    custom.autoSkip = { intro: true, recap: true }
+    custom.autoNextEpisode = true
+    custom.hidePauseOverlay = true
+    custom.preferredSpeedShortcuts = [{ id: 'preferred-speed:custom', speed: 3 }]
+    custom.bindings['preferred-speed:custom'] = { enabled: false, key: null }
+    custom.bindings.mute.enabled = false
+    const saved = await saveSettings(custom)
+    render(<OptionsApp />)
+    const search = await screen.findByRole('searchbox')
+    fireEvent.change(search, { target: { value: 'Restore defaults' } })
+    fireEvent.click(await screen.findByRole('button', { name: '還原預設值' }))
+    let dialog = await screen.findByRole('dialog', { name: '確定還原所有預設值？' })
+    fireEvent.click(within(dialog).getByRole('button', { name: '取消' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(await getSettings()).toEqual(saved)
+    fireEvent.change(search, { target: { value: '' } })
+    await selectShortcutCategory('備份與還原')
+    fireEvent.click(screen.getByRole('button', { name: '還原預設值' }))
+    dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: '還原預設值' }))
+
+    expect(await screen.findByText(getCopy('en').resetDefaultsSuccess)).toBeVisible()
+    expect(await getSettings()).toEqual(DEFAULT_SETTINGS)
+    expect(document.documentElement).toHaveAttribute('data-ui-style', DEFAULT_SETTINGS.uiStyle)
+    expect(screen.getByRole('switch', { name: 'Enable extension' })).toBeChecked()
+    await selectShortcutCategory('Playback speed')
+    expect(screen.getByLabelText('Highest speed')).toHaveValue(DEFAULT_SETTINGS.speed.max)
+    expect(screen.getByLabelText(getCopy('en').step)).toHaveValue(DEFAULT_SETTINGS.speed.step)
+    await selectShortcutCategory('Seeking and navigation')
+    expect(screen.getByRole('row', { name: 'Forward / Rewind 10 seconds' })).toBeVisible()
+  })
+
   it('imports a complete backup and synchronizes all form drafts', async () => {
     render(<OptionsApp />)
     await selectShortcutCategory('Backup and restore')
@@ -2206,7 +2428,7 @@ describe('OptionsApp', () => {
     const dialog = await screen.findByRole('dialog')
     fireEvent.click(within(dialog).getByRole('button', { name: 'Replace settings' }))
 
-    expect(await screen.findByRole('status')).toHaveTextContent('設定已成功匯入。')
+    expect(await screen.findByText('設定已成功匯入。')).toHaveAttribute('role', 'status')
     await selectShortcutCategory('一般設定')
     expect(screen.getByRole('combobox', { name: '語言' })).toHaveTextContent('繁中')
     expect(screen.getByRole('combobox', { name: '主題' })).toHaveTextContent('深色')
@@ -2379,14 +2601,13 @@ describe('OptionsApp', () => {
     ['VolumeUp', 'AudioVolumeUp'], ['VolumeDown', 'AudioVolumeDown'], ['VolumeMute', 'AudioVolumeMute'],
   ])('records and persists %s when the browser supplies no physical code', async (key, code) => {
     render(<OptionsApp />)
-    await selectShortcutCategory('Seeking and navigation')
+    await selectShortcutCategory('Playback')
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Next episode' }))
     const dialog = screen.getByRole('dialog', { name: 'Record shortcut' })
     const recordingArea = within(dialog).getByRole('group', { name: 'Record shortcut' })
     const pressed = createEvent.keyDown(recordingArea, { code: '', key })
     fireEvent(recordingArea, pressed)
     expect(pressed.defaultPrevented).toBe(true)
-    expect(within(dialog).getByText('No conflict detected.')).toBeVisible()
     expect(within(dialog).getByRole('button', { name: 'Save' })).toBeEnabled()
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())

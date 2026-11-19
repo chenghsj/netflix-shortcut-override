@@ -1,10 +1,10 @@
 import { getCopy } from './i18n'
 import { getPreferredSpeed } from './preferred-speed-shortcuts'
-import { OPTIONS_LAYOUT_COPY, type ShortcutCategory } from './options-navigation'
+import { OPTIONS_LAYOUT_COPY, OPTIONS_SECTION_COPY, type ShortcutCategory } from './options-navigation'
 import { matchesSearchText } from './search'
 import { getShortcutLabels, resolveSeekShortcut, SEEK_PAIR_COPY, SEEK_SECTION_COPY } from './seek-shortcuts'
-import { formatKeyBinding } from './shortcut-bindings'
-import { LOCALES, type KeyBinding, type ShortcutAction, type ShortcutSettings, type SubtitleNavigationAction } from './shortcut-types'
+import { formatKeyBinding, getBindingKeys } from './shortcut-bindings'
+import { LOCALES, type ShortcutAction, type ShortcutBinding, type ShortcutSettings, type SubtitleNavigationAction } from './shortcut-types'
 import { SUBTITLE_NAVIGATION_COPY } from './subtitle-navigation'
 import { subtitleLanguageCatalog } from './subtitle-language-catalog'
 
@@ -43,7 +43,7 @@ const subtitleNavigationAliases: Record<SubtitleNavigationAction, readonly strin
 const languageActions = new Set<ShortcutAction>(['cycleSubtitleTrack', 'previousSubtitleTrack', 'previousAudioTrack', 'nextAudioTrack'])
 const languageKeywords = [...new Set(subtitleLanguageCatalog.flatMap(({ value, keywords }) => [value, ...keywords]))]
 const displayKeywords = ['display', ...LOCALES.map(locale => getCopy(locale).shortcutGroups.display)]
-const seekingKeywords = ['Seeking and jumps', '快轉與跳轉', '快进与跳转', 'シーク・位置へ移動', '탐색 및 위치 이동']
+const seekingKeywords = ['Seeking and jumps', '快轉與跳轉', '快进与跳转', 'シーク・位置へ移動', '再生位置・エピソード', '탐색 및 위치 이동']
 const subtitleSizeAliases = ['font size', 'caption size', '字級', '字号', '文字サイズ', '글자 크기']
 
 const categoryKeywords = (category: ShortcutCategory | 'subtitleNavigation') => [category, ...(category === 'seeking' ? seekingKeywords : []), ...LOCALES.map(locale => {
@@ -74,6 +74,7 @@ export function createShortcutSearchIndex(settings: ShortcutSettings) {
     subtitleNavigation: (action: SubtitleNavigationAction) => [
       ...LOCALES.map(locale => SUBTITLE_NAVIGATION_COPY[locale][action]), ...categoryKeywords('subtitleNavigation'),
       ...subtitleNavigationAliases[action],
+      ...(action === 'playback' ? LOCALES.map(locale => OPTIONS_SECTION_COPY[locale].sentenceMode) : []),
     ],
     holdSpeed: LOCALES.map(locale => getCopy(locale).holdSpeed),
     seekPair: LOCALES.map(locale => SEEK_PAIR_COPY[locale].pair),
@@ -81,9 +82,13 @@ export function createShortcutSearchIndex(settings: ShortcutSettings) {
   }
 }
 
-export const matchesShortcutSearch = (keywords: string[], binding: KeyBinding | null | undefined, query: string): boolean =>
-  matchesSearchText([
-    ...keywords, binding?.code ?? '', binding?.key ?? '', binding ? formatKeyBinding(binding) : '',
-    binding?.ctrl ? 'ctrl control' : '', binding?.alt ? 'alt option ⌥' : '',
-    binding?.shift ? 'shift ⇧' : '', binding?.meta ? 'meta cmd command ⌘' : '',
-  ], query)
+export const matchesShortcutSearch = (
+  keywords: string[],
+  binding: Pick<ShortcutBinding, 'key' | 'additionalKeys'> | undefined,
+  query: string,
+): boolean =>
+  matchesSearchText(keywords, query) || getBindingKeys(binding).some(key => matchesSearchText([
+    ...keywords, key.code, key.key, formatKeyBinding(key),
+    key.ctrl ? 'ctrl control' : '', key.alt ? 'alt option ⌥' : '',
+    key.shift ? 'shift ⇧' : '', key.meta ? 'meta cmd command ⌘' : '',
+  ], query))

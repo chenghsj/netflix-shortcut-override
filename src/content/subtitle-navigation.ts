@@ -1,9 +1,10 @@
 import { findVideo } from './dom-utils'
 import { normalizeNetflixTimedText } from '@/shared/netflix-subtitles'
-import { subtitleStarts, subtitleTarget, SUBTITLE_NAVIGATION_FAILURE_COPY, type SubtitleNavigationFailureCode, SUBTITLE_NAVIGATION_COPY, type SubtitleNavigationAction } from '@/shared/subtitle-navigation'
+import { subtitleTimings, subtitleTarget, type SubtitleTiming, SUBTITLE_NAVIGATION_FAILURE_COPY, type SubtitleNavigationFailureCode, SUBTITLE_NAVIGATION_COPY, type SubtitleNavigationAction } from '@/shared/subtitle-navigation'
 import { resolveLocalePreference } from '@/shared/browser-locale'
 import type { ShortcutSettings } from '@/shared/shortcut-types'
 import type { NetflixPlaybackSession } from './netflix-playback-session'
+import type { ShortcutRequest } from './shortcuts/shortcut-command-types'
 import { getHintManager, type HintManager, type HintRequest } from './hints/hint-manager'
 import { CAPTION_REQUEST_EVENT, CAPTION_RESPONSE_EVENT, readCaptionEvent } from '@/shared/netflix-caption-events'
 import { getBrowserCapabilities } from '@/shared/browser-capabilities'
@@ -69,8 +70,8 @@ function fetchCaption(url: string, watchId: string, signal: AbortSignal): Promis
   })
 }
 
-export function createSubtitleNavigation(getSettings: () => ShortcutSettings, session: NetflixPlaybackSession, onSeek: () => void) {
-  let cache: { key: string; starts: number[] } | null = null
+export function createSubtitleNavigation(getSettings: () => ShortcutSettings, session: NetflixPlaybackSession, onSeek: (request?: ShortcutRequest) => void) {
+  let cache: { key: string; timings: SubtitleTiming[] } | null = null
   let busy = false
   let token = 0
   let pending: AbortController | null = null
@@ -82,7 +83,7 @@ export function createSubtitleNavigation(getSettings: () => ShortcutSettings, se
       if (!nextSettings.enabled || !nextSettings.subtitleNavigation.enabled ||
         (pendingAction && !nextSettings.subtitleNavigation.bindings[pendingAction].enabled)) cancel()
     },
-    async execute(action: Exclude<SubtitleNavigationAction, 'playback'>, targetDoc: Document) {
+    async execute(action: Exclude<SubtitleNavigationAction, 'playback'>, targetDoc: Document, request?: ShortcutRequest) {
       if (busy) return
       busy = true
       pendingAction = action
@@ -132,18 +133,18 @@ export function createSubtitleNavigation(getSettings: () => ShortcutSettings, se
           manager.show(request)
           const response = await fetchCaption(metadata.url, metadata.watchId, signal)
           dismissLoading()
-          let starts: number[]
-          try { starts = subtitleStarts(normalizeNetflixTimedText(response.text ?? '')) }
+          let timings: SubtitleTiming[]
+          try { timings = subtitleTimings(normalizeNetflixTimedText(response.text ?? '')) }
           catch { throw new SubtitleNavigationFailure('parse') }
-          if (!starts.length) throw new SubtitleNavigationFailure('parse')
+          if (!timings.length) throw new SubtitleNavigationFailure('parse')
           if (!active()) return
-          cache = { key: metadata.key, starts }
+          cache = { key: metadata.key, timings }
         }
         const latest = await requestCaptionMetadata(signal)
         if (!active() || latest.key !== metadata.key) return
-        const target = subtitleTarget(cache.starts, latest.currentMs, action)
+        const target = subtitleTarget(cache.timings, latest.currentMs, action)
         if (target === null) return
-        onSeek()
+        onSeek(request)
         const result = await session.seekTo(target)
         if (!active()) return
         if (result.failureLabel) throw new SubtitleNavigationFailure('seek')

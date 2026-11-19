@@ -26,6 +26,17 @@ const dragEvent = (kind: 'dragOver' | 'drop', row: HTMLElement, dataTransfer: Re
 }
 
 describe('subtitle size editor', () => {
+  it('records and saves CapsLock as the subtitle-size shortcut', async () => {
+    render(<OptionsApp />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Subtitles' }))
+    const dialog = await editDialog()
+    record(dialog, 'CapsLock', 'CapsLock')
+    expect(within(dialog).getByRole('group', { name: 'Key' })).toHaveTextContent('Caps')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect((await getSettings()).bindings.cycleSubtitleSize.key).toMatchObject({ code: 'CapsLock', key: 'CapsLock' })
+  })
+
   it('stops adding at six sizes and allows another size after one is removed', async () => {
     render(<OptionsApp />)
     fireEvent.click(await screen.findByRole('button', { name: 'Subtitles' }))
@@ -335,6 +346,8 @@ describe('subtitle size editor', () => {
     render(<OptionsApp />)
     fireEvent.click(await screen.findByRole('button', { name: 'Subtitles' }))
     const dialog = await editDialog('Set size · 125%')
+    expect(dialog).toHaveAttribute('data-size', 'wide')
+    expect(within(dialog).queryByText('Key', { selector: 'label' })).not.toBeInTheDocument()
     fireEvent.change(within(dialog).getByLabelText('Size'), { target: { value: '175' } })
     expect(within(dialog).queryByRole('button', { name: 'Add size' })).not.toBeInTheDocument()
     record(dialog, 'Space', ' ')

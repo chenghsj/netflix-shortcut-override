@@ -1,6 +1,6 @@
 import { PageFeatureManager, type ManagedFeatureEntry } from '@/options/page-feature-manager'
 import { FeatureGroupCheckbox } from '@/options/feature-group-checkbox'
-import { hideFeatures, isFeatureHidden, isFeatureGroupHidden, restoreFeatures, setFavoritesFeatureEnabled, type ManagedFeatureGroup, type ManagedFavoritesFeature } from '@/shared/feature-management'
+import { featureId, hideFeatures, isFeatureHidden, isFeatureGroupHidden, restoreFeatures, setFavoritesFeatureEnabled, type ManagedFeatureGroup, type ManagedFavoritesFeature } from '@/shared/feature-management'
 import { getAudioFavoritesCopy } from '@/shared/audio-favorites-copy'
 import { FEATURE_MANAGEMENT_COPY } from '@/shared/feature-management-copy'
 import { useFeatureManagement } from '@/options/use-feature-management'
@@ -13,16 +13,16 @@ import { SUBTITLE_PERMISSION_COPY, SUBTITLE_NAVIGATION_COPY } from '@/shared/sub
 import { resetSubtitleNavigationBindings } from '@/shared/shortcut-assignment'
 import {
   CircleHelpIcon,
+  CircleDotIcon,
   PencilIcon,
-  PlayIcon,
   PlusIcon,
   StarIcon,
 } from 'lucide-react'
-import { Fragment, useEffect, useId, useRef, useState, type ComponentProps } from 'react'
+import { Fragment, useEffect, useId, useLayoutEffect, useRef, useState, type ComponentProps } from 'react'
 
 import { GitHubIcon } from '@/components/github-icon'
 import { KeyBindingKbd } from '@/components/key-binding-kbd'
-import { ShortcutRecordingArea } from '@/components/shortcut-recording-area'
+import { ShortcutKeysEditor } from '@/components/shortcut-keys-editor'
 import { LanguageCombobox } from '@/components/language-combobox'
 import { NumericSettingField } from '@/components/numeric-setting-field'
 import { OtherProjectsSelect } from '@/components/other-projects-select'
@@ -41,7 +41,7 @@ import { SubtitleSizeShortcutRows } from '@/options/subtitle-size-shortcut-rows'
 import { useSubtitleSizeEditor } from '@/options/use-subtitle-size-editor'
 import { SeekShortcutDialog } from '@/options/seek-shortcut-dialog'
 import { useSeekShortcutEditor, type SeekEditorTarget } from '@/options/use-seek-shortcut-editor'
-import { ShortcutGroupToggle, ShortcutTableGroup } from '@/options/shortcut-table-group'
+import { ShortcutGroupToggle, ShortcutRow, shortcutRowId, ShortcutTableGroup } from '@/options/shortcut-table-group'
 import { HoldSpeedShortcutSettings, SpeedRangeSettings } from '@/options/speed-shortcut-settings'
 import { SPEED_SHORTCUT_COPY } from '@/options/speed-shortcut-copy'
 import { PreferredSpeedShortcutSettings } from '@/options/preferred-speed-shortcut-rows'
@@ -92,7 +92,7 @@ import {
 import { cn } from '@/lib/utils'
 import { getCopy } from '@/shared/i18n'
 import { createShortcutSearchIndex, matchesShortcutSearch } from '@/shared/shortcut-search'
-import { getOptionsPageFromHash, OPTIONS_PAGE_HASHES } from '@/shared/options-navigation'
+import { getOptionsPageFromHash, OPTIONS_PAGE_HASHES, OPTIONS_SECTION_COPY } from '@/shared/options-navigation'
 import { resolveLocalePreference } from '@/shared/browser-locale'
 import { getBrowserCapabilities } from '@/shared/browser-capabilities'
 import { getShortcutAvailability, getSubtitleNavigationAvailability, type ShortcutTarget } from '@/shared/shortcut-routing'
@@ -116,7 +116,7 @@ import { useTheme } from '@/shared/use-theme'
 import { useUiStyle } from '@/shared/use-ui-style'
 import { getUiStyleOptions } from '@/shared/ui-styles'
 import { SUBTITLE_OPTIONS_HASH } from '@/shared/feature-announcements'
-import { SEEK_GROUPS, SHORTCUT_GROUPS } from '@/shared/shortcut-groups'
+import { DISPLAY_SHORTCUT_ACTIONS, SEEK_GROUPS, SHORTCUT_GROUPS } from '@/shared/shortcut-groups'
 import { OptionsBreadcrumb, OptionsLayout, OPTIONS_LAYOUT_COPY, type OptionsPage, type OptionsPageDescriptor, type ShortcutCategory } from '@/options/options-layout'
 import { HelpPage } from '@/help/help-page'
 import { HELP_UI_COPY } from '@/help/help-copy'
@@ -196,6 +196,14 @@ export function OptionsApp() {
   const [activeShortcutCategory, setActiveShortcutCategory] = useState<OptionsPage>(() => getOptionsPageFromHash(window.location.hash))
   const [shortcutQuery, setShortcutQuery] = useState('')
   const [managingPage, setManagingPage] = useState<string | null>(null)
+  const pendingShortcutFocus = useRef<string | null>(null)
+  useLayoutEffect(() => {
+    if (!pendingShortcutFocus.current) return
+    const row = document.getElementById(pendingShortcutFocus.current)
+    pendingShortcutFocus.current = null
+    row?.focus({ preventScroll: true })
+    row?.scrollIntoView({ block: 'center', inline: 'nearest' })
+  })
   const holdSpeedSettingsId = useId()
   const pauseOverlaySettingsId = useId()
   const [expandedShortcutGroups, setExpandedShortcutGroups] = useState(() => new Set<OptionsShortcutGroupId>([...SEEK_GROUPS, 'holdSpeed', 'preferredSpeed']))
@@ -209,6 +217,13 @@ export function OptionsApp() {
   }
   const [subtitleGuideRequested, setSubtitleGuideRequested] = useState(() => window.location.hash === SUBTITLE_OPTIONS_HASH)
   const [subtitleNavigationRequest, setSubtitleNavigationRequest] = useState(0)
+  const selectOptionsPage = (page: OptionsPage) => {
+    setManagingPage(null)
+    cancelFeaturePreview()
+    window.history.replaceState(null, '', OPTIONS_PAGE_HASHES[page])
+    setActiveShortcutCategory(page)
+    setSubtitleGuideRequested(false)
+  }
   useEffect(() => {
     const navigate = () => {
       const requested = window.location.hash === SUBTITLE_OPTIONS_HASH
@@ -261,10 +276,12 @@ export function OptionsApp() {
   const seekEditor = useSeekShortcutEditor({ settings, updateSettings, supportsSubtitlePreservingPip: browserCapabilities.supportsSubtitlePreservingPip })
   const sizeEditor = useSubtitleSizeEditor({ settings, updateSettings, supportsSubtitlePreservingPip: browserCapabilities.supportsSubtitlePreservingPip })
   const { recorder, conflict } = editor
+  const editingPreferredSpeed = recorder?.preferredSpeed !== undefined
   const actionLabels: Record<string, string> = { ...getShortcutLabels(settings, resolvedLocale), ...subtitleNavigationCopy }
   const seekCopy = SEEK_SHORTCUT_COPY[resolvedLocale]
   const pairCopy = SEEK_PAIR_COPY[resolvedLocale]
   const browserCopy = OPTIONS_LAYOUT_COPY[resolvedLocale]
+  const sectionCopy = OPTIONS_SECTION_COPY[resolvedLocale]
   const shortcutGroupLabels = { ...copy.shortcutGroups, subtitles: browserCopy.subtitles, subtitleNavigation: browserCopy.subtitleNavigation, seeking: browserCopy.seeking, volume: browserCopy.volume, seek: pairCopy.pair, percentage: SEEK_SECTION_COPY[resolvedLocale].percentage }
   const searchingShortcuts = Boolean(shortcutQuery.trim())
   const holdSpeedExpanded = searchingShortcuts || expandedShortcutGroups.has('holdSpeed')
@@ -274,12 +291,13 @@ export function OptionsApp() {
   const matchesAudioFavorites = !settings.hiddenFeatures.includes('audioFavorites') && matchesSettings('audioFavorites', shortcutQuery)
   const matchesSpeedRange = matchesSettings('speedRange', shortcutQuery)
   const visibleSubtitleNavigationActions = SUBTITLE_NAVIGATION_ACTIONS.filter(action => !isFeatureHidden(settings, { group: 'subtitleNavigation', action }) && matchesShortcutSearch(
-    searchIndex.subtitleNavigation(action), settings.subtitleNavigation.bindings[action].key, shortcutQuery,
+    searchIndex.subtitleNavigation(action), settings.subtitleNavigation.bindings[action], shortcutQuery,
   ))
   const matchesShortcut = (action: ShortcutAction, category: ShortcutCategory, extra: string[] = []) => {
-    const binding = settings.bindings[action]?.key
+    const binding = settings.bindings[action]
     return !isFeatureHidden(settings, { group: 'general', action }) && matchesShortcutSearch([...searchIndex.general(action, category), ...extra], binding, shortcutQuery)
   }
+  const firstDisplayShortcut = DISPLAY_SHORTCUT_ACTIONS.find(action => matchesShortcut(action, 'playback'))
   const matchesSubtitleSize = (action: ShortcutAction) => matchesShortcut(action, 'subtitles')
   const matchesHoldSpeed = !settings.hiddenFeatures.includes(catalog.holdSpeed.id) && !isFeatureHidden(settings, { group: 'general', action: catalog.holdSpeed.parentAction }) && (matchesShortcut(catalog.holdSpeed.parentAction, 'playback', [...searchIndex.holdSpeed, String(settings.holdSpeed.speed)]) || matchesSettings('holdSpeed', shortcutQuery))
   const matchesSeekPair = (pair: ShortcutSeekPair = catalog.groups.seek.pairs[0]) => {
@@ -291,7 +309,35 @@ export function OptionsApp() {
   const visibleSeekGroups = SEEK_GROUPS.filter(group => !isFeatureGroupHidden(settings, group) && (!searchingShortcuts || (group === 'seek'
     ? catalog.groups.seek.pairs.some(matchesSeekPair)
     : matchesSettings('seekPercentage', shortcutQuery) || catalog.groups.percentage.shortcuts.some(matchesPercentage))))
-  const conflictNames = new Intl.ListFormat(resolvedLocale, { style: 'short', type: 'conjunction' }).format([...new Set(conflict?.affectedActions.map(action => actionLabels[action]) ?? [])])
+  const conflictDetails = ({ keys, actions, affectedTargets }: Pick<NonNullable<typeof conflict>, 'keys' | 'actions' | 'affectedTargets'>) => {
+    const owners = affectedTargets.filter(target => actions.includes(target.action)).flatMap(target => {
+      const pair = target.group === 'general' ? catalog.seekPairFor(target.action) : undefined
+      const group = pair ? 'seek'
+        : catalog.groups.percentage.actions.some(action => action === target.action) ? 'percentage'
+        : catalog.groups.preferredSpeed.actions.some(action => action === target.action) ? 'preferredSpeed' : undefined
+      const page = group === 'preferredSpeed' ? 'speed' : group ? 'seeking'
+        : target.group === 'subtitleNavigation' || settings.subtitleSizeShortcuts.some(shortcut => shortcut.id === target.action) ? 'subtitles'
+        : SHORTCUT_GROUPS.find(({ actions }) => actions.some(action => action === target.action))?.title
+      if (!page) return []
+      const row = pair ? { group: 'general' as const, action: pair.actions.backward } : target
+      return [{
+        id: featureId(target), label: actionLabels[target.action], href: OPTIONS_PAGE_HASHES[page],
+        navigate: () => {
+          pendingShortcutFocus.current = shortcutRowId(row)
+          setShortcutQuery('')
+          if (group) setShortcutGroupOpen(group, true)
+          selectOptionsPage(page)
+        },
+      }]
+    })
+    const affectedNames = new Intl.ListFormat(resolvedLocale, { style: 'short', type: 'conjunction' })
+      .format([...new Set(affectedTargets.map(target => actionLabels[target.action]))])
+    return {
+      keys: keys.map(key => formatKeyBinding(key)).join(' · '),
+      owners,
+      consequence: conflictCopy.consequence.replace('{actions}', () => affectedNames),
+    }
+  }
   const featureCheckbox = (targets: ShortcutTarget[], label: string, disabled = false) => <FeatureCheckbox
     checked={!targets.every(target => isFeatureHidden(settings, target))} disabled={disabled}
     aria-label={featureCopy.show.replace('{action}', label)} onCheckedChange={checked => updateSettings(current => checked === true
@@ -299,12 +345,9 @@ export function OptionsApp() {
       : hideFeatures(current, targets))} />
   const conflictSwitch = (target: ShortcutTarget, disabled: boolean) => {
     const binding = target.group === 'subtitleNavigation' ? settings.subtitleNavigation.bindings[target.action] : settings.bindings[target.action]
-    const open = Boolean(conflict?.group === target.group && conflict.action === target.action && conflict.actions.length)
+    const notice = conflict?.group === target.group && conflict.action === target.action && conflict.actions.length ? conflictDetails(conflict) : undefined
     return <ShortcutConflictSwitch checked={binding.enabled && (target.group === 'subtitleNavigation' || !disabled)} disabled={disabled}
-      label={`${actionLabels[target.action]} ${copy.status}`} open={open} copy={conflictCopy}
-      title={conflictCopy.title.replace('{key}', formatKeyBinding(conflict?.key ?? binding.key)).replace('{actions}', conflictNames)}
-      consequence={conflictCopy.consequence.replace('{actions}', conflictNames)}
-      transferLabel={conflictCopy.transfer.replace('{action}', actionLabels[target.action])}
+      label={`${actionLabels[target.action]} ${copy.status}`} conflict={notice} locale={resolvedLocale} copy={conflictCopy}
       onOpenChange={next => { if (!next) editor.dismissConflict() }}
       onCheckedChange={enabled => editor.setBindingEnabled(target, enabled)}
       onChangeKey={button => {
@@ -322,14 +365,10 @@ export function OptionsApp() {
     const pair = catalog.groups.seek.pairs.find(pair => target.kind === 'builtin' ? !pair.shortcut : pair.id === target.shortcut.id)!
     const actions = [pair.actions.backward, pair.actions.forward]
     const pending = seekEditor.pairConflict
-    const open = Boolean(pending && (target.kind === 'builtin' ? pending.target.kind === 'builtin'
-      : pending.target.kind === 'custom' && pending.target.shortcut.id === target.shortcut.id))
-    const names = new Intl.ListFormat(resolvedLocale, { style: 'short', type: 'conjunction' }).format(
-      [...new Set(pending?.affectedActions.map(action => actionLabels[action]) ?? [])])
+    const notice = pending && (target.kind === 'builtin' ? pending.target.kind === 'builtin'
+      : pending.target.kind === 'custom' && pending.target.shortcut.id === target.shortcut.id) ? conflictDetails(pending) : undefined
     return <ShortcutConflictSwitch checked={actions.some(action => settings.bindings[action].enabled)} disabled={false}
-      label={`${label} ${copy.status}`} open={open} copy={conflictCopy}
-      title={conflictCopy.title.replace('{key}', pending?.keys.map(key => formatKeyBinding(key)).join(' · ') ?? '').replace('{actions}', names)}
-      consequence={conflictCopy.consequence.replace('{actions}', names)} transferLabel={conflictCopy.transfer.replace('{action}', label)}
+      label={`${label} ${copy.status}`} conflict={notice} locale={resolvedLocale} copy={conflictCopy}
       onOpenChange={next => { if (!next) seekEditor.dismissConflict() }}
       onCheckedChange={enabled => seekEditor.setPairEnabled(target, enabled)}
       onChangeKey={seekEditor.changeConflictKeys} onTransfer={seekEditor.confirmTransfer} />
@@ -344,7 +383,7 @@ export function OptionsApp() {
     const binding = settings.bindings[action]
     return <TableCell key={action}>
       <div className="flex min-w-0 flex-col items-start gap-1">
-        <KeyBindingKbd binding={binding.key} emptyLabel={copy.unassignedShortcut} className="flex-wrap" />
+        <KeyBindingKbd binding={binding.key} additionalKeys={binding.additionalKeys} emptyLabel={copy.unassignedShortcut} className="flex-wrap" />
         <NetflixNativeKeyReplacement bindings={getReplacedNetflixNativeKeyBindings(action, binding)} template={copy.replacedNetflixKeys} />
       </div>
     </TableCell>
@@ -472,12 +511,13 @@ export function OptionsApp() {
                       const binding = settings.subtitleNavigation.bindings[action]
                       const { overridingAction } = getSubtitleNavigationAvailability(settings, action, browserCapabilities.supportsSubtitlePreservingPip)
                       const overrideDescription = overridingAction ? subtitlePopupCopy.overriddenBy.replace('{action}', actionLabels[overridingAction]) : undefined
-                      return <TableRow key={action}>
+                      return <ShortcutRow key={action} target={{ group: 'subtitleNavigation', action }}>
                         <TableCell className="font-medium whitespace-normal">
                           <span>{subtitleNavigationCopy[action]}</span>
+                          {action === 'playback' && <p className="mt-1 text-xs font-normal text-muted-foreground">{sectionCopy.sentenceMode}</p>}
                           {action === 'replay' && <p className="mt-1 text-xs font-normal text-muted-foreground">{subtitleNavigationCopy.replayHint}</p>}
                         </TableCell>
-                        <TableCell><div className="flex flex-wrap items-center gap-1.5"><KeyBindingKbd binding={binding.key} emptyLabel={copy.unassignedShortcut} className="flex-wrap" />
+                        <TableCell><div className="flex flex-wrap items-center gap-1.5"><KeyBindingKbd binding={binding.key} additionalKeys={binding.additionalKeys} emptyLabel={copy.unassignedShortcut} className="flex-wrap" />
                           {overridingAction && <Badge variant="secondary" className="max-w-full whitespace-normal" title={overrideDescription} aria-label={overrideDescription}>{subtitlePopupCopy.overridden}</Badge>}
                         </div></TableCell>
                         <TableCell>{conflictSwitch({ group: 'subtitleNavigation', action }, !settings.enabled || !settings.subtitleNavigation.enabled)}</TableCell>
@@ -489,7 +529,7 @@ export function OptionsApp() {
                             label={`${copy.reset} ${subtitleNavigationCopy[action]}`} description={RESET_SCOPE_COPY[resolvedLocale].binding}
                             onClick={() => editor.resetBinding({ group: 'subtitleNavigation', action })} />
                         </div></TableCell>
-                      </TableRow>
+                      </ShortcutRow>
                     })}</TableBody>
                   </Table>
                 </div>
@@ -543,7 +583,12 @@ export function OptionsApp() {
                             : action === 'previousFrame' || action === 'nextFrame' ? copy.frameStepTooltip : null
                           return (
                             <Fragment key={action}>
-                              <TableRow className={cn(action === catalog.holdSpeed.parentAction && matchesHoldSpeed && 'hover:bg-transparent has-aria-expanded:bg-transparent')}>
+                              {action === firstDisplayShortcut && (
+                                <TableRow className="bg-muted/50 hover:bg-muted/50">
+                                  <TableCell colSpan={4}><h4 className="text-sm font-semibold">{copy.shortcutGroups.display}</h4></TableCell>
+                                </TableRow>
+                              )}
+                              <ShortcutRow target={{ group: 'general', action }} className={cn(action === catalog.holdSpeed.parentAction && matchesHoldSpeed && 'hover:bg-transparent has-aria-expanded:bg-transparent')}>
                                 <TableCell className={cn('font-medium whitespace-normal', action === catalog.holdSpeed.parentAction && matchesHoldSpeed && !searchingShortcuts && 'p-0')}>
                                   <div className="flex items-center gap-1.5">
                                     {action === catalog.holdSpeed.parentAction && matchesHoldSpeed && !searchingShortcuts
@@ -576,7 +621,7 @@ export function OptionsApp() {
                                 <TableCell>
                                   <div className="flex flex-col items-start gap-1">
                                     <div className="flex min-w-0 max-w-full flex-wrap items-center gap-1.5">
-                                      <KeyBindingKbd binding={binding.key} emptyLabel={copy.unassignedShortcut} className="flex-wrap" />
+                                      <KeyBindingKbd binding={binding.key} additionalKeys={binding.additionalKeys} emptyLabel={copy.unassignedShortcut} className="flex-wrap" />
                                     </div>
                                     <NetflixNativeKeyReplacement
                                       bindings={replacedNetflixKeys}
@@ -604,7 +649,7 @@ export function OptionsApp() {
                                       label={`${copy.reset} ${copy.actions[action]}`} description={RESET_SCOPE_COPY[resolvedLocale].binding} />
                                   </div>
                                 </TableCell>
-                              </TableRow>
+                              </ShortcutRow>
                               {action === catalog.holdSpeed.parentAction && matchesHoldSpeed && <HoldSpeedShortcutSettings locale={resolvedLocale} settings={settings} form={holdSpeedForm} updateSettings={updateSettings}
                                 id={holdSpeedSettingsId} open={holdSpeedExpanded} />}
                             </Fragment>
@@ -634,7 +679,7 @@ export function OptionsApp() {
                               {seekTitle === 'seek' ? <><TableHead>{pairCopy.forwardKey}</TableHead><TableHead>{pairCopy.backwardKey}</TableHead></> : <TableHead>{copy.key}</TableHead>}
                               <TableHead>{copy.status}</TableHead><TableHead className="text-right">{copy.columnActions}</TableHead>
                             </TableRow></TableHeader>}>
-                          {seekTitle === 'seek' && matchesSeekPair() && <TableRow aria-label={pairCopy.group.replace('{value}', String(settings.seek.seconds))}>
+                          {seekTitle === 'seek' && matchesSeekPair() && <ShortcutRow target={{ group: 'general', action: catalog.groups.seek.pairs[0].actions.backward }} aria-label={pairCopy.group.replace('{value}', String(settings.seek.seconds))}>
                             <TableCell>{settings.seek.seconds} {pairCopy.unit}</TableCell>
                             {seekBindingCell(catalog.groups.seek.pairs[0].actions.forward)}
                             {seekBindingCell(catalog.groups.seek.pairs[0].actions.backward)}
@@ -643,7 +688,7 @@ export function OptionsApp() {
                               <Button variant="ghost" size="icon" className="text-muted-foreground focus-visible:text-foreground" aria-label={`${copy.edit} ${pairCopy.group.replace('{value}', String(settings.seek.seconds))}`} onClick={event => seekEditor.open({ kind: 'builtin' }, event.currentTarget)}><PencilIcon /></Button>
                               <ResetButton locale={resolvedLocale} variant="ghost" iconOnly className="text-muted-foreground focus-visible:text-foreground" onClick={seekEditor.resetBuiltin} label={copy.resetSeekSettings} description={RESET_SCOPE_COPY[resolvedLocale].seekInterval} />
                             </div></TableCell>
-                          </TableRow>}
+                          </ShortcutRow>}
                           {(seekTitle === 'seek'
                             ? catalog.groups.seek.pairs.flatMap(pair => pair.shortcut && matchesSeekPair(pair) ? [pair.shortcut] : [])
                             : catalog.groups.percentage.shortcuts.filter(matchesPercentage)).map(shortcut => {
@@ -654,7 +699,7 @@ export function OptionsApp() {
                               for (const action of pair ? [pair.actions.backward, pair.actions.forward] : [shortcut.id]) delete bindings[action]
                               return { ...current, bindings, seekShortcuts: current.seekShortcuts.filter(item => item.id !== shortcut.id) }
                             })} />
-                            if (shortcut.kind === 'relative') return <TableRow key={shortcut.id} aria-label={label}>
+                            if (shortcut.kind === 'relative') return <ShortcutRow key={shortcut.id} target={{ group: 'general', action: pair!.actions.backward }} aria-label={label}>
                               <TableCell>{shortcut.value} {pairCopy.unit}</TableCell>
                               {seekBindingCell(pair!.actions.forward)}
                               {seekBindingCell(pair!.actions.backward)}
@@ -663,23 +708,23 @@ export function OptionsApp() {
                                 <Button variant="ghost" size="icon" className="text-muted-foreground focus-visible:text-foreground" aria-label={`${copy.edit} ${label}`} onClick={event => seekEditor.open({ kind: 'custom', shortcut }, event.currentTarget)}><PencilIcon /></Button>
                                 {remove}
                               </div></TableCell>
-                            </TableRow>
+                            </ShortcutRow>
                             const binding = settings.bindings[shortcut.id]
-                            return <TableRow key={shortcut.id} aria-label={label}>
+                            return <ShortcutRow key={shortcut.id} target={{ group: 'general', action: shortcut.id }} aria-label={label}>
                               <TableCell className="font-medium whitespace-normal">
                                 <div className="flex flex-wrap items-center gap-3">
                                   <span>{label}</span>
                                 </div>
                               </TableCell>
                               <TableCell>
-                                <KeyBindingKbd binding={binding.key} emptyLabel={copy.unassignedShortcut} className="flex-wrap" />
+                                <KeyBindingKbd binding={binding.key} additionalKeys={binding.additionalKeys} emptyLabel={copy.unassignedShortcut} className="flex-wrap" />
                               </TableCell>
                               <TableCell>{conflictSwitch({ group: 'general', action: shortcut.id }, false)}</TableCell>
                               <TableCell><div className="flex items-center justify-end gap-2">
                                 <Button variant="ghost" size="icon" className="text-muted-foreground focus-visible:text-foreground" aria-label={`${copy.edit} ${label}`} onClick={event => seekEditor.open({ kind: 'custom', shortcut }, event.currentTarget)}><PencilIcon /></Button>
                                 {remove}
                               </div></TableCell>
-                            </TableRow>
+                            </ShortcutRow>
                           })}
                           </ShortcutTableGroup>
                         ))}
@@ -687,6 +732,8 @@ export function OptionsApp() {
                         </Table>
                       </section>,
                     }))
+  const matchesAutomation = matchesSettings('automation', shortcutQuery)
+  const matchesPauseScreen = matchesSettings('pauseScreen', shortcutQuery)
   pages.push(
     { id: 'general', label: copy.quickSettings, group: 'settings', matches: matchesSettings('general', shortcutQuery), content:               <Card>
                 <CardHeader>
@@ -714,7 +761,7 @@ export function OptionsApp() {
                         size="default"
                         label={copy.uiStyle}
                         value={settings.uiStyle}
-                        options={getUiStyleOptions(resolvedLocale)}
+                        options={getUiStyleOptions(resolvedLocale, settings.uiStyle)}
                         onChange={uiStyle => updateSettings(current => ({ ...current, uiStyle }))}
                       />
                     </Field>
@@ -733,24 +780,18 @@ export function OptionsApp() {
                         onChange={theme => updateSettings(current => ({ ...current, theme }))}
                       />
                     </Field>
-                    <Field orientation="horizontal" className="items-center justify-between">
-                      <SettingLabelWithTooltip htmlFor={pauseOverlaySettingsId}
-                        label={copy.hidePauseOverlay} tooltip={copy.hidePauseOverlayDescription} />
-                      <Switch id={pauseOverlaySettingsId}
-                        checked={settings.hidePauseOverlay} disabled={!settings.enabled}
-                        onCheckedChange={hidePauseOverlay => updateSettings(current => ({ ...current, hidePauseOverlay }))} />
-                    </Field>
                   </FieldGroup>
                 </CardContent>
               </Card> },
-    { id: 'automation', label: copy.autoSkip, group: 'settings', matches: matchesSettings('automation', shortcutQuery), content:               <Card>
+    { id: 'automation', label: sectionCopy.playbackPreferences, group: 'settings', matches: matchesAutomation || matchesPauseScreen, content:               <Card>
                 <CardHeader>
                   <CardTitle>
-                    {searchingShortcuts ? copy.autoSkip : <OptionsBreadcrumb locale={resolvedLocale} group="settings" label={copy.autoSkip} />}
+                    {searchingShortcuts ? sectionCopy.playbackPreferences : <OptionsBreadcrumb locale={resolvedLocale} group="settings" label={sectionCopy.playbackPreferences} />}
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <FieldGroup role="group" aria-label={copy.autoSkip}>
+                <CardContent className="flex flex-col gap-6">
+                  {matchesAutomation && <FieldGroup role="group" aria-labelledby="automation-heading">
+                    <h3 id="automation-heading" className="text-base font-semibold">{copy.autoSkip}</h3>
                     {([
                       ['intro', copy.autoSkipIntro],
                       ['recap', copy.autoSkipRecap],
@@ -781,7 +822,17 @@ export function OptionsApp() {
                         onCheckedChange={autoNextEpisode => updateSettings(current => ({ ...current, autoNextEpisode }))}
                       />
                     </div>
-                  </FieldGroup>
+                  </FieldGroup>}
+                  {matchesPauseScreen && <FieldGroup role="group" aria-labelledby="pause-screen-heading">
+                    <h3 id="pause-screen-heading" className="text-base font-semibold">{sectionCopy.pauseScreen}</h3>
+                    <Field orientation="horizontal" className="items-center justify-between">
+                      <SettingLabelWithTooltip htmlFor={pauseOverlaySettingsId}
+                        label={copy.hidePauseOverlay} tooltip={copy.hidePauseOverlayDescription} />
+                      <Switch id={pauseOverlaySettingsId}
+                        checked={settings.hidePauseOverlay} disabled={!settings.enabled}
+                        onCheckedChange={hidePauseOverlay => updateSettings(current => ({ ...current, hidePauseOverlay }))} />
+                    </Field>
+                  </FieldGroup>}
                 </CardContent>
               </Card> },
     { id: 'backup', label: copy.backupRestore, group: 'settings', matches: matchesSettings('backup', shortcutQuery), content:               <SettingsTransferCard
@@ -789,7 +840,7 @@ export function OptionsApp() {
                 copy={copy}
                 locale={resolvedLocale}
                 settings={settings}
-                onImport={replaceSettings}
+                onReplaceSettings={replaceSettings}
               /> },
     { id: 'help', label: HELP_UI_COPY[resolvedLocale].title, group: 'help', content: <HelpPage
       locale={resolvedLocale} query={shortcutQuery} /> },
@@ -798,13 +849,7 @@ export function OptionsApp() {
   return (
     <TooltipProvider>
       <OptionsLayout locale={resolvedLocale} pages={pages} activePage={activeShortcutCategory}
-        onPageChange={page => {
-          setManagingPage(null)
-          cancelFeaturePreview()
-          window.history.replaceState(null, '', OPTIONS_PAGE_HASHES[page])
-          setActiveShortcutCategory(page)
-          setSubtitleGuideRequested(false)
-        }}
+        onPageChange={selectOptionsPage}
         query={shortcutQuery} onQueryChange={query => { setManagingPage(null); cancelFeaturePreview(); setShortcutQuery(query) }}
         globalControl={                  <Field orientation="horizontal" className="min-h-8 items-center justify-between gap-3">
                     <SettingLabelWithTooltip
@@ -829,7 +874,7 @@ export function OptionsApp() {
                   {copy.appTitle}
                 </h1>
               </div>
-              <nav className="flex shrink-0 items-center gap-1 sm:gap-2 sm:pr-2">
+              <nav className="flex shrink-0 items-center gap-1 pr-[min(var(--ui-press-x),1px)] sm:gap-2">
                 <Tooltip>
                   <TooltipTrigger asChild><Button variant="outline" size="icon" asChild>
                     <a
@@ -842,6 +887,19 @@ export function OptionsApp() {
                     </a>
                   </Button></TooltipTrigger>
                   <TooltipContent side="bottom">{copy.githubRepository}</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild><Button variant="outline" size="icon" asChild>
+                    <a
+                      href={EXTERNAL_LINKS.githubNewIssue}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label={copy.reportIssueAriaLabel}
+                    >
+                      <CircleDotIcon aria-hidden="true" />
+                    </a>
+                  </Button></TooltipTrigger>
+                  <TooltipContent side="bottom">{copy.reportIssue}</TooltipContent>
                 </Tooltip>
                 <Tooltip>
                   <TooltipTrigger asChild><Button variant="outline" size="icon" asChild>
@@ -878,9 +936,10 @@ export function OptionsApp() {
 
       <Dialog open={Boolean(recorder)} onOpenChange={open => !open && editor.closeRecorder()}>
         <DialogContent
+          size={editingPreferredSpeed ? 'standard' : 'compact'}
           onOpenAutoFocus={event => {
             event.preventDefault()
-            if (recorder?.preferredSpeed !== undefined) preferredSpeedInput.current?.focus({ preventScroll: true })
+            if (editingPreferredSpeed) preferredSpeedInput.current?.focus({ preventScroll: true })
             else recordingArea.current?.focus({ preventScroll: true })
           }}
           onCloseAutoFocus={editor.restoreRecorderFocus}
@@ -898,8 +957,8 @@ export function OptionsApp() {
           }}
         >
           <DialogHeader>
-            <DialogTitle>{recorder?.preferredSpeed !== undefined ? copy.preferredSpeed : copy.recordTitle}</DialogTitle>
-            <DialogDescription>{recorder?.preferredSpeed !== undefined ? speedCopy.preferredDescription : `${copy.recordDesc} ${copy.shortcutOptional}`}</DialogDescription>
+            <DialogTitle>{editingPreferredSpeed ? copy.preferredSpeed : copy.recordTitle}</DialogTitle>
+            <DialogDescription>{editingPreferredSpeed ? speedCopy.preferredDescription : `${copy.recordDesc} ${copy.shortcutOptional}`}</DialogDescription>
           </DialogHeader>
 
           <div className="flex flex-col gap-4">
@@ -910,30 +969,20 @@ export function OptionsApp() {
                 value={recorder.preferredSpeed} onValueChange={editor.setPreferredSpeed} onBlur={editor.normalizePreferredSpeed}
                 onDragCommit={editor.normalizePreferredSpeed} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur() }} />
             </FieldGroup>}
-            {recorder?.preferredSpeed !== undefined && <Label id="preferred-speed-key-label">{copy.key}</Label>}
-            <ShortcutRecordingArea ref={recordingArea} aria-label={recorder?.preferredSpeed !== undefined ? undefined : copy.recordTitle}
-              aria-labelledby={recorder?.preferredSpeed !== undefined ? 'preferred-speed-key-label' : undefined}
-              tabIndex={recorder?.preferredSpeed !== undefined ? 0 : -1} onClick={event => event.currentTarget.focus()}
-              onClear={() => editor.capture(null)} clearLabel={copy.clearShortcut}
-              binding={recorder?.draft} placeholder={copy.pressKey} idlePlaceholder={copy.shortcutPlaceholder} aria-invalid={Boolean(recorder?.activeConflict)} />
-            {recorder?.preferredSpeedStale && <Alert variant="destructive"><AlertTitle>{speedCopy.changed}</AlertTitle></Alert>}
-            {recorder?.storageFull && <Alert variant="destructive"><AlertTitle>{copy.settingsStorageFull}</AlertTitle></Alert>}
-            {recorder?.draft && !recorder.preferredSpeedStale && (
-              <Alert variant={recorder.activeConflict ? 'destructive' : 'default'}>
-                <PlayIcon />
-                <AlertTitle>
-                  {recorder.activeConflict
-                    ? copy.conflict.replace('{action}', actionLabels[recorder.activeConflict])
-                    : copy.noConflict}
-                </AlertTitle>
-              </Alert>
-            )}
-            <NetflixNativeKeyReplacement
-              bindings={recorder?.replacedNetflixKeys ?? []}
-              template={copy.willReplaceNetflixKeys}
-              className="text-center"
-              aria-live="polite"
-            />
+            <div className="flex flex-col gap-3">
+              <ShortcutKeysEditor ref={recordingArea} locale={resolvedLocale} bindings={recorder?.keys ?? [null]} onChange={editor.captureKeys}
+                aria-label={editingPreferredSpeed ? copy.key : copy.recordTitle}
+                tabIndex={editingPreferredSpeed ? 0 : -1} onClick={event => event.currentTarget.focus()}
+                clearLabel={copy.clearShortcut} conflicts={recorder?.keyConflicts} actionLabel={action => actionLabels[action]} />
+              {recorder?.preferredSpeedStale && <Alert variant="destructive"><AlertTitle>{speedCopy.changed}</AlertTitle></Alert>}
+              {recorder?.storageFull && <Alert variant="destructive"><AlertTitle>{copy.settingsStorageFull}</AlertTitle></Alert>}
+              <NetflixNativeKeyReplacement
+                bindings={recorder?.replacedNetflixKeys ?? []}
+                template={copy.willReplaceNetflixKeys}
+                className="text-center"
+                aria-live="polite"
+              />
+            </div>
           </div>
 
           <DialogFooter className="sm:justify-between">

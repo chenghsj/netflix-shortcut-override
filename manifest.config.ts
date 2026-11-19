@@ -48,6 +48,12 @@ export default defineManifest(({ command, mode }) => {
     content_scripts: [
       {
         matches: ['*://*.netflix.com/*'],
+        js: ['src/content/media-session-bridge.iife.ts'],
+        run_at: 'document_start',
+        world: 'MAIN',
+      },
+      {
+        matches: ['*://*.netflix.com/*'],
         js: ['src/content/netflix-api-bridge.ts'],
         run_at: 'document_start',
         world: 'MAIN',

@@ -1,19 +1,20 @@
 import { RestoreButton } from '@/components/reset-button'
 import { RESET_SCOPE_COPY } from '@/shared/reset-scopes'
 import { PlayIcon } from 'lucide-react'
-import { useRef } from 'react'
-import { ShortcutRecordingArea } from '@/components/shortcut-recording-area'
+import { Fragment, useRef } from 'react'
+import { ShortcutKeysEditor } from '@/components/shortcut-keys-editor'
 import { Alert, AlertTitle } from '@/components/app-ui/alert'
 import { Button } from '@/components/app-ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/app-ui/dialog'
 import { Input } from '@/components/app-ui/input'
 import { Label } from '@/components/app-ui/label'
 import { Separator } from '@/components/app-ui/separator'
+import { cn } from '@/lib/utils'
 import { getCopy } from '@/shared/i18n'
 import { getShortcutLabels, SEEK_PAIR_COPY, SEEK_SHORTCUT_COPY } from '@/shared/seek-shortcuts'
-import { keyBindingFromEvent } from '@/shared/shortcut-bindings'
 import { useNumericLabelDrag } from '@/shared/use-numeric-label-drag'
 import type { Locale, ShortcutSettings } from '@/shared/shortcut-types'
+import { SUBTITLE_NAVIGATION_COPY } from '@/shared/subtitle-navigation'
 import type { useSeekShortcutEditor } from './use-seek-shortcut-editor'
 
 const EDITOR_COPY: Record<Locale, { description: string; changed: string }> = {
@@ -32,7 +33,7 @@ export function SeekShortcutDialog({ editor, settings, locale }: {
   const copy = getCopy(locale)
   const pairCopy = SEEK_PAIR_COPY[locale]
   const seekCopy = SEEK_SHORTCUT_COPY[locale]
-  const labels = getShortcutLabels(settings, locale)
+  const labels: Record<string, string> = { ...getShortcutLabels(settings, locale), ...SUBTITLE_NAVIGATION_COPY[locale] }
   const numberInput = useRef<HTMLInputElement>(null)
   const { dialog } = editor
   const actions = editor.actions.toReversed()
@@ -63,33 +64,26 @@ export function SeekShortcutDialog({ editor, settings, locale }: {
           </div>
         </div>
         <Separator />
-        <div className="grid gap-3">
+        <div className={cn('grid items-start gap-3', !editor.percentage && 'min-[25rem]:grid-cols-[max-content_minmax(0,1fr)] min-[25rem]:gap-x-4')}>
           {actions.map((action, index) => {
             const label = actionLabel(index)
+            const labelId = editor.percentage ? undefined : `seek-key-${index}-label`
             const key = dialog?.keys[action]
-            const conflict = editor.fieldConflicts[action]
-            return <div key={action} className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1.65fr)] items-start gap-x-4 gap-y-5">
-              <Label id={`seek-key-${index}-label`} className="flex items-center self-center leading-5">
+            return <Fragment key={action}>
+              {labelId && <Label id={labelId} className="leading-5 min-[25rem]:min-h-18">
                 {label}
-              </Label>
-              <ShortcutRecordingArea binding={key} placeholder={copy.pressKey} idlePlaceholder={copy.shortcutPlaceholder} aria-labelledby={`seek-key-${index}-label`} tabIndex={0}
-                onClear={() => editor.capture(action, null)} clearLabel={`${copy.clearShortcut}: ${label}`}
-                aria-invalid={Boolean(conflict)} aria-describedby={conflict ? `seek-key-${index}-feedback` : undefined}
-                onClick={event => event.currentTarget.focus()} onKeyDown={event => {
-                  if (event.key === 'Tab' || event.key === 'Escape' || ['Shift', 'Control', 'Alt', 'Meta'].includes(event.key)) return
-                  event.preventDefault()
-                  event.stopPropagation()
-                  editor.capture(action, keyBindingFromEvent(event))
-                }} />
-              {conflict && <Alert id={`seek-key-${index}-feedback`} variant="destructive" className="col-span-2">
-                <PlayIcon />
-                <AlertTitle>{copy.conflict.replace('{action}', actions.includes(conflict) ? actionLabel(actions.indexOf(conflict)) : labels[conflict])}</AlertTitle>
-              </Alert>}
-            </div>
+              </Label>}
+              <ShortcutKeysEditor bindings={[key ?? null, ...(dialog?.additionalKeys[action] ?? [])]} locale={locale}
+                onChange={keys => editor.captureKeys(action, keys)} aria-label={labelId ? undefined : label} aria-labelledby={labelId} tabIndex={0}
+                clearLabel={`${copy.clearShortcut}: ${label}`} conflicts={editor.keyConflicts[action]}
+                actionLabel={owner => {
+                  const direction = actions.findIndex(action => action === owner)
+                  return direction >= 0 ? actionLabel(direction) : labels[owner]
+                }}
+                onClick={event => event.currentTarget.focus()} />
+            </Fragment>
           })}
         </div>
-        {dialog && editor.actions.every(action => dialog.keys[action] && !editor.fieldConflicts[action]) &&
-          <Alert role="status"><PlayIcon /><AlertTitle>{copy.noConflict}</AlertTitle></Alert>}
         {editor.stale && <Alert variant="destructive"><PlayIcon /><AlertTitle>{EDITOR_COPY[locale].changed}</AlertTitle></Alert>}
         {editor.storageFull && <Alert variant="destructive"><PlayIcon /><AlertTitle>{copy.settingsStorageFull}</AlertTitle></Alert>}
       </div>

@@ -59,7 +59,7 @@ export function hideFeatures(settings: ShortcutSettings, targets: readonly Short
 export function restoreFeatures(settings: ShortcutSettings, targets: readonly ShortcutTarget[], supportsSubtitlePreservingPip: boolean): ShortcutSettings {
   const assignments = targets.flatMap(target => {
     const binding = target.group === 'general' ? settings.bindings[target.action] : settings.subtitleNavigation.bindings[target.action]
-    return binding ? [{ ...target, key: binding.key }] : []
+    return binding ? [{ ...target, key: binding.key, additionalKeys: binding.additionalKeys }] : []
   })
   const analysis = inspectShortcutAssignment(settings, assignments, { enabled: true, supportsSubtitlePreservingPip })
   const blocked = new Set(Object.entries(analysis.fieldConflicts).filter(([, conflict]) => conflict !== undefined).map(([action]) => action))

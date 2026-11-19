@@ -22,5 +22,6 @@ export const DEFAULT_UI_STYLE: UiStyle = 'neobrutalism'
 export const isUiStyle = (value: unknown): value is UiStyle =>
   UI_STYLE_DEFINITIONS.some(style => style.id === value)
 
-export const getUiStyleOptions = (locale: Locale) =>
-  UI_STYLE_DEFINITIONS.map(style => ({ value: style.id, label: style.labels[locale] }))
+export const getUiStyleOptions = (locale: Locale, currentStyle?: UiStyle) =>
+  UI_STYLE_DEFINITIONS.filter(style => style.id !== 'markdown' || currentStyle === 'markdown')
+    .map(style => ({ value: style.id, label: style.labels[locale] }))

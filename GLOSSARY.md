@@ -13,7 +13,7 @@ Choosing which enabled action handles a configured key during playback. Availabl
 _Avoid_: Shortcut dispatch policy, key priority pipeline
 
 **Shortcut assignment**:
-A saved key and enabled state for an action, with key ownership shared across general shortcuts and subtitle navigation. Transferring a key disables its previous action, including both directions when that action belongs to a seek pair.
+One to three saved keys and one enabled state for an action, with key ownership shared across general shortcuts and subtitle navigation. An unassigned action can have no keys. Transferring a key disables its previous action, including both directions when that action belongs to a seek pair.
 _Avoid_: Key ownership transaction, binding transfer pipeline
 
 **Shortcut edit**:

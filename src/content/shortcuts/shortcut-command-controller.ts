@@ -21,7 +21,7 @@ import {
   createHoldSpeedInteractionController,
   type HoldSpeedInteractionController,
 } from './hold-speed-interaction-controller'
-import type { CommandContext, ShortcutCommand } from './shortcut-command-types'
+import type { CommandContext, PlaybackDispatcher, ShortcutCommand, ShortcutRequest } from './shortcut-command-types'
 import { resolveLocalePreference } from '@/shared/browser-locale'
 import { getAudioFavoritesCopy } from '@/shared/audio-favorites-copy'
 import { getActiveFavorites } from '@/shared/feature-management'
@@ -40,13 +40,14 @@ const EXPLICIT_SPEED_ACTIONS = new Set<ShortcutAction>([
 
 export type ShortcutCommandController = HoldSpeedInteractionController & {
   cancelPendingAction(): void
-  execute(action: ShortcutAction, targetDoc: Document): boolean
+  execute(action: ShortcutAction, targetDoc: Document, request?: ShortcutRequest): boolean
+  setPlaybackPaused(paused: boolean, targetDoc: Document, request?: ShortcutRequest): boolean
   setVolume(volume: number, targetDoc: Document): boolean
 }
 
 type ShortcutCommandControllerOptions = {
-  onPlaybackToggleRequested?: () => void
-  onSeekRequested?: () => void
+  createPlaybackDispatcher?: (targetDoc: Document, request?: ShortcutRequest) => PlaybackDispatcher
+  onSeekRequested?: (request?: ShortcutRequest) => void
   onSubtitleSizeChanged?: (size: SubtitleSize, targetDoc: Document) => void
   onSubtitlesToggled?: (enabled: boolean, targetDoc: Document) => void
 }
@@ -126,7 +127,7 @@ const seekCommand =
   (
     playbackSession: NetflixPlaybackSession,
     direction: -1 | 1,
-    onSeekRequested?: () => void,
+    onSeekRequested?: (request?: ShortcutRequest) => void,
     secondsOverride?: number,
   ): ShortcutCommand =>
   context => {
@@ -140,7 +141,7 @@ const seekCommand =
       direction,
       seconds,
     })
-    onSeekRequested?.()
+    onSeekRequested?.(context.request)
     void playbackSession.seekBy(direction * seconds * 1000).then(result => {
       if (!context.isCurrentAction()) return
 
@@ -247,10 +248,10 @@ const episodeCommand = (direction: -1 | 1): ShortcutCommand => context => {
 
 const frameCommand = (
   playbackSession: NetflixPlaybackSession, direction: -1 | 1,
-  onSeekRequested?: () => void,
+  onSeekRequested?: (request?: ShortcutRequest) => void,
 ): ShortcutCommand => context => {
   if (!findVideo(context.targetDoc)) return false
-  onSeekRequested?.()
+  onSeekRequested?.(context.request)
   void playbackSession.stepFrame(direction).then(({ failureLabel }) => {
     if (!context.isCurrentAction()) return
     const icon = direction === -1 ? icons.frameBackward : icons.frameForward
@@ -315,8 +316,10 @@ const createCommandMap = (
     const video = findVideo(context.targetDoc)
     if (!video) return false
 
-    options.onPlaybackToggleRequested?.()
-    togglePlayback(playbackSession, video, context)
+    const execute = () => togglePlayback(playbackSession, video, context)
+    const dispatch = options.createPlaybackDispatcher?.(context.targetDoc, context.request)
+    if (dispatch) dispatch('toggle', execute)
+    else execute()
     return true
   },
   seekBackward: seekCommand(playbackSession, -1, options.onSeekRequested),
@@ -364,6 +367,7 @@ const createCommandMap = (
     const button = findSkipIntroButton(context.targetDoc)
     if (!button) return false
 
+    options.onSeekRequested?.(context.request)
     button.click()
     return true
   },
@@ -431,12 +435,13 @@ export const createShortcutCommandController = (
   const commands = createCommandMap(playbackSession, options, getSettings)
   let holdSpeedInteraction: HoldSpeedInteractionController | null = null
 
-  const createContext = (targetDoc: Document, actionToken = currentActionToken): CommandContext => {
+  const createContext = (targetDoc: Document, actionToken = currentActionToken, request?: ShortcutRequest): CommandContext => {
     // Consecutive presses share a lifetime while only the latest owns feedback.
     const version = cancellationVersion
     return {
       settings: getSettings(),
       targetDoc,
+      request,
       isCurrentAction: () => actionToken === currentActionToken && getSettings().enabled,
       isCancelled: () => version !== cancellationVersion,
     }
@@ -447,12 +452,12 @@ export const createShortcutCommandController = (
     return currentActionToken
   }
 
-  const execute = (action: ShortcutAction, targetDoc: Document): boolean => {
+  const execute = (action: ShortcutAction, targetDoc: Document, request?: ShortcutRequest): boolean => {
     if (EXPLICIT_SPEED_ACTIONS.has(action) || getSettings().preferredSpeedShortcuts.some(shortcut => shortcut.id === action) || action === 'previousFrame' || action === 'nextFrame') {
       holdSpeedInteraction?.cancelHoldSpeedInteraction()
     }
     const actionToken = startAction()
-    const context = createContext(targetDoc, actionToken)
+    const context = createContext(targetDoc, actionToken, request)
     if (isShortcutAction(action)) return commands[action](context)
     const speedShortcut = context.settings.preferredSpeedShortcuts.find(shortcut => shortcut.id === action)
     if (speedShortcut) {
@@ -473,7 +478,7 @@ export const createShortcutCommandController = (
     if (!video || !Number.isFinite(video.duration) || video.duration <= 0) return false
     const targetMilliseconds = Math.round(video.duration * 1000 * (shortcut.value / 100))
     const icon = targetMilliseconds < video.currentTime * 1000 ? icons.positionBackward : icons.positionForward
-    options.onSeekRequested?.()
+    options.onSeekRequested?.(context.request)
     const completion = playbackSession.seekTo(targetMilliseconds)
     showHintRequest(context, { type: 'position', icon, label: `${shortcut.value}%` })
     showCommandFailure(context, completion, icon)
@@ -499,10 +504,28 @@ export const createShortcutCommandController = (
     return true
   }
 
+  const setPlaybackPaused = (paused: boolean, targetDoc: Document, request?: ShortcutRequest): boolean => {
+    const video = findVideo(targetDoc)
+    if (!video) return false
+    holdSpeedInteraction?.cancelHoldSpeedInteraction()
+    const context = createContext(targetDoc, startAction(), request)
+    const execute = () => {
+      const icon = paused ? icons.playbackPause : icons.playbackPlay
+      const completion = paused ? playbackSession.pause(video) : playbackSession.play(video)
+      showHintRequest(context, { type: 'playback', icon })
+      showCommandFailure(context, completion, icon)
+    }
+    const dispatch = options.createPlaybackDispatcher?.(targetDoc, request)
+    if (dispatch) dispatch(paused ? 'pause' : 'play', execute)
+    else execute()
+    return true
+  }
+
   holdSpeedInteraction = createHoldSpeedInteractionController({
+    createPlaybackDispatcher: options.createPlaybackDispatcher,
     createContext,
     startAction,
-    executeShortPress: targetDoc => execute('playPause', targetDoc),
+    executeShortPress: (targetDoc, request) => execute('playPause', targetDoc, request),
     hideHoldSpeedHint: targetDoc => getHintManager(targetDoc).hideHoldSpeed(),
     playbackSession,
     showHoldSpeedHint: (context, label) => {
@@ -514,6 +537,7 @@ export const createShortcutCommandController = (
     ...holdSpeedInteraction,
     cancelPendingAction: () => { cancellationVersion += 1; startAction() },
     execute,
+    setPlaybackPaused,
     setVolume,
   }
 }

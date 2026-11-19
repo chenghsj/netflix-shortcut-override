@@ -1,5 +1,6 @@
 import { getAudioFavoritesCopy } from '@/shared/audio-favorites-copy'
 import { getCopy, LOCALE_LABELS } from '@/shared/i18n'
+import { OPTIONS_SECTION_COPY } from '@/shared/options-navigation'
 import { matchesSearchText } from '@/shared/search'
 import { SEEK_PAIR_COPY, SEEK_SECTION_COPY, SEEK_SHORTCUT_COPY } from '@/shared/seek-shortcuts'
 import { LOCALES, type ShortcutSettings } from '@/shared/shortcut-types'
@@ -9,7 +10,7 @@ import { getUiStyleOptions } from '@/shared/ui-styles'
 import { SPEED_SHORTCUT_COPY } from './speed-shortcut-copy'
 import { SUBTITLE_ACTIVATION_COPY } from './subtitle-activation-copy'
 
-type SettingsSection = 'audioFavorites' | 'subtitleFavorites' | 'speedRange' | 'holdSpeed' | 'seekPair' | 'seekPercentage' | 'subtitleNavigation' | 'general' | 'automation' | 'backup'
+type SettingsSection = 'audioFavorites' | 'subtitleFavorites' | 'speedRange' | 'holdSpeed' | 'seekPair' | 'seekPercentage' | 'subtitleNavigation' | 'general' | 'automation' | 'pauseScreen' | 'backup'
 
 export function createSettingsSearch(settings: ShortcutSettings) {
   const favoriteLanguages = settings.subtitleFavorites.flatMap(({ language }) => [
@@ -22,6 +23,7 @@ export function createSettingsSearch(settings: ShortcutSettings) {
     const copy = getCopy(locale)
     const speedCopy = SPEED_SHORTCUT_COPY[locale]
     const navigation = SUBTITLE_NAVIGATION_COPY[locale]
+    const sections = OPTIONS_SECTION_COPY[locale]
     return {
       audioFavorites: [copy.shortcutGroups.volume, ...Object.values(getAudioFavoritesCopy(locale)), ...audioLanguages],
       subtitleFavorites: [copy.shortcutGroups.subtitles, copy.subtitleFavorites.title, copy.subtitleFavorites.description,
@@ -33,12 +35,14 @@ export function createSettingsSearch(settings: ShortcutSettings) {
       seekPair: [SEEK_PAIR_COPY[locale].pair, SEEK_SHORTCUT_COPY[locale].seconds, copy.seekSeconds, copy.seekSecondsTooltip],
       seekPercentage: [SEEK_SECTION_COPY[locale].percentage, SEEK_SECTION_COPY[locale].percentageHint, SEEK_SHORTCUT_COPY[locale].percentage],
       subtitleNavigation: [navigation.title, navigation.enabled, navigation.description, SUBTITLE_ACTIVATION_COPY[locale].permission],
-      general: [copy.quickSettings, copy.locale, copy.localeAuto, copy.uiStyle, copy.theme, copy.hidePauseOverlay, copy.hidePauseOverlayDescription,
+      general: [copy.quickSettings, copy.locale, copy.localeAuto, copy.uiStyle, copy.theme,
         copy.themeAuto, copy.themeLight, copy.themeDark, ...Object.values(LOCALE_LABELS),
         ...getUiStyleOptions(locale).map(option => option.label)],
-      automation: [copy.autoSkip, copy.autoSkipIntro, copy.autoSkipRecap, copy.autoNextEpisode,
+      automation: [sections.playbackPreferences, copy.autoSkip, copy.autoSkipIntro, copy.autoSkipRecap, copy.autoNextEpisode,
         copy.actions.skipIntro, copy.actions.nextEpisode, 'auto skip intro', 'auto skip recap', 'auto play next episode'],
-      backup: [copy.backupRestore, copy.backupRestoreDesc, copy.exportSettings, copy.importSettings, 'JSON'],
+      pauseScreen: [sections.playbackPreferences, sections.pauseScreen, copy.hidePauseOverlay, copy.hidePauseOverlayDescription],
+      backup: [copy.backupRestore, copy.backupRestoreDesc, copy.exportSettings, copy.importSettings,
+        copy.resetDefaults, copy.resetDefaultsDesc, 'JSON'],
     } satisfies Record<SettingsSection, string[]>
   })
   return (section: SettingsSection, query: string) => matchesSearchText(translations.flatMap(copy => copy[section]), query)

@@ -10,21 +10,32 @@ import { saveSettings } from '@/shared/storage'
 describe('Options category links', () => {
   afterEach(() => { window.history.replaceState(null, '', '/') })
 
-  it('keeps playback controls separate from position and episode navigation', async () => {
+  it('groups episode and display controls under Playback and keeps in-episode jumps together', async () => {
     render(<OptionsApp />)
     expect(await screen.findByRole('button', { name: 'Edit Play / Pause' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Edit Previous episode' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Edit Next episode' })).toBeVisible()
+    expect(screen.getByRole('heading', { name: 'Display' })).toBeVisible()
     expect(screen.getByRole('button', { name: 'Edit Fullscreen' })).toBeVisible()
     expect(screen.getByRole('button', { name: 'Edit Picture-in-Picture' })).toBeVisible()
     expect(screen.queryByRole('button', { name: 'Edit Previous frame' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Seeking and navigation' }))
-    for (const action of ['Previous frame', 'Next frame', 'Skip intro', 'Previous episode', 'Next episode', 'Forward / Rewind 10 seconds']) {
+    for (const action of ['Previous frame', 'Next frame', 'Skip intro', 'Forward / Rewind 10 seconds']) {
       expect(screen.getByRole('button', { name: `Edit ${action}` })).toBeVisible()
     }
     expect(screen.queryByRole('button', { name: 'Edit Play / Pause' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit Previous episode' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Manage page features' }))
     expect(screen.getByRole('checkbox', { name: 'Show Previous frame' })).toBeVisible()
-    expect(screen.getByRole('checkbox', { name: 'Show Previous episode' })).toBeVisible()
     expect(screen.getByRole('checkbox', { name: 'Show Forward / Rewind 10 seconds' })).toBeVisible()
+  })
+
+  it('shows the display heading when only Picture-in-Picture matches', async () => {
+    render(<OptionsApp />)
+    fireEvent.change(await screen.findByRole('searchbox'), { target: { value: 'floating player' } })
+    expect(screen.getByRole('heading', { name: 'Display' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Edit Picture-in-Picture' })).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Edit Fullscreen' })).not.toBeInTheDocument()
   })
 
   it('opens the merged playback category from an old Display link', async () => {
@@ -42,7 +53,8 @@ describe('Options category links', () => {
     render(<OptionsApp />)
     expect(await screen.findByRole('button', { name: 'Subtitles' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('group', { name: 'Subtitle language and size' })).toBeVisible()
-    expect(screen.getByRole('group', { name: 'Sentence jumps and replay' })).toBeVisible()
+    const sentenceSection = screen.getByRole('group', { name: 'Sentence jumps and replay' })
+    expect(within(sentenceSection).getByRole('row', { name: /Play \/ pause Sentence mode/ })).toBeVisible()
   })
 
   it.each(LOCALES)('groups both subtitle sections under one category in %s', async locale => {
@@ -58,7 +70,7 @@ describe('Options category links', () => {
   it.each([
     ['playback', 'Playback'], ['seeking', 'Seeking and navigation'], ['subtitles', 'Subtitles'],
     ['volume', 'Volume and audio'],
-    ['speed', 'Playback speed'], ['general', 'General settings'], ['automation', 'Playback automation'], ['backup', 'Backup and restore'],
+    ['speed', 'Playback speed'], ['general', 'General settings'], ['automation', 'Playback preferences'], ['backup', 'Backup and restore'],
   ] as const)('opens %s from a direct category link', async (page, label) => {
     window.history.replaceState(null, '', `/options.html${OPTIONS_PAGE_HASHES[page]}`)
     render(<OptionsApp />)
@@ -86,7 +98,7 @@ describe('Options category links', () => {
   it.each([
     ['playback', 'Playback'], ['seeking', 'Seeking and navigation'], ['subtitles', 'Subtitles'],
     ['volume', 'Volume and audio'],
-    ['speed', 'Playback speed'], ['general', 'General settings'], ['automation', 'Playback automation'], ['backup', 'Backup and restore'],
+    ['speed', 'Playback speed'], ['general', 'General settings'], ['automation', 'Playback preferences'], ['backup', 'Backup and restore'],
   ] as const)('keeps %s selected after refreshing a sidebar selection', async (page, label) => {
     window.history.replaceState(null, '', '/options.html#seeking')
     const view = render(<OptionsApp />)
@@ -142,7 +154,7 @@ describe('Options numbered navigation', () => {
     const pages = [
       ['playback', 'Playback'], ['seeking', 'Seeking and navigation'], ['subtitles', 'Subtitles'],
       ['volume', 'Volume and audio'], ['speed', 'Playback speed'], ['general', 'General settings'],
-      ['automation', 'Playback automation'], ['backup', 'Backup and restore'], ['help', 'User guide'],
+      ['automation', 'Playback preferences'], ['backup', 'Backup and restore'], ['help', 'User guide'],
     ] as const
     pages.forEach(([page, label], index) => {
       fireEvent.change(search, { target: { value: 'subtitle' } })

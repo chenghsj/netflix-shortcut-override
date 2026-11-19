@@ -5,11 +5,112 @@ import { keyBindingFromEvent } from '@/shared/shortcut-bindings'
 import type { ShortcutSettings } from '@/shared/shortcut-types'
 import { getSettings, saveSettings } from '@/shared/storage'
 import { PipManager } from '@/content/pip/pip-manager'
+import { MEDIA_SESSION_ACTION_EVENT } from '@/shared/media-session-events'
+import { installMediaSessionBridge } from '@/content/media-session-bridge'
 
 import { setupContentIndexTests } from './content-script.test-support'
 
+const episodeMediaSettings = (): ShortcutSettings => {
+  const settings = structuredClone(DEFAULT_SETTINGS)
+  for (const [action, key] of [['nextEpisode', 'MediaTrackNext'], ['previousEpisode', 'MediaTrackPrevious']] as const) {
+    settings.bindings[action].additionalKeys = [keyBindingFromEvent(new KeyboardEvent('keydown', { key }))]
+  }
+  return settings
+}
+
 describe('content media shortcuts', () => {
   setupContentIndexTests()
+
+  it('keeps Ctrl+P/Ctrl+N working alongside saved additional media keys', async () => {
+    await saveSettings(episodeMediaSettings())
+    document.body.innerHTML = '<video></video><button data-uia="control-next">Next</button><div><button data-uia="episode-pane-item">Previous</button><button data-uia="episode-pane-item" aria-selected="true">Current</button></div>'
+    const next = vi.fn()
+    const previous = vi.fn()
+    document.querySelector('[data-uia="control-next"]')!.addEventListener('click', next)
+    document.querySelector('[data-uia="episode-pane-item"]')!.addEventListener('click', previous)
+    for (const init of [
+      { key: 'n', code: 'KeyN', ctrlKey: true },
+      { key: 'MediaTrackNext' },
+      { key: 'p', code: 'KeyP', ctrlKey: true },
+      { key: 'MediaTrackPrevious', code: 'Unidentified' },
+    ]) {
+      const event = new KeyboardEvent('keydown', { ...init, bubbles: true, cancelable: true })
+      window.dispatchEvent(event)
+      expect(event.defaultPrevented).toBe(true)
+    }
+    expect(next).toHaveBeenCalledTimes(2)
+    expect(previous).toHaveBeenCalledTimes(2)
+    expect((await getSettings()).bindings.nextEpisode.key).toEqual(DEFAULT_SETTINGS.bindings.nextEpisode.key)
+    expect((await getSettings()).bindings.previousEpisode.key).toEqual(DEFAULT_SETTINGS.bindings.previousEpisode.key)
+  })
+
+  it('handles system media track actions and releases them on disable, while typing and outside playback', async () => {
+    await saveSettings(episodeMediaSettings())
+    document.body.innerHTML = '<video></video><input /><button data-uia="control-next">Next</button>'
+    Object.defineProperty(document.querySelector('video'), 'readyState', { value: HTMLMediaElement.HAVE_METADATA })
+    const next = vi.fn()
+    document.querySelector('button')!.addEventListener('click', next)
+    const press = () => {
+      const event = new CustomEvent(MEDIA_SESSION_ACTION_EVENT, { detail: 'nexttrack', cancelable: true })
+      window.dispatchEvent(event)
+      return event.defaultPrevented
+    }
+    vi.useFakeTimers()
+    expect(press()).toBe(true)
+    vi.advanceTimersByTime(120)
+    expect(next).toHaveBeenCalledOnce()
+    document.querySelector('input')!.focus()
+    expect(press()).toBe(false)
+    document.querySelector('input')!.blur()
+    const settings = structuredClone(DEFAULT_SETTINGS)
+    settings.bindings.nextEpisode.enabled = false
+    await saveSettings(settings)
+    expect(press()).toBe(false)
+    await saveSettings(DEFAULT_SETTINGS)
+    window.history.replaceState(null, '', '/browse')
+    expect(press()).toBe(false)
+    expect(next).toHaveBeenCalledOnce()
+  })
+
+  it('defers media track actions to Netflix until playback is ready and restores Netflix on disable', async () => {
+    await saveSettings(episodeMediaSettings())
+    document.body.innerHTML = '<button data-uia="control-next">Next</button>'
+    const next = vi.fn()
+    document.querySelector('button')!.addEventListener('click', next)
+    const registered = new Map<MediaSessionAction, MediaSessionActionHandler | null>()
+    const media = { setActionHandler: (action: MediaSessionAction, handler: MediaSessionActionHandler | null) => { registered.set(action, handler) } }
+    const descriptor = Object.getOwnPropertyDescriptor(navigator, 'mediaSession')
+    Object.defineProperty(navigator, 'mediaSession', { configurable: true, value: media })
+    const controller = new AbortController()
+    try {
+      installMediaSessionBridge(controller.signal)
+      const siteNext = vi.fn()
+      media.setActionHandler('nexttrack', siteNext)
+      registered.get('nexttrack')?.({ action: 'nexttrack' })
+      const video = document.createElement('video')
+      document.body.append(video)
+      registered.get('nexttrack')?.({ action: 'nexttrack' })
+      expect(siteNext).toHaveBeenCalledTimes(2)
+      expect(next).not.toHaveBeenCalled()
+      Object.defineProperty(video, 'readyState', { value: HTMLMediaElement.HAVE_METADATA })
+      vi.useFakeTimers()
+      registered.get('nexttrack')?.({ action: 'nexttrack' })
+      vi.advanceTimersByTime(120)
+      expect(next).toHaveBeenCalledOnce()
+      expect(siteNext).toHaveBeenCalledTimes(2)
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', code: 'KeyN', ctrlKey: true, cancelable: true }))
+      expect(next).toHaveBeenCalledTimes(2)
+      await saveSettings({ ...DEFAULT_SETTINGS, enabled: false })
+      expect(registered.get('nexttrack')).toBe(siteNext)
+      registered.get('nexttrack')?.({ action: 'nexttrack' })
+      expect(siteNext).toHaveBeenCalledTimes(3)
+      expect(next).toHaveBeenCalledTimes(2)
+    } finally {
+      controller.abort()
+      if (descriptor) Object.defineProperty(navigator, 'mediaSession', descriptor)
+      else Reflect.deleteProperty(navigator, 'mediaSession')
+    }
+  })
 
   it.each([
     { nextKey: 'MediaTrackNext', previousKey: 'MediaTrackPrevious' },

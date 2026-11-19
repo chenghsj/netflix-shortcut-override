@@ -11,12 +11,14 @@
   </head>
   <body data-app-ui>
     <button id="run" type="button">Run simulated media key checks</button>
+    <button id="run-multiple" type="button">Run multiple shortcut checks</button>
     <output id="result" aria-live="polite">Not run</output>
     <details><summary>Detailed simulated results</summary><pre id="cases"></pre></details>
     <details open><summary>Recent keyboard events (press a physical media key in the recorder)</summary><pre id="events">No events</pre></details>
     <div id="root"></div>
     <script type="module">
       import React from 'react'
+      import '/src/index.css'
       import { createRoot } from 'react-dom/client'
       import { OptionsApp } from '/src/options/options-app.tsx'
       import { DEFAULT_SETTINGS, normalizeSettings } from '/src/shared/shortcut-settings.ts'
@@ -24,6 +26,8 @@
       import { keyBindingFromEvent, isKeyBinding } from '/src/shared/shortcut-bindings.ts'
       import { resolvePlaybackShortcut } from '/src/shared/shortcut-routing.ts'
       import { SPECIAL_SHORTCUT_KEYS, LEGACY_SPECIAL_KEY_ALIASES } from '/src/shared/special-shortcut-keys.ts'
+      import { getCopy } from '/src/shared/i18n.ts'
+      import { MULTI_SHORTCUT_COPY } from '/src/components/shortcut-keys-editor.tsx'
 
       // Start on the tested category even when the sidebar is hidden on a
       // narrow viewport, including the Codex in-app browser.
@@ -94,6 +98,55 @@
           output.dataset.state = 'passed'
         } catch (error) {
           output.textContent = JSON.stringify({ pass: false, error: String(error), count: cases.length }, null, 2)
+          output.dataset.state = 'failed'
+        } finally {
+          document.getElementById('cases').textContent = JSON.stringify(cases, null, 2)
+          await saveSettings(original)
+          renderOptions()
+          run.disabled = false
+        }
+      }
+
+      document.getElementById('run-multiple').onclick = async event => {
+        const run = event.currentTarget
+        const output = document.getElementById('result')
+        const original = await getSettings()
+        const cases = []
+        run.disabled = true
+        output.dataset.state = 'running'
+        try {
+          for (const locale of ['en', 'zh-TW', 'zh-CN', 'ja', 'ko']) {
+            const copy = getCopy(locale)
+            await saveSettings({ ...DEFAULT_SETTINGS, locale })
+            window.history.replaceState(null, '', `${location.pathname}#seeking`)
+            renderOptions()
+            ;(await until(() => button(document, `${copy.edit} ${copy.actions.nextEpisode}`))).click()
+            const dialog = await until(() => document.querySelector('[role="dialog"]'))
+            button(dialog, MULTI_SHORTCUT_COPY[locale].add).click()
+            const area = await until(() => dialog.querySelectorAll('[data-slot="shortcut-recording"]')[1])
+            area.focus()
+            area.dispatchEvent(new KeyboardEvent('keydown', { key: 'MediaTrackNext', bubbles: true, cancelable: true }))
+            ;(await until(() => {
+              const save = button(dialog, copy.save)
+              return save && !save.disabled && save
+            })).click()
+            await until(() => !document.querySelector('[role="dialog"]'))
+            const saved = await getSettings()
+            const mediaAction = resolvePlaybackShortcut(saved, new KeyboardEvent('keydown', { key: 'MediaTrackNext' }), true)?.action
+            const originalAction = resolvePlaybackShortcut(saved, new KeyboardEvent('keydown', { key: 'n', code: 'KeyN', ctrlKey: true }), true)?.action
+            const pass = saved.bindings.nextEpisode.key.code === 'KeyN' && saved.bindings.nextEpisode.additionalKeys?.[0].code === 'MediaTrackNext' && mediaAction === 'nextEpisode' && originalAction === 'nextEpisode'
+            cases.push({ locale, pass, mediaAction, originalAction })
+            if (!pass) throw new Error(`Multiple shortcuts failed for ${locale}`)
+            button(document, `${copy.edit} ${copy.actions.nextEpisode}`).click()
+            const reopened = await until(() => document.querySelector('[role="dialog"]'))
+            if (reopened.querySelectorAll('[data-slot="shortcut-recording"]').length !== 2) throw new Error('Saved key list was not restored')
+            button(reopened, copy.cancel).click()
+            await until(() => !document.querySelector('[role="dialog"]'))
+          }
+          output.textContent = JSON.stringify({ pass: true, count: cases.length, simulated: true }, null, 2)
+          output.dataset.state = 'passed'
+        } catch (error) {
+          output.textContent = JSON.stringify({ pass: false, error: String(error) }, null, 2)
           output.dataset.state = 'failed'
         } finally {
           document.getElementById('cases').textContent = JSON.stringify(cases, null, 2)

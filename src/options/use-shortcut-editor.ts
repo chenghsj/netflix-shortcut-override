@@ -6,6 +6,7 @@ import {
   getReplacedNetflixNativeKeyBindings,
   isShortcutAction,
   keyBindingsEqual,
+  keyListsEqual,
 } from '@/shared/shortcut-bindings'
 import { DEFAULT_SETTINGS, normalizeSpeedSettings } from '@/shared/shortcut-settings'
 import { getPreferredSpeed } from '@/shared/preferred-speed-shortcuts'
@@ -19,6 +20,8 @@ import type { useShortcutSettingsForm } from '@/shared/use-shortcut-settings-for
 
 type BindingRequest = ShortcutTarget & {
   savedKey: KeyBinding | null
+  additionalKeys: KeyBinding[]
+  savedAdditionalKeys: KeyBinding[]
   key: KeyBinding | null
   reason: 'enable' | 'reset'
 }
@@ -28,6 +31,8 @@ type RecordingIntent =
 type Recorder = ShortcutTarget & {
   draft: KeyBinding | null
   savedKey: KeyBinding | null
+  additionalKeys: (KeyBinding | null)[]
+  savedAdditionalKeys: KeyBinding[]
   intent: RecordingIntent
   snapshot: ShortcutEditSnapshot
   preferredSpeed?: { saved: number; draft: string }
@@ -42,6 +47,7 @@ type SettingsForm = ReturnType<typeof useShortcutSettingsForm>
 const recorderDraft = (recorder: Recorder): ShortcutEditDraft => ({
   snapshot: recorder.snapshot,
   keys: { [recorder.action]: recorder.draft },
+  additionalKeys: { [recorder.action]: recorder.additionalKeys },
   enabled: recorder.intent.kind === 'enable' ? true : 'preserve',
   value: recorder.preferredSpeed?.draft,
   allowSubtitleEnable: recorder.intent.kind === 'enable' && recorder.intent.reason === 'reset',
@@ -81,16 +87,18 @@ export function useShortcutEditor({
   const bindingFor = (target: ShortcutTarget) => target.group === 'subtitleNavigation'
     ? settings.subtitleNavigation.bindings[target.action]
     : settings.bindings[target.action]
-  const conflictsFor = (target: ShortcutTarget, key: KeyBinding | null) =>
-    inspectShortcutAssignment(settings, [{ ...target, key }], { enabled: true, supportsSubtitlePreservingPip })
+  const conflictsFor = (target: ShortcutTarget, key: KeyBinding | null, additionalKeys = bindingFor(target)?.additionalKeys ?? []) =>
+    inspectShortcutAssignment(settings, [{ ...target, key, additionalKeys }], { enabled: true, supportsSubtitlePreservingPip })
   const requestEnabled = (
     target: ShortcutTarget,
     enabled: boolean,
     key = bindingFor(target).key,
     reason: BindingRequest['reason'] = 'enable',
   ) => {
-    const request: BindingRequest = { ...target, savedKey: bindingFor(target).key, key, reason }
-    if (enabled && conflictsFor(target, key).conflicts.length) {
+    const additionalKeys = reason === 'reset' ? [] : bindingFor(target).additionalKeys ?? []
+    const request: BindingRequest = { ...target, savedKey: bindingFor(target).key,
+      savedAdditionalKeys: bindingFor(target).additionalKeys ?? [], additionalKeys, key, reason }
+    if (enabled && conflictsFor(target, key, additionalKeys).conflicts.length) {
       setEditing({ kind: 'confirm', request })
       return
     }
@@ -101,23 +109,23 @@ export function useShortcutEditor({
   const request = editing.kind === 'confirm' ? editing.request : null
   const validRequest = request &&
     bindingFor(request) && keyBindingsEqual(request.savedKey, bindingFor(request).key) &&
+    keyListsEqual(request.savedAdditionalKeys, bindingFor(request).additionalKeys ?? []) &&
     (request.group === 'general' || (settings.enabled && (request.reason === 'reset' || settings.subtitleNavigation.enabled)))
     ? request : null
-  const conflictAnalysis = validRequest ? conflictsFor(validRequest, validRequest.key) : null
+  const conflictAnalysis = validRequest ? conflictsFor(validRequest, validRequest.key, validRequest.additionalKeys) : null
   const conflict = validRequest && conflictAnalysis ? {
     group: validRequest.group,
     action: validRequest.action,
-    key: validRequest.key,
+    keys: conflictAnalysis.conflictingKeys,
     actions: conflictAnalysis.conflicts,
-    affectedActions: conflictAnalysis.affectedActions,
+    affectedTargets: conflictAnalysis.affectedTargets,
   } : null
 
   const recorder = editing.kind === 'record' && (editing.recorder.isNewPreferredSpeed || bindingFor(editing.recorder)) ? editing.recorder : null
   const evaluation = recorder ? evaluateShortcutEdit(settings, recorderDraft(recorder), supportsSubtitlePreservingPip) : null
   const preferredSpeedStale = Boolean(recorder?.preferredSpeed && evaluation?.stale)
-  const activeConflict = recorder?.draft && (recorder.isNewPreferredSpeed || recorder.intent.kind === 'enable' || bindingFor(recorder)?.enabled)
-    ? conflictsFor(recorder, recorder.draft).conflicts[0] ?? null
-    : null
+  const keyConflicts = recorder && evaluation?.analysis.keyConflicts[recorder.action]
+  const activeConflict = Boolean(keyConflicts?.length)
   const validDraft = Boolean(
     recorder && !activeConflict && !preferredSpeedStale && (
       recorder?.group === 'general' || (settings.enabled && recorder && (
@@ -131,18 +139,19 @@ export function useShortcutEditor({
   const canSaveDraft = validDraft && Boolean(evaluation?.canSave)
   const canRestoreDraft = Boolean(recorder && (
     !keyBindingsEqual(recorder.draft, recorder.savedKey) ||
+    !keyListsEqual(recorder.additionalKeys, recorder.savedAdditionalKeys) ||
     (recorder.preferredSpeed && recorder.preferredSpeed.draft !== String(recorder.preferredSpeed.saved))
   ))
-  const replacedNetflixKeys = recorder?.draft && !activeConflict && recorder.group === 'general'
-    ? getReplacedNetflixNativeKeyBindings(recorder.action, { enabled: settings.bindings[recorder.action]?.enabled ?? true, key: recorder.draft })
+  const replacedNetflixKeys = recorder && [recorder.draft, ...recorder.additionalKeys].some(Boolean) && !activeConflict && recorder.group === 'general'
+    ? getReplacedNetflixNativeKeyBindings(recorder.action, { enabled: settings.bindings[recorder.action]?.enabled ?? true,
+        key: recorder.draft, additionalKeys: recorder.additionalKeys.filter((key): key is KeyBinding => key !== null) })
     : []
 
   return {
     conflict,
     recorder: recorder && {
-      action: recorder.action,
-      draft: recorder.draft,
-      activeConflict,
+      keys: [recorder.draft, ...recorder.additionalKeys],
+      keyConflicts: keyConflicts ?? undefined,
       canSaveDraft,
       canRestoreDraft,
       replacedNetflixKeys,
@@ -163,7 +172,8 @@ export function useShortcutEditor({
       recorderReturnFocus.current = returnFocus ?? null
       setEditing({
         kind: 'record',
-        recorder: { ...target, savedKey, draft: savedKey, intent: { kind: 'preserve-enabled' },
+        recorder: { ...target, savedKey, draft: savedKey, additionalKeys: bindingFor(target).additionalKeys ?? [],
+          savedAdditionalKeys: bindingFor(target).additionalKeys ?? [], intent: { kind: 'preserve-enabled' },
           snapshot: captureShortcutEdit(settings, speed !== undefined && target.group === 'general'
             ? { kind: 'preferredSpeed', action: target.action as 'setPreferredSpeed' | `preferred-speed:${string}` }
             : { kind: 'binding', target }),
@@ -175,7 +185,7 @@ export function useShortcutEditor({
       const action = `preferred-speed:${crypto.randomUUID()}` as const
       setEditing({ kind: 'record', recorder: { group: 'general', action,
         snapshot: captureShortcutEdit(settings, { kind: 'preferredSpeed', action, isNew: true }),
-        savedKey: null, draft: null, intent: { kind: 'enable', reason: 'enable' }, isNewPreferredSpeed: true,
+        savedKey: null, draft: null, additionalKeys: [], savedAdditionalKeys: [], intent: { kind: 'enable', reason: 'enable' }, isNewPreferredSpeed: true,
         preferredSpeed: { saved: DEFAULT_SETTINGS.speed.preferred, draft: String(DEFAULT_SETTINGS.speed.preferred) } } })
     },
     dismissConflict: () => setEditing(current => current.kind === 'confirm' ? { kind: 'idle' } : current),
@@ -203,6 +213,8 @@ export function useShortcutEditor({
       if (current.kind === 'record') return { ...current, recorder: { ...current.recorder, draft } }
       return current
     }),
+    captureKeys: (keys: (KeyBinding | null)[]) => setEditing(current => current.kind === 'record'
+      ? { ...current, recorder: { ...current.recorder, draft: keys[0] ?? null, additionalKeys: keys.slice(1) } } : current),
     setPreferredSpeed: (draft: string) => setEditing(current => {
       if (current.kind !== 'record' || !current.recorder.preferredSpeed) return current
       return { ...current, recorder: { ...current.recorder, preferredSpeed: { ...current.recorder.preferredSpeed, draft } } }
@@ -217,6 +229,7 @@ export function useShortcutEditor({
     }),
     restoreSavedDraft: () => setEditing(current => {
       if (current.kind === 'record') return { ...current, recorder: { ...current.recorder, draft: current.recorder.savedKey,
+        additionalKeys: current.recorder.savedAdditionalKeys,
         ...(current.recorder.preferredSpeed ? { preferredSpeed: { ...current.recorder.preferredSpeed, draft: String(current.recorder.preferredSpeed.saved) } } : {}) } }
       return current
     }),

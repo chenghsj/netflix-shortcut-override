@@ -166,6 +166,26 @@ describe('audio track cycling', () => {
     expect(setAudioTrack).toHaveBeenLastCalledWith(uk)
   })
 
+  it.each([false, true])('uses the requested region, then a regionless match with audioDescription=%s', audioDescription => {
+    const fallback = audioDescription ? tracks[1] : tracks[0]
+    const otherType = audioDescription ? tracks[0] : tracks[1]
+    const us = { ...fallback, trackId: 'en-US', bcp47: 'en-US' }
+    const uk = { ...fallback, trackId: 'en-GB', bcp47: 'en-GB' }
+    let available = [otherType, fallback, uk, us]
+    const setAudioTrack = vi.fn()
+    installPlayer({ getAudioTrackList: () => available, getAudioTrack: () => tracks[2], setAudioTrack })
+    const favorites = [{ language: 'en-US', audioDescription }]
+
+    expect(execute('cycleAudioTrack', 1, [], favorites).audioTrackLanguage).toBe('en-US')
+    available = [otherType, fallback, uk]
+    expect(execute('cycleAudioTrack', 1, [], favorites)).toMatchObject({
+      audioTrackLanguage: 'en', audioTrackIsAudioDescription: audioDescription,
+    })
+    available = [otherType, uk]
+    expect(execute('cycleAudioTrack', 1, [], favorites).audioCycleOutcome).toBe('no-tracks-available')
+    expect(setAudioTrack.mock.calls).toEqual([[us], [fallback]])
+  })
+
   it.each([
     { rawTrackType: 'ASSISTIVE' }, { trackType: 'assistive' }, { isAssistive: true },
     { displayName: 'English (Audio Description)' }, { displayName: '英語（口述影像）' },

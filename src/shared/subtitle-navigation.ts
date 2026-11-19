@@ -29,26 +29,52 @@ import type { SubtitleNavigationAction } from './shortcut-types'
 export type { SubtitleNavigationAction } from './shortcut-types'
 type DefaultSubtitleNavigationBindings = Record<Exclude<SubtitleNavigationAction, 'replay'>, ShortcutBinding & { key: KeyBinding }> & { replay: ShortcutBinding }
 export const DEFAULT_SUBTITLE_NAVIGATION_BINDINGS = Object.fromEntries(SUBTITLE_NAVIGATION_ACTIONS.map((action, index) => [action, { enabled: action !== 'replay', key: action === 'replay' ? null : { code: ['KeyA', 'KeyD', 'KeyS', 'KeyW'][index], key: ['a', 'd', 's', 'w'][index], ctrl: false, alt: false, shift: false, meta: false } }])) as DefaultSubtitleNavigationBindings
-export function subtitleStarts(input: string): number[] {
-  const clock = (raw: string) => {
+export type SubtitleTiming = { startMs: number; endMs: number }
+
+export function subtitleTimings(input: string): SubtitleTiming[] {
+  const parseTimestamp = (raw: string) => {
     const match = raw.trim().match(/^(?:(\d+):)?([0-5]?\d):([0-5]\d)\.(\d{3})$/)
     return match ? ((Number(match[1] ?? 0) * 60 + Number(match[2])) * 60 + Number(match[3])) * 1000 + Number(match[4]) : null
   }
-  const starts = input.replace(/\r/g, '').split(/\n\s*\n/).flatMap(block => {
+  const timings = input.replace(/\r/g, '').split(/\n\s*\n/).flatMap(block => {
     const lines = block.trim().split('\n')
-    const index = lines.findIndex(line => line.includes('-->'))
-    if (index < 0 || !lines.slice(index + 1).join('').trim()) return []
-    const [start, end] = lines[index].split('-->')
-    const left = clock(start), right = clock(end?.trim().split(/\s+/)[0] ?? '')
-    return left !== null && right !== null && right > left ? [left] : []
+    const timingLine = lines.findIndex(line => line.includes('-->'))
+    if (timingLine < 0 || !lines.slice(timingLine + 1).join('').trim()) return []
+    const [start, end] = lines[timingLine].split('-->')
+    const startMs = parseTimestamp(start)
+    const endMs = parseTimestamp(end?.trim().split(/\s+/)[0] ?? '')
+    if (startMs === null || endMs === null || endMs <= startMs) return []
+    return [{ startMs, endMs }]
   })
-  return [...new Set(starts)].sort((a, b) => a - b)
+  const byStart = new Map<number, SubtitleTiming>()
+  for (const timing of timings) {
+    const existing = byStart.get(timing.startMs)
+    if (!existing || timing.endMs > existing.endMs) byStart.set(timing.startMs, timing)
+  }
+  return [...byStart.values()].sort((a, b) => a.startMs - b.startMs)
 }
 
-export function subtitleTarget(starts: number[], currentMs: number, action: Exclude<SubtitleNavigationAction, 'playback'>): number | null {
+export function subtitleTarget(timings: readonly SubtitleTiming[], currentMs: number, action: Exclude<SubtitleNavigationAction, 'playback'>): number | null {
   if (!Number.isFinite(currentMs)) return null
-  const next = starts.findIndex(start => start > currentMs + 50)
-  const current = next === -1 ? starts.length - 1 : next - 1
-  const index = action === 'next' ? next : action === 'previous' ? current - 1 : Math.max(0, current)
-  return starts[index] ?? null
+  // Treat a position within 50ms before a start as that cue, allowing for seek
+  // rounding without selecting the same cue again on the next key press.
+  const startToleranceMs = 50
+  const nextIndex = timings.findIndex(cue => cue.startMs > currentMs + startToleranceMs)
+  if (action === 'next') return timings[nextIndex]?.startMs ?? null
+
+  const currentIndex = nextIndex === -1 ? timings.length - 1 : nextIndex - 1
+  if (action === 'replay') return timings[Math.max(0, currentIndex)]?.startMs ?? null
+
+  // An earlier-starting cue can still be active after a later one ends.
+  let latestEnded: SubtitleTiming | undefined
+  for (let index = currentIndex; index >= 0; index--) {
+    const cue = timings[index]
+    if (cue.startMs > currentMs) continue
+    if (cue.endMs > currentMs) return timings[index - 1]?.startMs ?? null
+    if (!latestEnded || cue.endMs > latestEnded.endMs) latestEnded = cue
+  }
+  // Apply seek-rounding tolerance in a gap after checking actual active cues.
+  const nearStart = timings[currentIndex]
+  if (nearStart && nearStart.startMs > currentMs) return timings[currentIndex - 1]?.startMs ?? null
+  return latestEnded?.startMs ?? null
 }

@@ -119,7 +119,7 @@ export function HoldSpeedShortcutSettings({ locale, settings, form, updateSettin
         </Table>
       </TableCell>
     </TableRow>
-    <DialogContent onOpenAutoFocus={event => { event.preventDefault(); firstInput.current?.focus() }}>
+    <DialogContent size="compact" onOpenAutoFocus={event => { event.preventDefault(); firstInput.current?.focus() }}>
       <DialogHeader><DialogTitle>{copy.holdSpeed}</DialogTitle><DialogDescription>{copy.holdSpeedDesc}</DialogDescription></DialogHeader>
       <FieldGroup>
         <NumericSettingField ref={firstInput} id="hold-speed" label={copy.holdSpeedRate} tooltip={copy.holdSpeedTooltip}

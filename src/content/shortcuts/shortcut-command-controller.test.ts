@@ -4,6 +4,7 @@ import { getHintManager } from '@/content/hints/hint-manager'
 import { createNetflixPlaybackSession } from '@/content/netflix-playback-session'
 import type { NetflixApiResponse } from '@/shared/netflix-api'
 import { createShortcutCommandController } from './shortcut-command-controller'
+import type { PlaybackDispatcher } from './shortcut-command-types'
 import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
 import type { ShortcutSettings } from '@/shared/shortcut-types'
 import { PipControls } from '@/content/pip/pip-controls'
@@ -17,6 +18,48 @@ const subtitleTrackResponse: NetflixApiResponse = {
 }
 
 describe('ShortcutCommandController', () => {
+  it.each([
+    ['older', 1, false], ['same', 2, false], ['newer', 3, true],
+  ] as const)('compares the held request with a %s cancellation request', (_age, order, cancelled) => {
+    vi.useFakeTimers()
+    document.body.innerHTML = '<video></video>'
+    const video = document.querySelector('video')!
+    Object.defineProperty(video, 'paused', { get: () => false })
+    const controller = createShortcutCommandController(() => DEFAULT_SETTINGS)
+    controller.beginHoldSpeedInteraction(document, video, 'Space', { time: 0, order: 2 })
+    controller.cancelHoldSpeedInteraction({ time: 0, order })
+    vi.advanceTimersByTime(300)
+    expect(video.playbackRate).toBe(cancelled ? 1 : DEFAULT_SETTINGS.holdSpeed.speed)
+    expect(controller.completeHoldSpeedInteraction('Space')).toBe(true)
+    expect(video.playbackRate).toBe(1)
+  })
+
+  it('cancels an active hold before an explicit pause and ignores its later release', () => {
+    vi.useFakeTimers()
+    document.body.innerHTML = '<video></video>'
+    const video = document.querySelector('video')!
+    video.playbackRate = 1.25
+    Object.defineProperty(video, 'paused', { get: () => false })
+    const pause = vi.spyOn(video, 'pause').mockImplementation(() => undefined)
+    const play = vi.spyOn(video, 'play').mockResolvedValue()
+    const transport = vi.fn().mockResolvedValue({ success: true })
+    const dispatch = vi.fn<PlaybackDispatcher>((_intent, execute) => execute())
+    const controller = createShortcutCommandController(() => DEFAULT_SETTINGS,
+      createNetflixPlaybackSession(transport), { createPlaybackDispatcher: () => dispatch })
+    controller.beginHoldSpeedInteraction(document, video, 'Space')
+    vi.advanceTimersByTime(1000)
+    expect(video.playbackRate).toBe(DEFAULT_SETTINGS.holdSpeed.speed)
+    expect(controller.setPlaybackPaused(true, document)).toBe(true)
+    controller.completeHoldSpeedInteraction('Space')
+    vi.advanceTimersByTime(1000)
+    expect(video.playbackRate).toBe(1.25)
+    expect(pause).toHaveBeenCalledOnce()
+    expect(play).not.toHaveBeenCalled()
+    expect(dispatch.mock.calls.map(([intent]) => intent)).toEqual(['play', 'pause'])
+    document.body.innerHTML = ''
+    expect(controller.setPlaybackPaused(false, document)).toBe(false)
+  })
+
   it('applies each custom preferred speed and keeps it after a held speed ends', () => {
     vi.useFakeTimers()
     document.body.innerHTML = '<video></video>'

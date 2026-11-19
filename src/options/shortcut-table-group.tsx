@@ -3,6 +3,15 @@ import type { ComponentProps, ReactNode } from 'react'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/app-ui/collapsible'
 import { Table, TableBody, TableCell, TableRow } from '@/components/app-ui/table'
 import { cn } from '@/lib/utils'
+import { featureId } from '@/shared/feature-management'
+import type { ShortcutTarget } from '@/shared/shortcut-routing'
+
+export const shortcutRowId = (target: ShortcutTarget) => `shortcut-row-${featureId(target)}`
+
+export function ShortcutRow({ target, className, ...props }: ComponentProps<typeof TableRow> & { target: ShortcutTarget }) {
+  return <TableRow {...props} id={shortcutRowId(target)} tabIndex={-1}
+    className={cn('focus:bg-accent focus:outline-2 focus:-outline-offset-2 focus:outline-ring', className)} />
+}
 
 export function ShortcutGroupToggle({ label, open, children = label, className, ...props }: ComponentProps<'button'> & {
   label: string

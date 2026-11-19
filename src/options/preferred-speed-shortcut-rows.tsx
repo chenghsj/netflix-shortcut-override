@@ -12,7 +12,7 @@ import type { Locale, PreferredSpeedShortcutAction, ShortcutAction, ShortcutSett
 import type { useShortcutSettingsForm } from '@/shared/use-shortcut-settings-form'
 import { SPEED_SHORTCUT_COPY } from './speed-shortcut-copy'
 import type { useShortcutEditor } from './use-shortcut-editor'
-import { ShortcutTableGroup } from './shortcut-table-group'
+import { ShortcutRow, ShortcutTableGroup } from './shortcut-table-group'
 
 export function PreferredSpeedShortcutSettings({ settings, locale, editor, updateSettings, conflictSwitch, isVisible, open, onOpenChange, collapsible }: {
   settings: ShortcutSettings
@@ -44,9 +44,9 @@ export function PreferredSpeedShortcutSettings({ settings, locale, editor, updat
     const label = `${copy.actions.setPreferredSpeed}${builtin ? '' : ` · ${shortcut.speed}×`}`
     const target = { group: 'general' as const, action: shortcut.id }
     const binding = settings.bindings[shortcut.id]
-    return <TableRow key={shortcut.id} aria-label={`${copy.actions.setPreferredSpeed} · ${shortcut.speed}×`}>
+    return <ShortcutRow key={shortcut.id} target={target} aria-label={`${copy.actions.setPreferredSpeed} · ${shortcut.speed}×`}>
       <TableCell className="tabular-nums">{shortcut.speed}×</TableCell>
-      <TableCell><KeyBindingKbd binding={binding.key} emptyLabel={copy.unassignedShortcut} className="flex-wrap" /></TableCell>
+      <TableCell><KeyBindingKbd binding={binding.key} additionalKeys={binding.additionalKeys} emptyLabel={copy.unassignedShortcut} className="flex-wrap" /></TableCell>
       <TableCell>{conflictSwitch(target, false)}</TableCell>
       <TableCell><div className="flex items-center justify-end gap-2">
         <Button variant="ghost" size="icon" className="text-muted-foreground focus-visible:text-foreground" aria-label={`${copy.edit} ${label}`} onClick={event => editor.edit(target, event.currentTarget)}><PencilIcon /></Button>
@@ -57,7 +57,7 @@ export function PreferredSpeedShortcutSettings({ settings, locale, editor, updat
             return { ...current, bindings, preferredSpeedShortcuts: current.preferredSpeedShortcuts.filter(item => item.id !== shortcut.id) }
           })} />}
       </div></TableCell>
-    </TableRow>
+    </ShortcutRow>
     })}
   </ShortcutTableGroup>
 }

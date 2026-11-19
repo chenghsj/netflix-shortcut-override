@@ -1,5 +1,6 @@
 export const EXTERNAL_LINKS = {
   githubRepository: 'https://github.com/chenghsj/netflix-shortcut-override',
+  githubNewIssue: 'https://github.com/chenghsj/netflix-shortcut-override/issues/new/choose',
   shortcutOverrideChromeWebStore:
     'https://chromewebstore.google.com/detail/shortcut-override-for-net/jebnhiecgnchnioahfagmnebdknddbom/reviews',
   shortcutOverrideEdgeAddons:

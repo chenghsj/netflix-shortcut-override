@@ -1,9 +1,11 @@
 import {
+  CircleCheckIcon,
   DatabaseBackupIcon,
   DownloadIcon,
+  RotateCcwIcon,
   UploadIcon,
 } from 'lucide-react'
-import { useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { KeyBindingKbd } from '@/components/key-binding-kbd'
 import { Alert, AlertTitle } from '@/components/app-ui/alert'
@@ -16,6 +18,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from '@/components/app-ui/dialog'
 import { LOCALE_LABELS, getCopy } from '@/shared/i18n'
 import {
@@ -29,14 +32,20 @@ import {
 import { SUBTITLE_NAVIGATION_ACTIONS, type Locale, type ShortcutSettings } from '@/shared/shortcut-types'
 import { getShortcutActions } from '@/shared/shortcut-bindings'
 import { SUBTITLE_NAVIGATION_COPY } from '@/shared/subtitle-navigation'
+import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
 
 type SettingsTransferCardProps = {
   title?: ReactNode
   copy: ReturnType<typeof getCopy>
   locale: Locale
   settings: ShortcutSettings
-  onImport: (settings: ShortcutSettings) => Promise<ShortcutSettings>
+  onReplaceSettings: (settings: ShortcutSettings) => Promise<ShortcutSettings>
 }
+
+type SettingsTransfer =
+  | { kind: 'idle' | 'reading' }
+  | { kind: 'import'; backup: ParsedSettingsBackup; saving: boolean }
+  | { kind: 'reset'; saving: boolean }
 
 const formatTemplate = (
   template: string,
@@ -60,14 +69,32 @@ export function SettingsTransferCard({
   copy,
   locale,
   settings,
-  onImport,
+  onReplaceSettings,
 }: SettingsTransferCardProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [pendingBackup, setPendingBackup] = useState<ParsedSettingsBackup | null>(null)
+  const resetCancelRef = useRef<HTMLButtonElement>(null)
+  const [transfer, setTransfer] = useState<SettingsTransfer>({ kind: 'idle' })
+  const activeTransfer = useRef(transfer)
   const [parseError, setParseError] = useState<SettingsBackupParseErrorCode | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
   const [imported, setImported] = useState(false)
-  const [importing, setImporting] = useState(false)
+  const [resetError, setResetError] = useState<string | null>(null)
+  const [resetComplete, setResetComplete] = useState(false)
+  const transferActive = transfer.kind !== 'idle'
+  const pendingBackup = transfer.kind === 'import' ? transfer.backup : null
+  const importing = transfer.kind === 'import' && transfer.saving
+  const resetOpen = transfer.kind === 'reset'
+  const resetting = resetOpen && transfer.saving
+  const changeTransfer = (next: SettingsTransfer) => {
+    activeTransfer.current = next
+    setTransfer(next)
+  }
+
+  useEffect(() => {
+    if (!resetComplete) return
+    const timeout = window.setTimeout(() => setResetComplete(false), 5000)
+    return () => window.clearTimeout(timeout)
+  }, [resetComplete])
 
   const parseErrorMessages: Record<SettingsBackupParseErrorCode, string> = {
     invalidJson: copy.importInvalidJson,
@@ -98,42 +125,81 @@ export function SettingsTransferCard({
   }
 
   const importFile = async (file: File) => {
+    if (activeTransfer.current.kind !== 'idle') return
+    changeTransfer({ kind: 'reading' })
     setImported(false)
+    setResetComplete(false)
     setParseError(null)
     setImportError(null)
 
-    let source: string
+    let result: ReturnType<typeof parseSettingsBackup>
     try {
-      source = await file.text()
+      result = parseSettingsBackup(await file.text())
     } catch {
       setParseError('invalidJson')
+      changeTransfer({ kind: 'idle' })
       return
     }
 
-    const result = parseSettingsBackup(source)
     if (!result.ok) {
       setParseError(result.error)
+      changeTransfer({ kind: 'idle' })
       return
     }
 
-    setPendingBackup(result.value)
+    changeTransfer({ kind: 'import', backup: result.value, saving: false })
   }
 
   const confirmImport = async () => {
-    if (!pendingBackup || importing) return
-    setImporting(true)
+    const current = activeTransfer.current
+    if (current.kind !== 'import' || current.saving) return
+    changeTransfer({ ...current, saving: true })
     setImportError(null)
 
     try {
-      await onImport(pendingBackup.settings)
-      setPendingBackup(null)
+      await onReplaceSettings(current.backup.settings)
+      changeTransfer({ kind: 'idle' })
       setImported(true)
     } catch (error) {
       setImportError(
         formatTemplate(copy.importSaveError, { message: getErrorMessage(error) })
       )
-    } finally {
-      setImporting(false)
+      changeTransfer(current)
+    }
+  }
+
+  const changeResetOpen = (open: boolean) => {
+    const current = activeTransfer.current
+    if (open ? current.kind !== 'idle' : current.kind !== 'reset' || current.saving) return
+    changeTransfer(open ? { kind: 'reset', saving: false } : { kind: 'idle' })
+    setResetError(null)
+  }
+
+  const closeImport = () => {
+    const current = activeTransfer.current
+    if (current.kind !== 'import' || current.saving) return
+    changeTransfer({ kind: 'idle' })
+    setImportError(null)
+  }
+
+  const confirmReset = async () => {
+    const current = activeTransfer.current
+    if (current.kind !== 'reset' || current.saving) return
+    changeTransfer({ kind: 'reset', saving: true })
+    setResetError(null)
+    setResetComplete(false)
+    setImported(false)
+    setParseError(null)
+
+    try {
+      await onReplaceSettings(DEFAULT_SETTINGS)
+      changeTransfer({ kind: 'idle' })
+      setResetComplete(true)
+    } catch (error) {
+      setResetError(
+        formatTemplate(copy.resetDefaultsSaveError, { message: getErrorMessage(error) })
+      )
+      changeTransfer(current)
     }
   }
 
@@ -171,12 +237,13 @@ export function SettingsTransferCard({
         <CardContent className="flex flex-col gap-4">
           <p className="text-sm text-muted-foreground">{copy.backupRestoreDesc}</p>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={exportSettings}>
+            <Button variant="outline" disabled={transferActive} onClick={exportSettings}>
               <DownloadIcon data-icon="inline-start" />
               {copy.exportSettings}
             </Button>
             <Button
               variant="outline"
+              disabled={transferActive}
               onClick={() => {
                 if (fileInputRef.current) fileInputRef.current.value = ''
                 fileInputRef.current?.click()
@@ -190,6 +257,7 @@ export function SettingsTransferCard({
               type="file"
               accept="application/json,.json"
               hidden
+              disabled={transferActive}
               aria-label={copy.importSettings}
               onChange={event => {
                 const file = event.currentTarget.files?.[0]
@@ -209,25 +277,64 @@ export function SettingsTransferCard({
               <AlertTitle role="status">{copy.importSuccess}</AlertTitle>
             </Alert>
           )}
+          <div className="flex flex-col items-start gap-3 border-t pt-4">
+            <p className="text-sm text-muted-foreground">{copy.resetDefaultsDesc}</p>
+            <Dialog open={resetOpen} onOpenChange={changeResetOpen}>
+              <div className="flex max-w-full flex-wrap items-center gap-x-3 gap-y-2">
+                <DialogTrigger asChild>
+                  <Button variant="outline" disabled={transferActive}>
+                    <RotateCcwIcon data-icon="inline-start" />
+                    {copy.resetDefaults}
+                  </Button>
+                </DialogTrigger>
+                <div role="status" aria-live="polite" aria-atomic="true" className="min-w-0">
+                  {resetComplete && (
+                    <div className="flex items-center gap-2 rounded-lg border-2 bg-card px-2.5 py-1.5 text-sm font-medium text-card-foreground shadow-xs motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
+                      <CircleCheckIcon className="size-4 shrink-0" aria-hidden="true" />
+                      <span>{copy.resetDefaultsSuccess}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <DialogContent size="compact" showCloseButton={!resetting} onOpenAutoFocus={event => {
+                event.preventDefault()
+                resetCancelRef.current?.focus()
+              }}>
+                <DialogHeader>
+                  <DialogTitle>{copy.resetDefaultsDialogTitle}</DialogTitle>
+                  <DialogDescription>{copy.resetDefaultsDialogDesc}</DialogDescription>
+                </DialogHeader>
+                {resetError && (
+                  <Alert variant="destructive">
+                    <AlertTitle>{resetError}</AlertTitle>
+                  </Alert>
+                )}
+                <DialogFooter>
+                  <Button ref={resetCancelRef} variant="outline" disabled={resetting} onClick={() => changeResetOpen(false)}>
+                    {copy.cancel}
+                  </Button>
+                  <Button variant="destructive" disabled={resetting} onClick={() => void confirmReset()}>
+                    {resetting ? copy.resettingDefaults : copy.resetDefaults}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
         </CardContent>
       </Card>
 
       <Dialog
         open={Boolean(pendingBackup)}
-        onOpenChange={open => {
-          if (open || importing) return
-          setPendingBackup(null)
-          setImportError(null)
-        }}
+        onOpenChange={open => { if (!open) closeImport() }}
       >
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent size="wide" className="flex flex-col overflow-hidden">
+          <DialogHeader className="shrink-0">
             <DialogTitle>{copy.importDialogTitle}</DialogTitle>
             <DialogDescription>{copy.importDialogDesc}</DialogDescription>
           </DialogHeader>
 
           {pendingBackup && importedSettings && (
-            <dl className="grid gap-x-4 gap-y-2 text-sm sm:grid-cols-[max-content_1fr]">
+            <dl className="-mx-2 grid min-h-0 min-w-0 gap-x-4 gap-y-2 overflow-y-auto px-2 text-sm sm:grid-cols-[max-content_minmax(0,1fr)]">
               <dt className="text-muted-foreground">{copy.backupDate}</dt>
               <dd>
                 {new Intl.DateTimeFormat(locale, {
@@ -258,7 +365,7 @@ export function SettingsTransferCard({
                     return (
                       <li key={action} className="flex flex-wrap items-center gap-x-2 gap-y-1">
                         <span>{subtitleCopy[action]}</span>
-                        <KeyBindingKbd binding={binding.key} emptyLabel={copy.unassignedShortcut} className="flex-wrap" />
+                        <KeyBindingKbd binding={binding.key} additionalKeys={binding.additionalKeys} emptyLabel={copy.unassignedShortcut} className="flex-wrap" />
                         <span className="text-muted-foreground">{enabledLabel(binding.enabled)}</span>
                       </li>
                     )
@@ -292,19 +399,16 @@ export function SettingsTransferCard({
           )}
 
           {importError && (
-            <Alert variant="destructive">
+            <Alert variant="destructive" className="shrink-0">
               <AlertTitle>{importError}</AlertTitle>
             </Alert>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="shrink-0">
             <Button
               variant="outline"
               disabled={importing}
-              onClick={() => {
-                setPendingBackup(null)
-                setImportError(null)
-              }}
+              onClick={closeImport}
             >
               {copy.cancel}
             </Button>

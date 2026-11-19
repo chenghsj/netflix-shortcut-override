@@ -3,9 +3,20 @@ import type * as React from 'react'
 import * as Upstream from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 
-function DialogContent({ className, ...props }: React.ComponentProps<typeof Upstream.DialogContent>) {
-  return <Upstream.DialogContent {...props} className={cn(
-    "app-dialog-content rounded-[var(--ui-dialog-radius)] border-border shadow-lg",
+const dialogWidths = {
+  compact: 'max-w-[22rem] sm:max-w-[22rem]',
+  standard: 'max-w-md sm:max-w-md',
+  wide: 'max-w-lg sm:max-w-lg',
+} as const
+
+type DialogContentProps = React.ComponentProps<typeof Upstream.DialogContent> & {
+  size?: keyof typeof dialogWidths
+}
+
+function DialogContent({ size = 'standard', className, ...props }: DialogContentProps) {
+  return <Upstream.DialogContent {...props} data-size={size} className={cn(
+    'app-dialog-content max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] overflow-y-auto rounded-[var(--ui-dialog-radius)] border-border shadow-lg',
+    dialogWidths[size],
     className
   )} />
 }

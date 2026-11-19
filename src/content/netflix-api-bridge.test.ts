@@ -474,6 +474,50 @@ describe('main-world Netflix API bridge', () => {
     }
   })
 
+  it('cycles from Japanese to English CC without a region tag for an American English favorite', () => {
+    const japanese = { id: 'ja', bcp47: 'ja' }
+    const english = { id: 'en-cc', bcp47: 'en', displayName: '英語 (CC)' }
+    const setTextTrack = vi.fn()
+    mockPlayer({
+      getTextTrackList: () => [english, japanese],
+      getTextTrack: () => japanese,
+      setTextTrack,
+    })
+
+    expect(callBridge('cycleSubtitleTrack', 1, [{ language: 'ja' }, { language: 'en-US' }])?.result)
+      .toMatchObject({ subtitleTrackLanguage: 'en', subtitleTrackIsClosedCaption: true })
+    expect(setTextTrack).toHaveBeenCalledExactlyOnceWith(english)
+  })
+
+  it.each([
+    { favorite: 'en-US', languages: ['en', 'en-US'], selected: 'en-US' },
+    { favorite: 'en-US', languages: ['en-GB'], selected: null },
+    { favorite: 'zh-TW', languages: ['zh', 'zh-Hans', 'zh-Hant'], selected: 'zh-Hant' },
+    { favorite: 'zh-TW', languages: ['zh', 'zh-Hans'], selected: null },
+  ])('preserves regional and script preferences for $favorite with $languages', ({ favorite, languages, selected }) => {
+    const off = { id: 'none', isNoneTrack: true }
+    const tracks = languages.map(language => ({
+      id: language,
+      bcp47: language,
+      rawTrackType: language === 'en-US' ? 'closedcaptions' : undefined,
+    }))
+    const setTextTrack = vi.fn()
+    mockPlayer({
+      getTextTrackList: () => [off, ...tracks],
+      getTextTrack: () => off,
+      setTextTrack,
+    })
+
+    const result = callBridge('cycleSubtitleTrack', undefined, [{ language: favorite }])?.result
+    if (selected) {
+      expect(result).toMatchObject({ subtitleTrackLanguage: selected })
+      expect(setTextTrack).toHaveBeenCalledExactlyOnceWith(tracks.find(track => track.bcp47 === selected))
+    } else {
+      expect(result).toMatchObject({ subtitleCycleOutcome: 'no-tracks-available' })
+      expect(setTextTrack).not.toHaveBeenCalled()
+    }
+  })
+
   it('prefers regular subtitles for favorites and falls back to CC when needed', () => {
     const off = { id: 'none', isNoneTrack: true }
     const japanese = { id: 'ja', bcp47: 'ja' }

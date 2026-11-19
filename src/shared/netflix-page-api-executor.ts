@@ -22,6 +22,18 @@ type NetflixPlayer = {
   seek(time: number): void
   getInternalPlayer?(): {
     seek?(time: number, cause?: unknown, segmentId?: unknown, forcePreciseSeeking?: boolean): void
+    playback?: {
+      presentingState?: { value?: number }
+      timedTextManager?: {
+        shouldShowTimedText?: boolean
+        timedTextTimer?: {
+          updatedForMediaTime?: number
+          getMediaTime?(): number
+          manager?: { getCurrentAndNextSubtitles?(time: number): unknown[] | null }
+        }
+        updateActiveEntry?(): void
+      }
+    }
   } | null
   getCurrentTime(): number
   getDuration?(): number
@@ -69,6 +81,7 @@ type NetflixVideoPlayerApi = {
 }
 
 type NetflixWindow = typeof window & {
+  __shortcutOverrideCancelSubtitleRefresh?: () => void
   __shortcutOverrideFrameStep?: {
     player: NetflixPlayer
     video: HTMLVideoElement | null
@@ -615,6 +628,12 @@ export const executeNetflixPageApi = (
     return true
   }
 
+  const matchesRegionFallback = (candidate: Intl.Locale, favorite: Intl.Locale): boolean => {
+    if (!favorite.region || candidate.region || candidate.language !== favorite.language) return false
+    const script = getTrackScript(favorite)
+    return !script || getTrackScript(candidate) === script
+  }
+
   const orderFavoriteTracks = (selectable: NetflixTextTrack[]): NetflixTextTrack[] => {
     const candidates = selectable.flatMap(track => {
       const locale = getTrackLocale(track)
@@ -652,6 +671,13 @@ export const executeNetflixPageApi = (
       fillExactMatches(closedCaption)
       fillLanguageMatches(closedCaption, 'specific')
       fillLanguageMatches(closedCaption, 'generic')
+    }
+    // Try tracks without region tags after reserving exact and generic choices.
+    for (const closedCaption of [false, true]) {
+      preferences.forEach((locale, index) => {
+        if (ordered[index]) return
+        ordered[index] = takeTrack(closedCaption, candidate => matchesRegionFallback(candidate, locale))
+      })
     }
     return ordered.filter(track => track !== undefined)
   }
@@ -704,6 +730,8 @@ export const executeNetflixPageApi = (
     result.subtitleTrackIsClosedCaption = isClosedCaption(next)
   }
 
+  const getVideoPlayerApi = (page: NetflixWindow) =>
+    page.netflix?.appContext?.state?.playerApp?.getAPI().videoPlayer
   const selectPlayerSession = (
     videoPlayer: NetflixVideoPlayerApi,
     sessionIds: string[],
@@ -740,6 +768,71 @@ export const executeNetflixPageApi = (
     } else {
       player.seek(targetTime)
     }
+  }
+  const preparePausedSubtitleRefresh = (
+    page: NetflixWindow,
+    { player, sessionId }: NonNullable<ReturnType<typeof selectPlayerSession>>,
+    video: HTMLVideoElement | null,
+    targetTime: number,
+  ): (() => void) | undefined => {
+    if (!video || !(player.getPaused?.() ?? video.paused)) return
+    const seekCompletionTimeoutMs = 3_000
+    const targetToleranceMs = 250
+    const subtitleRetryIntervalMs = 16
+    const waitingPresentingState = 1 // Cadmium's WAITING presentation state.
+    const watchPath = location.pathname
+    let retryTimer: number | undefined
+    const cancel = () => {
+      window.clearTimeout(expiryTimer)
+      window.clearTimeout(retryTimer)
+      video.removeEventListener('seeked', onSeeked)
+      video.removeEventListener('seeking', cancel)
+      video.removeEventListener('play', cancel)
+      video.removeEventListener('emptied', cancel)
+      if (page.__shortcutOverrideCancelSubtitleRefresh === cancel) delete page.__shortcutOverrideCancelSubtitleRefresh
+    }
+    const refresh = () => {
+      retryTimer = undefined
+      try {
+        if (!video.isConnected || video.seeking || location.pathname !== watchPath || findSessionReferenceVideo(page) !== video) return
+        const playerApi = getVideoPlayerApi(page)
+        const current = playerApi && selectPlayerSession(playerApi, playerApi.getAllPlayerSessionIds(), video)
+        if (current?.sessionId !== sessionId || current.player !== player) return
+        const stillPaused = player.getPaused?.() ?? video.paused
+        if (!stillPaused) return
+        const nearTarget = Math.abs(player.getCurrentTime() - targetTime) <= targetToleranceMs
+        if (!nearTarget) return
+        const playback = player.getInternalPlayer?.()?.playback
+        const manager = playback?.timedTextManager
+        const timer = manager?.timedTextTimer
+        if (!timer || !('updatedForMediaTime' in timer) || typeof manager?.updateActiveEntry !== 'function' || manager.shouldShowTimedText === false) return
+        const mediaTime = timer.getMediaTime?.()
+        // Cadmium returns null while the subtitle stream fills its buffer.
+        // An empty list means the lookup completed with no cues.
+        const subtitleBuffering = typeof mediaTime === 'number' &&
+          timer.manager?.getCurrentAndNextSubtitles?.(mediaTime) === null
+        if (playback?.presentingState?.value === waitingPresentingState || subtitleBuffering) {
+          retryTimer = window.setTimeout(refresh, subtitleRetryIntervalMs)
+          return
+        }
+        // Cadmium can cache an empty entry while a paused seek is in flight.
+        // Recompute once presentation is ready, even when its media
+        // time has not changed. The requested cue position stays unchanged.
+        timer.updatedForMediaTime = undefined
+        manager.updateActiveEntry()
+      } catch { /* Optional native subtitle refresh must not fail the seek. */ }
+      finally { if (retryTimer === undefined) cancel() }
+    }
+    const onSeeked = () => {
+      video.addEventListener('seeking', cancel, { once: true })
+      refresh()
+    }
+    const expiryTimer = window.setTimeout(cancel, seekCompletionTimeoutMs)
+    video.addEventListener('seeked', onSeeked, { once: true })
+    video.addEventListener('play', cancel, { once: true })
+    video.addEventListener('emptied', cancel, { once: true })
+    page.__shortcutOverrideCancelSubtitleRefresh = cancel
+    return cancel
   }
   const stepFrame = (page: NetflixWindow, player: NetflixPlayer, video: HTMLVideoElement | null): void => {
     if (!(player.getPaused?.() ?? video?.paused)) {
@@ -833,6 +926,7 @@ export const executeNetflixPageApi = (
     fillMatches((candidate, preference) => candidate.baseName === preference.baseName)
     fillMatches((candidate, preference) => Boolean(preference.script || preference.region) && matchesFavoriteLocale(candidate, preference))
     fillMatches((candidate, preference) => !preference.script && !preference.region && matchesFavoriteLocale(candidate, preference))
+    fillMatches(matchesRegionFallback)
     return ordered.filter(track => track !== undefined)
   }
 
@@ -877,25 +971,20 @@ export const executeNetflixPageApi = (
     seekCalled: false,
   }
   try {
-    const playerApi = (window as NetflixWindow).netflix?.appContext?.state?.playerApp?.getAPI()
-      .videoPlayer
-
+    const pageWindow = window as NetflixWindow
+    const playerApi = getVideoPlayerApi(pageWindow)
     result.playerApiFound = Boolean(playerApi)
     const sessionIds = playerApi?.getAllPlayerSessionIds() ?? []
     result.sessionIds = sessionIds
-    const selected = playerApi
-      ? selectPlayerSession(
-          playerApi,
-          sessionIds,
-          findSessionReferenceVideo(window as NetflixWindow)
-        )
-      : null
+    const video = playerApi ? findSessionReferenceVideo(pageWindow) : null
+    const selected = playerApi ? selectPlayerSession(playerApi, sessionIds, video) : null
     result.sessionId = selected?.sessionId
-    const player = selected?.player
-    result.playerFound = Boolean(player)
-    const pageWindow = window as NetflixWindow
+    result.playerFound = Boolean(selected)
     if (action === 'play' || action === 'pause' || action === 'seek' || action === 'seekTo') {
       pageWindow.__shortcutOverrideFrameStep?.clear()
+    }
+    if (action === 'play' || action === 'pause' || action === 'seek' || action === 'seekTo' || action === 'stepFrame') {
+      pageWindow.__shortcutOverrideCancelSubtitleRefresh?.()
     }
 
     if (action === 'getCaptionMetadata') {
@@ -903,7 +992,8 @@ export const executeNetflixPageApi = (
       if (!watchId) throw new Error('watch')
       if (!selected) throw new Error('player')
       result.captionMetadata = readCaptionMetadata(window as CaptionPage, selected.player, selected.sessionId, watchId)
-    } else if (player) {
+    } else if (selected) {
+      const { player } = selected
       if (action === 'diagnose') {
         // Diagnostics only inspect API availability and must not alter playback.
         result.subtitleDiagnostics = summarizeSubtitleDiagnostics(player)
@@ -912,13 +1002,18 @@ export const executeNetflixPageApi = (
       } else if (action === 'pause') {
         player.pause()
       } else if (action === 'stepFrame') {
-        stepFrame(pageWindow, player, findSessionReferenceVideo(pageWindow))
+        stepFrame(pageWindow, player, video)
       } else if ((action === 'seek' || action === 'seekTo') && value !== undefined) {
         const currentTime = player.getCurrentTime()
         result.currentTime = currentTime
         result.targetTime = action === 'seek' ? currentTime + value : value
-        if (action === 'seekTo') seekPrecisely(player, result.targetTime)
-        else player.seek(result.targetTime)
+        if (action === 'seekTo') {
+          let cancelRefresh: (() => void) | undefined
+          try { cancelRefresh = preparePausedSubtitleRefresh(pageWindow, selected, video, result.targetTime) }
+          catch { /* Optional refresh setup must not block the seek. */ }
+          try { seekPrecisely(player, result.targetTime) }
+          catch (error) { cancelRefresh?.(); throw error }
+        } else player.seek(result.targetTime)
         result.seekCalled = true
       } else if (action === 'setVolume' && value !== undefined) {
         player.setVolume(clampVolume(value))

@@ -16,7 +16,7 @@ type ShortcutRecordingAreaProps = ComponentProps<'div'> & {
 export function ShortcutRecordingArea({ binding, placeholder, idlePlaceholder, onClear, clearLabel, className, tabIndex = -1, onFocus, onBlur, ...props }: ShortcutRecordingAreaProps) {
   const [focused, setFocused] = useState(false)
   return <div className="relative min-w-0"><div data-slot="shortcut-recording" role="group" tabIndex={tabIndex}
-    className={cn('flex min-h-16 min-w-0 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-input bg-[var(--ui-recording-bg)] px-3 py-2 text-center outline-none transition-colors focus:outline-solid focus:outline-2 focus:outline-offset-2 focus:outline-ring aria-invalid:border-destructive aria-invalid:focus:outline-destructive motion-reduce:transition-none', onClear && 'px-12', className)}
+    className={cn('flex min-h-18 min-w-0 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-input bg-[var(--ui-recording-bg)] px-3 py-2 text-center outline-none transition-colors focus:outline-solid focus:outline-2 focus:outline-offset-2 focus:outline-ring aria-invalid:border-destructive aria-invalid:focus:outline-destructive motion-reduce:transition-none', onClear && 'px-12', className)}
     {...props}
     onFocus={event => { setFocused(true); onFocus?.(event) }}
     onBlur={event => { setFocused(false); onBlur?.(event) }}>

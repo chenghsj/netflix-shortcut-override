@@ -32,7 +32,7 @@ export function HelpPage({ locale, query }: {
   }
   const allExpanded = categories.length > 0 && categories.every(isOpen)
 
-  return <section aria-labelledby="user-guide-heading" className="min-w-0 max-w-3xl">
+  return <section aria-labelledby="user-guide-heading" className="w-full min-w-0">
     <header className="mb-6 flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -41,7 +41,7 @@ export function HelpPage({ locale, query }: {
             {copy.results.replace('{count}', String(visibleTopics.length))}
           </p>}
         </div>
-        <Button variant="outline" size="sm" disabled={!categories.length} onClick={() => setAllOpen(!allExpanded)}>
+        <Button variant="outline" size="sm" className="mr-(--ui-press-x)" disabled={!categories.length} onClick={() => setAllOpen(!allExpanded)}>
           {allExpanded ? copy.collapse : copy.expand}
         </Button>
       </div>
@@ -51,14 +51,14 @@ export function HelpPage({ locale, query }: {
       {categories.map(category => {
         const entries = visibleTopics.filter(topic => topic.category === category)
         return <AccordionItem key={category} value={category}>
-          <AccordionTrigger>
+          <AccordionTrigger className="px-0">
             <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2.5 gap-y-1">
               <span>{getHelpCategoryLabel(category, locale)}</span>
               <span className="shrink-0 text-xs font-normal text-muted-foreground tabular-nums">{entries.length}</span>
             </span>
           </AccordionTrigger>
           <AccordionContent forceMount inert={!isOpen(category)} aria-hidden={!isOpen(category)}>
-            <div className="flex flex-col gap-8 px-3 pt-2 sm:px-6">
+            <div className="flex flex-col gap-8 pt-2">
               {entries.map(topic => <article key={topic.id} aria-labelledby={`help-${topic.id}`} className="flex min-w-0 flex-col gap-3">
                 <h4 id={`help-${topic.id}`} className="text-sm font-semibold">{topic.title}</h4>
                 <HelpText text={topic.body} />

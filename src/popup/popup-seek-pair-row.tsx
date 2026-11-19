@@ -24,7 +24,7 @@ export function PopupSeekPairRow({ seconds, locale, enabled, backward, forward }
         <div key={row.id} role="group" aria-label={row.label} className="flex min-w-0 flex-wrap items-center justify-end gap-1">
           <span className="text-xs text-muted-foreground">{label}</span>
           {!row.enabled ? <Badge variant="secondary" className="rounded-[var(--ui-key-radius)]">{copy.disabledStatus}</Badge>
-            : <KeyBindingKbd binding={row.key} emptyLabel={copy.unassignedShortcut} className="flex-wrap justify-end" />}
+            : <KeyBindingKbd binding={row.key} additionalKeys={row.additionalKeys} emptyLabel={copy.unassignedShortcut} className="flex-wrap justify-end" />}
         </div>)}
     </div>
   </div>

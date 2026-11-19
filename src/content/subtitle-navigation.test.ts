@@ -7,6 +7,25 @@ import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
 const metadata = { key: '123:player:en', watchId: '123', url: 'https://a.nflxvideo.net/sub.vtt', currentMs: 3500 }
 afterEach(() => { getHintManager(document).destroy(); vi.restoreAllMocks() })
 
+it('jumps back to the immediately preceding subtitle when paused in the gap after it', async () => {
+  const settings = structuredClone(DEFAULT_SETTINGS)
+  settings.subtitleNavigation.enabled = true
+  const session = createNetflixPlaybackSession()
+  const seek = vi.spyOn(session, 'seekTo').mockResolvedValue({ response: { success: true }, failureLabel: null })
+  vi.spyOn(chrome.runtime, 'sendMessage').mockImplementation(() => Promise.resolve({
+    text: 'WEBVTT\n\n00:03:05.000 --> 00:03:08.000\nEarlier\n\n00:03:15.000 --> 00:03:18.000\nPrevious\n\n00:03:25.000 --> 00:03:28.000\nNext',
+  }) as never)
+  const respond = (event: Event) => window.dispatchEvent(new CustomEvent('shortcut-override:caption-response', {
+    detail: JSON.stringify({ source: 'shortcut-override', id: JSON.parse((event as CustomEvent<string>).detail).id,
+      metadata: { ...metadata, currentMs: 200_000 } }),
+  }))
+  window.addEventListener('shortcut-override:caption-request', respond)
+  try {
+    await createSubtitleNavigation(() => settings, session, vi.fn()).execute('previous', document)
+    expect(seek).toHaveBeenCalledExactlyOnceWith(195_000)
+  } finally { window.removeEventListener('shortcut-override:caption-request', respond) }
+})
+
 it('explains missing subtitle host access and allows retry after granting it', async () => {
   vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 Firefox/156.0')
   let granted = false

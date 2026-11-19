@@ -14,6 +14,7 @@ export type PopupShortcutRow = {
   target: ShortcutTarget
   label: string
   key: KeyBinding | null
+  additionalKeys?: KeyBinding[]
   enabled: boolean
   keywords: string[]
   parentId?: string
@@ -48,7 +49,7 @@ export function getPopupShortcutCategories(settings: ShortcutSettings, locale: L
         const binding = settings.bindings[holdSpeed.parentAction]
         rows.playback.push({
           id: holdSpeed.id, parentId: holdSpeed.parentAction, target: { group: 'general', action: holdSpeed.parentAction },
-          label: copy.holdSpeedRate, displayValue: `${settings.holdSpeed.speed}×`, key: binding.key,
+          label: copy.holdSpeedRate, displayValue: `${settings.holdSpeed.speed}×`, key: binding.key, additionalKeys: binding.additionalKeys,
           enabled: binding.enabled && settings.holdSpeed.enabled,
           keywords: [...searchIndex.holdSpeed, ...searchIndex.general(holdSpeed.parentAction, 'playback')],
         })
@@ -84,4 +85,4 @@ export function getPopupShortcutCategories(settings: ShortcutSettings, locale: L
 }
 
 export const matchesPopupShortcut = (row: PopupShortcutRow, category: ShortcutCategory, categoryLabel: string, query: string) =>
-  matchesShortcutSearch([row.label, row.displayValue ?? '', ...row.keywords, category, categoryLabel], row.key, query)
+  matchesShortcutSearch([row.label, row.displayValue ?? '', ...row.keywords, category, categoryLabel], row, query)

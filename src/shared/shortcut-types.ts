@@ -84,7 +84,10 @@ export type KeyEventLike = {
 
 export type ShortcutBinding = {
   enabled: boolean
+  // Keep the original key field for single-key settings and older backups.
   key: KeyBinding | null
+  // Saved bindings have a primary key before any additional keys; no empty rows.
+  additionalKeys?: KeyBinding[]
 }
 
 export type SpeedSettings = {

@@ -38,14 +38,17 @@ describe('PopupApp', () => {
     vi.restoreAllMocks()
   })
 
-  it('moves frame, intro and episode shortcuts into the navigation category', async () => {
+  it('groups episode shortcuts under Playback and frame and intro shortcuts under navigation', async () => {
     render(<PopupApp />)
     const shortcuts = await getPopupShortcuts()
     expect(within(shortcuts).getByText('Play / Pause')).toBeVisible()
     expect(within(shortcuts).getByText('Fullscreen')).toBeVisible()
     expect(within(shortcuts).queryByText('Previous frame')).not.toBeInTheDocument()
+    expect(within(shortcuts).getByText('Previous episode')).toBeVisible()
+    expect(within(shortcuts).getByText('Next episode')).toBeVisible()
     const navigation = await selectCategory('Seeking and navigation')
-    for (const label of ['Previous frame', 'Next frame', 'Skip intro', 'Previous episode', 'Next episode']) {
+    expect(within(navigation).queryByText('Next episode')).not.toBeInTheDocument()
+    for (const label of ['Previous frame', 'Next frame', 'Skip intro']) {
       expect(within(navigation).getByText(label)).toBeVisible()
     }
     const pair = within(navigation).getByRole('group', { name: 'Forward / Rewind 10 seconds' })
@@ -57,10 +60,25 @@ describe('PopupApp', () => {
     expect(within(navigation).queryByText('Fullscreen')).not.toBeInTheDocument()
   })
 
+  it('shows additional seek keys and finds their modifier aliases', async () => {
+    const settings = structuredClone(DEFAULT_SETTINGS)
+    settings.bindings.seekForward.additionalKeys = [
+      { ...settings.bindings.seekForward.key!, code: 'F20', key: 'F20', meta: true },
+    ]
+    await saveSettings(settings)
+    render(<PopupApp />)
+    const navigation = await selectCategory('Seeking and navigation')
+    const pair = within(navigation).getByRole('group', { name: 'Forward / Rewind 10 seconds' })
+    expect(within(pair).getByText('F20')).toBeVisible()
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'command f20' } })
+    expect(await screen.findByText('F20')).toBeVisible()
+  })
+
   it('opens directly on shortcut reference and keeps preferences in Options', async () => {
     render(<PopupApp />)
     expect(await getPopupShortcuts()).toBeVisible()
     expect(screen.getByRole('searchbox', { name: 'Search actions or keys…' })).toBeVisible()
+    expect(screen.getByRole('searchbox')).toHaveFocus()
     expect(screen.getByText('Play / Pause')).toBeVisible()
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
     expect(screen.getAllByRole('switch')).toHaveLength(1)
@@ -73,7 +91,19 @@ describe('PopupApp', () => {
     expect(screen.getByRole('combobox', { name: 'Other products' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'More' })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Open GitHub repository' })).toHaveAttribute('href', EXTERNAL_LINKS.githubRepository)
+    expect(screen.getByRole('link', { name: 'Open a new GitHub issue' })).toHaveAttribute('href', EXTERNAL_LINKS.githubNewIssue)
     expect(screen.getByRole('link', { name: 'Rate this extension in the extension store' })).toHaveAttribute('href', EXTERNAL_LINKS.shortcutOverrideChromeWebStore)
+  })
+
+  it('keeps focus on the selected control when popup settings update', async () => {
+    render(<PopupApp />)
+    await getPopupShortcuts()
+    expect(screen.getByRole('searchbox')).toHaveFocus()
+    const enabled = screen.getByRole('switch', { name: 'Enable extension' })
+    act(() => enabled.focus())
+    fireEvent.click(enabled)
+    await waitFor(async () => expect((await getSettings()).enabled).toBe(false))
+    expect(enabled).toHaveFocus()
   })
 
   it('shows nested hold speed and keeps its parent when searching, while respecting disabled and hidden state', async () => {
@@ -330,6 +360,7 @@ describe('PopupApp', () => {
     render(<PopupApp />)
     await getPopupShortcuts()
     expect(screen.getByRole('searchbox')).toHaveValue('')
+    expect(screen.getByRole('searchbox')).toHaveFocus()
     expect(screen.getByRole('combobox', { name: 'Shortcut category' })).toHaveTextContent('Playback')
   })
 

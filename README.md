@@ -16,7 +16,7 @@ This is an unofficial extension, not affiliated with, endorsed by, or sponsored 
 
 ![Playback settings with customizable shortcuts, hold-speed controls, and category navigation](docs/assets/options-playback.png)
 
-The Options page in the Neobrutalism style. Classic and Markdown styles are also available, with light, dark, or system brightness.
+The Options page in the Neobrutalism style. Classic is also available, with light, dark, or system brightness.
 
 ## Install
 
@@ -66,6 +66,8 @@ The 23 built-in actions below follow the current Options categories. All playbac
 | Action | Default key | Behavior |
 | --- | --- | --- |
 | Play / Pause | `Space` | Tap to play/pause; hold for temporary speed. |
+| Previous episode | `Ctrl + P` | Use Netflix's episode picker to play the preceding available episode. |
+| Next episode | `Ctrl + N` | Use Netflix's next-episode control or episode picker. |
 | Fullscreen | `F` | Toggle fullscreen on the Netflix page; unavailable inside PiP. |
 | Picture-in-Picture | `Shift + P` | Open/close subtitle-preserving PiP on Chrome/Edge 116+. |
 
@@ -76,8 +78,6 @@ The 23 built-in actions below follow the current Options categories. All playbac
 | Previous frame | `,` | Pause, move back one frame, and remain paused. |
 | Next frame | `.` | Pause, move forward one frame, and remain paused. |
 | Skip intro | `S` | Click a recognized visible Netflix skip button for an intro, recap, or credits. |
-| Previous episode | `Ctrl + P` | Use Netflix's episode picker to play the preceding available episode. |
-| Next episode | `Ctrl + N` | Use Netflix's next-episode control or episode picker. |
 | Forward | `→` | Forward 10 seconds by default; built-in interval: 1–300 seconds. |
 | Rewind | `←` | Rewind by the same interval as Forward. |
 
@@ -122,30 +122,38 @@ These shortcuts operate in the extension interface and are separate from the edi
 | Focus search in Options or the toolbar popup | `⌘ + K` | `Ctrl + K` |
 | Switch Options pages in sidebar order | `⌘ + 1`–`⌘ + 9` | `Ctrl + 1`–`Ctrl + 9` |
 
-In Options, 1–9 select Playback, Seeking and navigation, Subtitles, Volume and audio, Playback speed, General settings, Playback automation, Backup and restore, and User guide. Hold `⌘` / `Ctrl` for about 300 ms to show the sidebar number hints. `Esc` clears search. Category shortcuts are inactive in editing dialogs and during key recording.
+In Options, 1–9 select Playback, Seeking and navigation, Subtitles, Volume and audio, Playback speed, General settings, Playback preferences, Backup and restore, and User guide. Hold `⌘` / `Ctrl` for about 300 ms to show the sidebar number hints. `Esc` clears search. Category shortcuts are inactive in editing dialogs and during key recording.
 
 ## Settings and Customization
 
-Open **User guide** below Backup and restore in the Options sidebar or from the popup footer for searchable, collapsible instructions in all five interface languages. The guide covers playback features and setting operations, shows your current keys (including hidden or disabled features), and links to the corresponding settings.
+Open **User guide** below Backup and restore in the Options sidebar or from the popup footer for searchable, collapsible instructions in all five interface languages. Its 11 concise topics cover four categories: Quick start, Shortcut settings, Backup and recovery, and Permissions and privacy, with links to relevant settings. Feature-specific tips appear beside their controls; see the [detailed user guide](docs/user-guide.md) for the full reference.
 
-Use the Options sidebar to choose a shortcut category, General settings, Playback automation, or Backup and restore. Search settings, action names, language names, or keys across all five interface languages. The toolbar popup provides searchable shortcut reference and compatibility status; **Open settings** opens the corresponding Options page for editing.
+Use the Options sidebar to choose a shortcut category, General settings, Playback preferences, or Backup and restore. Search settings, action names, language names, or keys across all five interface languages. The toolbar popup provides searchable shortcut reference and compatibility status; **Open settings** opens the corresponding Options page for editing.
 
 - **Seeking:** set the built-in or any custom rewind/forward pair to 1–300 seconds, with separate keys for each direction, or add a jump to 0–100% of the video. Older custom intervals above 300 seconds become 300 seconds on upgrade while retaining their keys.
 - **Subtitle size:** edit the default 80% → 100% → 125% cycle with 2–6 different whole percentages from 50–300%, and drag to set their order. 100% restores the original size; this scales captions locally without changing Netflix account preferences. Regular playback and PiP keep their current sizes separately. Previously saved longer cycles are preserved, and fixed-size or extra cycle shortcuts remain editable and removable.
 - **Playback speed:** add preferred-speed shortcuts from `0.25x` to `5x`. Edit each speed and key together; configure hold speed beneath Play / Pause and speed limits and steps on the Playback speed page.
 - **Favorite tracks:** add subtitle languages or audio tracks in batches, then drag to set their switching order. Audio Description tracks are separate choices. Shortcuts skip unavailable favorites; an empty list cycles through all available tracks. Favorites apply when switching with shortcuts and do not automatically select a track when a title opens.
 - **Page features:** use **Manage page features** to hide unused controls and disable their shortcuts while retaining saved keys and values. Showing a feature again enables its shortcuts when their keys are free. You can also clear a key in its editor and save it as **Not set**.
-- **Appearance:** choose Classic, Neobrutalism, or Markdown independently of light/dark mode or the system theme.
+- **Appearance:** choose Classic or Neobrutalism independently of light/dark mode or the system theme. Existing/imported Markdown settings remain active and correctly labeled until you switch away.
 
 Custom seek pairs, percentage jumps, and additional preferred speeds start empty and have no predefined keys; assign them when adding each entry. Hold speed shares the Play / Pause binding. Automatic skipping and next-episode automation use switches rather than additional shortcut keys.
 
-In **Playback automation**, enable Intro, Recap, or Next episode independently. Each clicks the matching Netflix button when it becomes visible. In **General settings**, **Hide pause overlay** hides the paused title, synopsis, and dark backdrop while keeping subtitles and playback controls visible. These options are all off by default.
+In **Playback preferences → Playback automation**, enable Intro, Recap, or Next episode independently. Each clicks the matching Netflix button when it becomes visible. Under **Playback preferences → Pause screen**, **Hide pause overlay** hides the paused title, synopsis, and dark backdrop while keeping subtitles and playback controls visible. These options are all off by default.
 
 ### Editing Keys and Resolving Conflicts
 
-Select a row's pencil, record your key combination, and select **Save**. If another enabled action owns the key, choose a different combination or explicitly transfer it to the edited action; transferring disables its previous owner. Disabled rows retain their keys and release them for reuse. **Clear shortcut** followed by **Save** leaves an action unassigned.
+Select a row's pencil, record your key combination, and select **Save**. Choose **Add shortcut** to keep the existing key and add another, up to three keys per action. Remove keys individually; saving discards empty fields and promotes the first remaining key. Clear or remove every key and save to leave the action unassigned.
 
-Remapping a supported Netflix shortcut such as Play / Pause or Forward suppresses its original Netflix key while that action is enabled. Disabling the action, clearing its key, or turning off the extension lets Netflix handle that original key again.
+If another enabled action owns a key, choose a different combination or explicitly transfer it; transferring disables the previous action and both directions if it belongs to a seek pair. All keys for an action share its enabled state. Disabled rows retain their complete key lists and release them for reuse; Options, popup reference, search and backups include every assigned key.
+
+For episode controls, add `MediaTrackNext` alongside `Ctrl+N` or `MediaTrackPrevious` alongside `Ctrl+P` if the browser delivers that key to the recorder. During playback, assigned track keys also route through browser Media Session controls. Keys consumed by the operating system or browser may not reach the recorder.
+
+Assigned play/pause, stop, fast-forward and rewind keys also accept browser Media Session controls. When assigned to Play / Pause, Play resumes and Pause or Stop pauses, without hold speed. Unassigned controls keep Netflix's behavior. Volume keys still require keyboard events.
+
+Media keys can use Ctrl, Alt, Shift or Command/Win when the browser delivers the full keyboard event. For example, `Ctrl+MediaTrackNext` and `MediaTrackNext` are distinct shortcuts. Paired keyboard/media notifications run only the delivered key combination. Every configured browser-only control waits up to 120ms, then uses the plain-key assignment or Netflix's handler; it never guesses a modifier. Keyboard input selects its exact assignment immediately; older playback may wait for a newer tentative media notification to settle, and unassigned combinations do not trigger a plain-key shortcut even when no modifier binding is configured.
+
+Remapping a supported Netflix shortcut such as Play / Pause or Forward suppresses its original Netflix key only while that action is enabled, has an assigned key, and no longer retains the original key in its list. Disabling the action, clearing all its keys, or turning off the extension releases that suppression.
 
 For example, add a 90-second seek pair, a jump to 50%, or separate `1.25x` and `2x` preferred-speed keys. Custom entries can be edited, disabled, or deleted independently.
 
@@ -208,6 +216,7 @@ Settings use your browser's sync storage. Cross-device sync depends on the brows
 
 Reset controls have different scopes:
 
+- **Restore defaults** in Backup and restore resets all settings after confirmation, including custom shortcuts, favorite tracks, hidden features, language, theme and interface style. Export a backup first if you want to retain your preferences.
 - **Reset general shortcuts** restores all ordinary shortcut keys and enabled states, removes custom seek/preferred-speed/subtitle-size entries, and restores the subtitle-size cycle. Subtitle-navigation keys and other preferences are retained.
 - **Reset subtitle navigation** restores its four rows while retaining its master switch. Default keys already owned by enabled ordinary shortcuts stay disabled.
 - Individual settings have narrower resets, such as only the seek interval, speed range/step, or hold-speed settings. Read the reset description before confirming.

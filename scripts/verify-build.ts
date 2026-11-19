@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
+import { Script } from 'node:vm'
 import packageJson from '../package.json' with { type: 'json' }
 
 for (const browser of ['chromium', 'firefox']) {
@@ -21,6 +22,14 @@ for (const browser of ['chromium', 'firefox']) {
   if (!entry) throw new Error(`${browser}: background loader has no module entry`)
   const workerEntry = resolve(dirname(worker), entry)
   assert.ok(Array.isArray(manifest.content_scripts), `${browser}: missing content scripts`)
+  const mediaBridgePath = 'src/content/media-session-bridge.iife.js'
+  const mediaBridge = manifest.content_scripts.find(script => script.js?.includes(mediaBridgePath))
+  assert.ok(mediaBridge, `${browser}: missing standalone media session bridge`)
+  assert.equal(mediaBridge.world, 'MAIN', `${browser}: media session bridge must run in the page world`)
+  assert.equal(mediaBridge.run_at, 'document_start', `${browser}: media session bridge must run before site registration`)
+  const mediaBridgeSource = readFileSync(resolve(root, mediaBridgePath), 'utf8')
+  assert.doesNotThrow(() => new Script(mediaBridgeSource), `${browser}: media session bridge must be a classic script`)
+  assert.doesNotMatch(mediaBridgeSource, /\bimport\s*\(/, `${browser}: media session bridge cannot use an async loader`)
   const contentScripts: unknown[] = manifest.content_scripts
   const contentEntries = contentScripts.flatMap(script => {
     assert.ok(script && typeof script === 'object' && 'js' in script && Array.isArray(script.js), `${browser}: invalid content script`)

@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { captureShortcutEdit, evaluateShortcutEdit, type ShortcutEditSnapshot } from '@/shared/shortcut-edit'
 import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
 import { DEFAULT_SUBTITLE_SIZE_CYCLE, getSubtitleSizeEditLimit, isSubtitleSizeList, SUBTITLE_SIZE_LIMITS } from '@/shared/subtitle-size-shortcuts'
-import type { KeyBinding, ShortcutAction, ShortcutSettings, SubtitleSizeShortcut, SubtitleSizeShortcutAction } from '@/shared/shortcut-types'
+import type { KeyBinding, ShortcutSettings, SubtitleSizeShortcut, SubtitleSizeShortcutAction } from '@/shared/shortcut-types'
 import type { useShortcutSettingsForm } from '@/shared/use-shortcut-settings-form'
 
 type SizeAction = 'cycleSubtitleSize' | SubtitleSizeShortcutAction
@@ -12,7 +12,8 @@ type SizeDialog = {
   kind: SubtitleSizeShortcut['kind']
   sizes: SizeDraft[]
   key: KeyBinding | null
-  saved: { edit: ShortcutEditSnapshot; sizes: number[]; key: KeyBinding | null }
+  additionalKeys: (KeyBinding | null)[]
+  saved: { edit: ShortcutEditSnapshot; sizes: number[]; key: KeyBinding | null; additionalKeys: KeyBinding[] }
   enableOnSave: boolean
 }
 
@@ -29,8 +30,10 @@ export function useSubtitleSizeEditor({ settings, updateSettings, supportsSubtit
     returnFocus.current = button
     setDialog({ action, kind: builtin ? 'cycle' : entry!.kind,
       sizes: sizeDrafts(builtin ? settings.subtitleSizeCycle : entry!.sizes), key: settings.bindings[action].key,
+      additionalKeys: settings.bindings[action].additionalKeys ?? [],
       saved: { edit: captureShortcutEdit(settings, { kind: 'subtitleSize', action }),
-        sizes: [...(builtin ? settings.subtitleSizeCycle : entry!.sizes)], key: settings.bindings[action].key }, enableOnSave })
+        sizes: [...(builtin ? settings.subtitleSizeCycle : entry!.sizes)], key: settings.bindings[action].key,
+        additionalKeys: settings.bindings[action].additionalKeys ?? [] }, enableOnSave })
   }
   const sizes = dialog?.sizes.map(size => Number(size.value)) ?? []
   const validSizes = Boolean(dialog && dialog.sizes.every(size => size.value.trim()) &&
@@ -38,16 +41,17 @@ export function useSubtitleSizeEditor({ settings, updateSettings, supportsSubtit
     (dialog.kind !== 'fixed' || sizes.length === 1))
   const evaluate = (current: ShortcutSettings, draft: SizeDialog) => evaluateShortcutEdit(current, {
     snapshot: draft.saved.edit, keys: { [draft.action]: draft.key },
+    additionalKeys: { [draft.action]: draft.additionalKeys },
     value: draft.sizes.map(size => Number(size.value)), enabled: draft.enableOnSave ? true : 'preserve',
   }, supportsSubtitlePreservingPip)
   const evaluation = dialog ? evaluate(settings, dialog) : null
   const stale = evaluation?.stale ?? false
-  const conflict = evaluation?.analysis.conflicts[0] as ShortcutAction | undefined
+  const keyConflicts = dialog ? evaluation?.analysis.keyConflicts[dialog.action] : undefined
   const storageFull = validSizes && (evaluation?.storageFull ?? false)
   const canSave = validSizes && (evaluation?.canSave ?? false)
 
   return {
-    dialog, validSizes, stale, conflict, storageFull, canSave,
+    dialog, validSizes, stale, keyConflicts, storageFull, canSave,
     open,
     setSize: (id: number, value: string) => setDialog(current => current && { ...current,
       sizes: current.sizes.map(size => size.id === id ? { ...size, value } : size) }),
@@ -69,11 +73,12 @@ export function useSubtitleSizeEditor({ settings, updateSettings, supportsSubtit
     removeSize: (id: number) => setDialog(current => current && current.sizes.length > 2
       ? { ...current, sizes: current.sizes.filter(size => size.id !== id) } : current),
     capture: (key: KeyBinding | null) => setDialog(current => current && { ...current, key }),
+    captureKeys: (keys: (KeyBinding | null)[]) => setDialog(current => current && { ...current, key: keys[0] ?? null, additionalKeys: keys.slice(1) }),
     restore: () => setDialog(current => {
       if (!current) return null
       if (current.action === 'cycleSubtitleSize') return { ...current, sizes: sizeDrafts(DEFAULT_SUBTITLE_SIZE_CYCLE),
-        key: DEFAULT_SETTINGS.bindings.cycleSubtitleSize.key }
-      return { ...current, sizes: sizeDrafts(current.saved.sizes), key: current.saved.key }
+        key: DEFAULT_SETTINGS.bindings.cycleSubtitleSize.key, additionalKeys: [] }
+      return { ...current, sizes: sizeDrafts(current.saved.sizes), key: current.saved.key, additionalKeys: current.saved.additionalKeys }
     }),
     close: () => setDialog(null),
     restoreFocus: (event: Event) => {
