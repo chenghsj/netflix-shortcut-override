@@ -48,6 +48,18 @@ export type SubtitleMirrorOptions = {
 const getSubtitleStyle = (element: HTMLElement): CSSStyleDeclaration | null =>
   element.ownerDocument.defaultView?.getComputedStyle(element) ?? null
 
+const isHiddenVisibility = (visibility: string | undefined): boolean =>
+  visibility === 'hidden' || visibility === 'collapse'
+
+const isHiddenSubtitleElement = (
+  element: HTMLElement,
+  style: CSSStyleDeclaration | null,
+  sourceVisibilityHidden = false,
+): boolean =>
+  element.hasAttribute('hidden') || style?.display === 'none' || style?.opacity === '0' ||
+  isHiddenVisibility(element.style.visibility) ||
+  (!sourceVisibilityHidden && isHiddenVisibility(style?.visibility))
+
 const SUBTITLE_STYLE_PROPERTIES = [
   'color',
   'font-family',
@@ -348,29 +360,35 @@ const getPercentage = (value: string | undefined): number | null => {
   return match ? Number(match[1]) : null
 }
 
-const getSubtitleBottom = (controlsVisible: boolean, scale: number): string => {
-  if (!controlsVisible) return DEFAULT_PIP_SUBTITLE_BOTTOM
-
-  const sourcePixels = Number(
-    (CONTROLS_VISIBLE_SUBTITLE_CLEARANCE_PX / Math.max(scale, 0.001)).toFixed(3)
-  )
-  return `calc(${DEFAULT_PIP_SUBTITLE_BOTTOM} + ${sourcePixels}px)`
+type PositionedSubtitle = {
+  element: HTMLElement
+  sourceTop: number
+  sourceHeight: number
 }
 
-const stabilizeSubtitlePosition = (
+const prepareSubtitlePosition = (
   source: HTMLElement,
-  inner: HTMLElement,
-  subtitleBottom: string
-): void => {
+  inner: HTMLElement
+): Map<Element, PositionedSubtitle[]> => {
   const sourceElements = source.querySelectorAll<HTMLElement>('*')
   const mirroredElements = inner.querySelectorAll<HTMLElement>('*')
   const sourceFrameRect = source.getBoundingClientRect()
+  // Netflix can hide the whole subtitle source while PiP still needs its cues.
+  const sourceVisibilityHidden = isHiddenVisibility(getSubtitleStyle(source)?.visibility)
+  const sourcePixelsPerRenderedPixel = source.offsetWidth && sourceFrameRect.width
+    ? source.offsetWidth / sourceFrameRect.width
+    : 1
+  const groups = new Map<Element, PositionedSubtitle[]>()
 
   for (const [index, mirroredElement] of mirroredElements.entries()) {
     const sourceElement = sourceElements[index]
-    if (!sourceElement) continue
+    if (!sourceElement || !inner.contains(mirroredElement)) continue
 
     const sourceStyle = getSubtitleStyle(sourceElement)
+    if (isHiddenSubtitleElement(sourceElement, sourceStyle, sourceVisibilityHidden)) {
+      mirroredElement.remove()
+      continue
+    }
     if (sourceStyle?.position !== 'absolute' && sourceStyle?.position !== 'fixed') continue
 
     Object.assign(mirroredElement.style, {
@@ -383,29 +401,62 @@ const stabilizeSubtitlePosition = (
       textAlign: 'center',
     })
 
+    const sourceRect = sourceElement.getBoundingClientRect()
     const topPercentage =
       getPercentage(sourceElement.style.top || sourceStyle?.top) ??
       (sourceFrameRect.height > 0
-        ? ((sourceElement.getBoundingClientRect().top - sourceFrameRect.top) /
-            sourceFrameRect.height) *
-          100
+        ? ((sourceRect.top - sourceFrameRect.top) / sourceFrameRect.height) * 100
         : null)
     if (topPercentage === null || topPercentage < 50) continue
 
-    Object.assign(mirroredElement.style, {
-      top: 'auto',
-      bottom: subtitleBottom,
+    // Measure the row at its final anchoring so top and bottom cannot stretch it.
+    mirroredElement.style.top = 'auto'
+    mirroredElement.style.bottom = DEFAULT_PIP_SUBTITLE_BOTTOM
+    const frame = sourceElement.offsetParent
+    const containingBlock = frame && source.contains(frame) ? frame : source
+    const group = groups.get(containingBlock) ?? []
+    const sourceTop = sourceRect.height > 0
+      ? sourceRect.top - sourceFrameRect.top
+      : sourceFrameRect.height * topPercentage / 100
+    group.push({
+      element: mirroredElement,
+      sourceTop: sourceTop * sourcePixelsPerRenderedPixel,
+      sourceHeight: sourceRect.height * sourcePixelsPerRenderedPixel,
     })
+    groups.set(containingBlock, group)
+  }
+
+  return groups
+}
+
+const positionLowerSubtitles = (
+  groups: Map<Element, PositionedSubtitle[]>,
+  controlClearance: number
+): void => {
+  for (const group of groups.values()) {
+    group.sort((first, second) => first.sourceTop - second.sourceTop)
+    const heights = group.map(({ element, sourceHeight }) => element.offsetHeight || sourceHeight)
+    let offset = controlClearance
+
+    for (let index = group.length - 1; index >= 0; index -= 1) {
+      const { element, sourceTop } = group[index]
+      const pixels = Number(offset.toFixed(3))
+      element.style.bottom = pixels > 0
+        ? `calc(${DEFAULT_PIP_SUBTITLE_BOTTOM} + ${pixels}px)`
+        : DEFAULT_PIP_SUBTITLE_BOTTOM
+
+      const above = group[index - 1]
+      if (above) {
+        // Use the PiP row height so larger fonts and wrapped lines get enough room.
+        const sourceGap = Math.max(0, sourceTop - (above.sourceTop + above.sourceHeight))
+        offset += heights[index] + sourceGap
+      }
+    }
   }
 }
 
 const hasVisibleSubtitle = (element: HTMLElement): boolean => {
-  const style = getSubtitleStyle(element)
-  if (style?.display === 'none' || style?.visibility === 'hidden' || style?.opacity === '0') {
-    return false
-  }
-
-  return Boolean(element.textContent?.trim())
+  return !isHiddenSubtitleElement(element, getSubtitleStyle(element)) && hasSubtitleText(element)
 }
 
 const hasSubtitleText = (element: HTMLElement): boolean => Boolean(element.textContent?.trim())
@@ -540,7 +591,7 @@ export class SubtitleMirror {
     })
     this.rootObserver.observe(this.searchRoot, {
       attributes: true,
-      attributeFilter: ['class', 'data-uia', 'style', 'aria-hidden'],
+      attributeFilter: ['class', 'data-uia', 'style', 'aria-hidden', 'hidden'],
       childList: true,
       subtree: true,
     })
@@ -634,7 +685,7 @@ export class SubtitleMirror {
       this.sourceObserver = new MutationObserver(() => this.scheduleSync())
       this.sourceObserver.observe(nextSource, {
         attributes: true,
-        attributeFilter: ['class', 'style', 'dir', 'lang'],
+        attributeFilter: ['class', 'style', 'dir', 'lang', 'hidden'],
         childList: true,
         subtree: true,
         characterData: true,
@@ -712,7 +763,7 @@ export class SubtitleMirror {
       sourceHeight
     )
     const scale = Math.min(contentRect.width / sourceWidth, contentRect.height / sourceHeight)
-    stabilizeSubtitlePosition(source, inner, getSubtitleBottom(this.controlsVisible, scale))
+    const lowerSubtitles = prepareSubtitlePosition(source, inner)
     applySubtitleBackground(inner, this.subtitleBackground)
     const renderedWidth = sourceWidth * scale
     const renderedHeight = sourceHeight * scale
@@ -744,7 +795,11 @@ export class SubtitleMirror {
       opacity: '1',
     })
     inner.style.isolation = 'isolate'
+    const controlClearance = this.controlsVisible
+      ? CONTROLS_VISIBLE_SUBTITLE_CLEARANCE_PX / Math.max(scale, 0.001)
+      : 0
+    positionLowerSubtitles(lowerSubtitles, controlClearance)
     renderSubtitleBackgroundShape(inner, this.subtitleBackground, scale)
-    mirror.style.visibility = hasSubtitleText(source) ? 'visible' : 'hidden'
+    mirror.style.visibility = hasSubtitleText(inner) ? 'visible' : 'hidden'
   }
 }

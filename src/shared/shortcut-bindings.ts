@@ -28,15 +28,15 @@ export const DEFAULT_KEY_BINDINGS: Record<BuiltinShortcutAction, KeyBinding> = {
   fullscreen: { code: 'KeyF', key: 'f', ctrl: false, alt: false, shift: false, meta: false },
   pictureInPicture: {
     code: 'KeyP',
-    key: 'P',
+    key: 'p',
     ctrl: false,
     alt: false,
-    shift: true,
+    shift: false,
     meta: false,
   },
   skipIntro: { code: 'KeyS', key: 's', ctrl: false, alt: false, shift: false, meta: false },
-  previousEpisode: { code: 'KeyP', key: 'p', ctrl: true, alt: false, shift: false, meta: false },
-  nextEpisode: { code: 'KeyN', key: 'n', ctrl: true, alt: false, shift: false, meta: false },
+  previousEpisode: { code: 'KeyP', key: 'P', ctrl: false, alt: false, shift: true, meta: false },
+  nextEpisode: { code: 'KeyN', key: 'N', ctrl: false, alt: false, shift: true, meta: false },
   speedUp: { code: 'Period', key: '>', ctrl: false, alt: false, shift: true, meta: false },
   speedDown: { code: 'Comma', key: '<', ctrl: false, alt: false, shift: true, meta: false },
   setPreferredSpeed: {
@@ -98,9 +98,41 @@ export const isKeyBinding = (value: unknown): value is KeyBinding => {
 export const isShortcutKey = (value: unknown): value is KeyBinding | null =>
   value === null || isKeyBinding(value)
 
+const NON_LATIN_KEY_TEXT = /^(?![\p{Script_Extensions=Latin}0-9])[\p{Letter}\p{Mark}\p{Decimal_Number}]/u
+const LOCALIZED_PUNCTUATION = /^(?:(?!\p{ASCII})\p{Punctuation}|[！-～])$/u
+
+const US_PUNCTUATION_KEYS = new Map<string, readonly [plain: string, shifted: string]>([
+  ['Backquote', ['`', '~']],
+  ['Minus', ['-', '_']],
+  ['Equal', ['=', '+']],
+  ['BracketLeft', ['[', '{']],
+  ['BracketRight', [']', '}']],
+  ['Backslash', ['\\', '|']],
+  ['Semicolon', [';', ':']],
+  ['Quote', ["'", '"']],
+  ['Comma', [',', '<']],
+  ['Period', ['.', '>']],
+  ['Slash', ['/', '?']],
+])
+
+const normalizeShortcutKey = (code: string, key: string, shift: boolean): string => {
+  const punctuation = US_PUNCTUATION_KEYS.get(code)
+  if (!punctuation && !/^(?:Key[A-Z]|Digit[0-9])$/.test(code)) return key
+  if (/^[Ａ-Ｚａ-ｚ０-９]$/u.test(key)) return key.normalize('NFKC')
+
+  const needsPunctuationFallback = punctuation && (key === 'Dead' || LOCALIZED_PUNCTUATION.test(key))
+  // Zhuyin tone marks also occur outside the Bopomofo script.
+  if (key && key !== 'Process' && key !== 'Unidentified' &&
+    !NON_LATIN_KEY_TEXT.test(key) && !/^[ˇˊˋ˙]$/.test(key) && !needsPunctuationFallback) return key
+
+  if (punctuation) return punctuation[shift ? 1 : 0]
+  const physicalKey = code.slice(-1)
+  return shift ? physicalKey : physicalKey.toLowerCase()
+}
+
 export const keyBindingFromEvent = (event: KeyEventLike): KeyBinding => ({
   code: getShortcutKeyCode(event),
-  key: event.key,
+  key: normalizeShortcutKey(event.code, event.key, event.shiftKey),
   ctrl: event.ctrlKey,
   alt: event.altKey,
   shift: event.shiftKey,
@@ -255,7 +287,7 @@ export const getKeyBindingLabels = (
     binding.alt ? 'Alt' : null,
     binding.shift ? 'Shift' : null,
     binding.meta ? getMetaKeyLabel(options.platform) : null,
-    CODE_LABELS[binding.code] ?? binding.key.toUpperCase(),
+    CODE_LABELS[binding.code] ?? normalizeShortcutKey(binding.code, binding.key, binding.shift).toUpperCase(),
   ]
 
   return labels.filter((label): label is string => Boolean(label))

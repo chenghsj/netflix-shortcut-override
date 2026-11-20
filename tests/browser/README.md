@@ -24,7 +24,7 @@ BrowserBack/BrowserForward recording, routing, cancellation and repeat/disabled/
 
 ## Multiple keys per action
 
-On `/tests/browser/media-keys.html`, choose **Run multiple shortcut checks**. `#result[data-state="passed"]` must report `pass: true`, `count: 5`. It uses the production modal to add MediaTrackNext beside Ctrl+N, save, reopen and route both keys in English, Traditional Chinese, Simplified Chinese, Japanese and Korean. It restores the prior development-page settings. These events are simulated and do not prove physical media-key delivery. The fixture imports the production stylesheet for layout inspection.
+On `/tests/browser/media-keys.html`, choose **Run multiple shortcut checks**. `#result[data-state="passed"]` must report `pass: true`, `count: 5`. It uses the production modal to add MediaTrackNext beside Shift+N, save, reopen and route both keys in English, Traditional Chinese, Simplified Chinese, Japanese and Korean. It restores the prior development-page settings. These events are simulated and do not prove physical media-key delivery. The fixture imports the production stylesheet for layout inspection.
 
 ## Browser media-control routing
 

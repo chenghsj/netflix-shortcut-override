@@ -571,6 +571,110 @@ describe('SubtitleMirror', () => {
     mirror.destroy()
   })
 
+  it('keeps independently positioned lower subtitles apart above the PiP controls', async () => {
+    const pipWindow = iframe.contentWindow
+    if (!pipWindow) throw new Error('Expected PiP window')
+    const player = document.createElement('div')
+    const video = document.createElement('video')
+    const subtitle = document.createElement('div')
+    subtitle.className = 'player-timedtext'
+    subtitle.getBoundingClientRect = () => new DOMRect(0, 0, 800, 450)
+    subtitle.innerHTML = `
+      <div class="player-timedtext-text-container" style="position:absolute; top:75%; font-size:20px">First line</div>
+      <div class="player-timedtext-text-container" style="position:absolute; top:82%; bottom:0px; font-size:20px">Second line</div>
+    `
+    const [first, second] = subtitle.querySelectorAll('div')
+    first.getBoundingClientRect = () => new DOMRect(320, 337.5, 160, 20)
+    second.getBoundingClientRect = () => new DOMRect(280, 369, 240, 81)
+    player.append(video, subtitle)
+    document.body.append(player)
+
+    const videoArea = pipWindow.document.createElement('div')
+    Object.defineProperties(videoArea, {
+      clientWidth: { configurable: true, value: 640 },
+      clientHeight: { configurable: true, value: 360 },
+    })
+    pipWindow.document.body.append(videoArea)
+    const rowHeight = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function (this: HTMLElement) {
+      if (this.style.top === '82%' && this.style.bottom === '0px') return 81
+      return Number.parseFloat(this.style.fontSize) || 0
+    })
+
+    const mirror = new SubtitleMirror({ sourceDocument: document, searchRoot: player, pipWindow, video, videoArea })
+    const getBottoms = () => Array.from(
+      videoArea.querySelectorAll<HTMLElement>('.player-timedtext-text-container'),
+      element => element.style.bottom,
+    )
+
+    try {
+      mirror.start()
+      await flushFrames(window, pipWindow)
+      expect(getBottoms()).toEqual(['calc(8% + 31.5px)', '8%'])
+
+      mirror.setControlsVisible(true)
+      await flushFrames(window, pipWindow)
+      expect(getBottoms()).toEqual(['calc(8% + 76.5px)', 'calc(8% + 45px)'])
+
+      mirror.setSettings({ subtitlesEnabled: true, subtitleSize: 'large', subtitleBackground: 'translucent' })
+      await flushFrames(window, pipWindow)
+      expect(getBottoms()).toEqual(['calc(8% + 81.5px)', 'calc(8% + 45px)'])
+      expect(first.style.top).toBe('75%')
+      expect(second.style.top).toBe('82%')
+    } finally {
+      mirror.destroy()
+      rowHeight.mockRestore()
+    }
+  })
+
+  it('removes hidden cue branches and relays changes to the hidden attribute', async () => {
+    const pipWindow = iframe.contentWindow
+    if (!pipWindow) throw new Error('Expected PiP window')
+    const player = document.createElement('div')
+    const video = document.createElement('video')
+    const subtitle = document.createElement('div')
+    subtitle.className = 'player-timedtext'
+    subtitle.getBoundingClientRect = () => new DOMRect(0, 0, 800, 450)
+    subtitle.innerHTML = `
+      <div class="first-cue" style="position:absolute; top:75%">First line</div>
+      <div class="second-cue" hidden style="position:absolute; top:95%">Second line</div>
+      <div style="display:none"><div style="position:absolute; top:97%">Obsolete line</div></div>
+    `
+    const first = subtitle.querySelector<HTMLElement>('.first-cue')!
+    const second = subtitle.querySelector<HTMLElement>('.second-cue')!
+    first.getBoundingClientRect = () => new DOMRect(320, 337.5, 160, 20)
+    second.getBoundingClientRect = () => second.hidden ? new DOMRect() : new DOMRect(320, 427.5, 160, 20)
+    player.append(video, subtitle)
+    document.body.append(player)
+
+    const videoArea = pipWindow.document.createElement('div')
+    pipWindow.document.body.append(videoArea)
+    const mirror = new SubtitleMirror({ sourceDocument: document, searchRoot: player, pipWindow, video, videoArea })
+    const firstBottom = () => videoArea.querySelector<HTMLElement>('.first-cue')?.style.bottom
+
+    try {
+      mirror.start()
+      await flushFrames(window, pipWindow)
+      expect(firstBottom()).toBe('8%')
+      expect(videoArea).not.toHaveTextContent(/Second line|Obsolete line/)
+
+      second.hidden = false
+      await flushFrames(window, pipWindow)
+      expect(firstBottom()).toBe('calc(8% + 90px)')
+      expect(videoArea).toHaveTextContent('Second line')
+
+      second.hidden = true
+      await flushFrames(window, pipWindow)
+      expect(firstBottom()).toBe('8%')
+      expect(videoArea).not.toHaveTextContent('Second line')
+
+      subtitle.style.visibility = 'hidden'
+      await flushFrames(window, pipWindow)
+      expect(videoArea).toHaveTextContent('First line')
+    } finally {
+      mirror.destroy()
+    }
+  })
+
   it('keeps a lower subtitle centered after reducing its font size', async () => {
     const pipWindow = iframe.contentWindow
     if (!pipWindow) throw new Error('Expected PiP window')

@@ -121,7 +121,7 @@ describe('custom seeking', () => {
     expect(migrated.bindings['seek:old-backward']).toEqual({ ...saved, enabled: false })
   })
 
-  it('migrates v21 without stealing an existing Ctrl+N or Ctrl+P assignment', () => {
+  it('migrates v21 without stealing an existing Shift+N or Shift+P assignment', () => {
     const settings = customSettings()
     settings.subtitleNavigation = legacySubtitleNavigation()
     const { nextEpisode, previousEpisode, ...bindings } = settings.bindings

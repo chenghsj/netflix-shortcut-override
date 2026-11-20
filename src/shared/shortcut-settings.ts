@@ -1,3 +1,4 @@
+import { getBrowserCapabilities, isShortcutSupported } from './browser-capabilities'
 import { DEFAULT_SUBTITLE_SIZE_CYCLE, isSubtitleSize, isSubtitleSizeList, isSubtitleSizeShortcut } from './subtitle-size-shortcuts'
 import { isPreferredSpeedShortcut, PREFERRED_SPEED_LIMITS } from './preferred-speed-shortcuts'
 import { getFeatureGroupActions, MANAGED_FEATURE_GROUPS, MANAGED_FAVORITES_FEATURES, type ManagedFeatureGroup, type ManagedFavoritesFeature } from './feature-management'
@@ -124,7 +125,7 @@ const SETTINGS_ACTIONS_BY_VERSION: Record<number, readonly ShortcutAction[]> = {
   33: SHORTCUT_ACTIONS,
 }
 
-const LEGACY_PICTURE_IN_PICTURE_BINDING = {
+export const LEGACY_PICTURE_IN_PICTURE_BINDING = {
   code: 'KeyW',
   key: 'W',
   ctrl: false,
@@ -397,7 +398,8 @@ const hasMigratedDefaultConflict = (
   sourceVersion: number,
   rawBindings: RawShortcutBindings,
   subtitleBindings: Partial<SubtitleNavigationSettings['bindings']> | undefined,
-  key: KeyBinding | null
+  key: KeyBinding | null,
+  supportsSubtitlePreservingPip: boolean,
 ): boolean => {
   if (rawBindings[action] !== undefined) return false
   const migration = SHORTCUT_BINDING_MIGRATIONS[action]
@@ -405,8 +407,11 @@ const hasMigratedDefaultConflict = (
   const introducesBinding = sourceVersion < migration.introducedIn
   if (!introducesBinding) return false
 
+  const supportedBindings = Object.entries(rawBindings)
+    .filter(([candidate]) => isShortcutSupported(candidate as ShortcutAction, supportsSubtitlePreservingPip))
+    .map(([, binding]) => binding)
   // Preserve the older migrations' treatment of disabled saved bindings.
-  return [...Object.values(rawBindings), ...Object.values(subtitleBindings ?? {})].some(candidate => {
+  return [...supportedBindings, ...Object.values(subtitleBindings ?? {})].some(candidate => {
     if (migration.ignoreDisabledBindings && candidate?.enabled === false) return false
     if (!isKeyBinding(candidate?.key)) return false
     return bindingMatchesKey({ key: candidate.key, ...normalizedAdditionalKeys(candidate, candidate.key) }, key)
@@ -427,12 +432,15 @@ export const normalizeSettings = (raw: unknown): ShortcutSettings => {
       ? (source.bindings as RawShortcutBindings)
       : {}
   const legacySpeed = source.speed as Partial<SpeedSettings & { hold?: unknown }> | undefined
+  const { supportsSubtitlePreservingPip } = getBrowserCapabilities()
 
   const bindings = Object.fromEntries(
     SHORTCUT_ACTIONS.map(action => {
       const rawBinding = rawBindings[action]
       const key = resolveBindingKey(action, rawBinding?.key, sourceVersion)
-      const migratedDefaultConflicts = hasMigratedDefaultConflict(action, sourceVersion, rawBindings, subtitleNavigation?.bindings, key)
+      const migratedDefaultConflicts = hasMigratedDefaultConflict(
+        action, sourceVersion, rawBindings, subtitleNavigation?.bindings, key, supportsSubtitlePreservingPip,
+      )
       const savedEnabled = typeof rawBinding?.enabled === 'boolean'
         ? rawBinding.enabled
         : DEFAULT_SETTINGS.bindings[action].enabled

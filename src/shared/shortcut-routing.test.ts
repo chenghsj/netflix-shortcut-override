@@ -154,7 +154,7 @@ describe('shortcut routing', () => {
 
   it('routes edited subtitle keys and releases individually disabled keys', () => {
     const settings = overlappingSettings()
-    settings.subtitleNavigation.bindings.next.key = { code: 'KeyN', key: 'n', ctrl: false, alt: false, shift: true, meta: false }
+    settings.subtitleNavigation.bindings.next.key = { code: 'KeyJ', key: 'J', ctrl: false, alt: false, shift: true, meta: false }
     expect(resolvePlaybackShortcut(settings, eventFor(settings.subtitleNavigation.bindings.next.key), true)).toMatchObject({ action: 'next' })
     expect(resolvePlaybackShortcut(settings, eventFor(DEFAULT_SETTINGS.subtitleNavigation.bindings.next.key), true)).toBeNull()
     settings.subtitleNavigation.bindings.next.enabled = false

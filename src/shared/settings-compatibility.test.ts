@@ -20,8 +20,27 @@ const addedActions: BuiltinShortcutAction[] = [
 ]
 
 describe('upgrading existing subtitle keys', () => {
+  it('enables the new Previous episode default when Firefox upgrades or imports legacy PiP settings', async () => {
+    const browser = vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 Firefox/128.0')
+    try {
+      await setSync({ [SETTINGS_STORAGE_KEY]: legacy.settings })
+      const expected = {
+        bindings: {
+          previousEpisode: DEFAULT_SETTINGS.bindings.previousEpisode,
+          pictureInPicture: legacy.settings.bindings.pictureInPicture,
+        },
+      }
+      expect(await getSettings()).toMatchObject(expected)
+      expect(parseSettingsBackup(JSON.stringify(legacy.backup)))
+        .toMatchObject({ ok: true, value: { settings: expected } })
+    } finally {
+      browser.mockRestore()
+    }
+  })
+
   it.each(addedActions)('preserves saved general keys and disabled masters when introducing %s', async action => {
     const raw = structuredClone(legacy.settings)
+    raw.bindings.pictureInPicture.key = { ...DEFAULT_SETTINGS.bindings.pictureInPicture.key }
     raw.enabled = false
     raw.bindings.mute.key = { ...DEFAULT_SETTINGS.bindings[action].key }
     await setSync({ [SETTINGS_STORAGE_KEY]: raw })
@@ -38,6 +57,7 @@ describe('upgrading existing subtitle keys', () => {
 
   it.each(addedActions)('does not let %s take an enabled subtitle key during upgrade or import', async action => {
     const raw = structuredClone(legacy.settings)
+    raw.bindings.pictureInPicture.key = { ...DEFAULT_SETTINGS.bindings.pictureInPicture.key }
     const key = DEFAULT_SETTINGS.bindings[action].key
     raw.subtitleNavigation.enabled = true
     raw.subtitleNavigation.bindings.previous.key = { ...key }
@@ -86,6 +106,86 @@ const currentPreferences = (): ShortcutSettings => {
 }
 
 describe('settings shared with older clients', () => {
+  it('keeps both Previous episode keys active when a legacy Firefox client syncs its PiP key', async () => {
+    const browser = vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 Firefox/128.0')
+    try {
+      const current = structuredClone(DEFAULT_SETTINGS)
+      const mediaKey = { code: 'MediaTrackPrevious', key: 'MediaTrackPrevious', ctrl: false, alt: false, shift: false, meta: false }
+      current.bindings.previousEpisode.additionalKeys = [mediaKey]
+      await saveSettings(current)
+
+      const oldWrite = { ...structuredClone(legacy.settings), theme: 'dark' }
+      await setSync({ [SETTINGS_STORAGE_KEY]: oldWrite })
+      const recovered = await getSettings()
+      expect(recovered.theme).toBe('dark')
+      expect(recovered.bindings.previousEpisode).toEqual(current.bindings.previousEpisode)
+      expect(recovered.bindings.pictureInPicture).toEqual(oldWrite.bindings.pictureInPicture)
+      for (const binding of [current.bindings.previousEpisode.key, mediaKey]) {
+        expect(resolvePlaybackShortcut(recovered, {
+          code: binding.code, key: binding.key,
+          ctrlKey: binding.ctrl, altKey: binding.alt, shiftKey: binding.shift, metaKey: binding.meta,
+        }, false)).toEqual({ group: 'general', action: 'previousEpisode', supported: true })
+      }
+    } finally {
+      browser.mockRestore()
+    }
+  })
+
+  it('preserves saved beta.3 episode, media, and PiP shortcuts on load and backup import', async () => {
+    const saved = structuredClone(DEFAULT_SETTINGS)
+    saved.bindings.previousEpisode.key = { code: 'KeyP', key: 'p', ctrl: true, alt: false, shift: false, meta: false }
+    saved.bindings.nextEpisode.key = { code: 'KeyN', key: 'n', ctrl: true, alt: false, shift: false, meta: false }
+    saved.bindings.nextEpisode.additionalKeys = [
+      { code: 'MediaTrackNext', key: 'MediaTrackNext', ctrl: false, alt: false, shift: false, meta: false },
+    ]
+    saved.bindings.pictureInPicture.key = { code: 'KeyP', key: 'P', ctrl: false, alt: false, shift: true, meta: false }
+    await setSync({ [SETTINGS_STORAGE_KEY]: saved })
+
+    expect((await getSettings()).bindings).toEqual(saved.bindings)
+    expect(parseSettingsBackup(JSON.stringify(createSettingsBackup(saved, { extensionVersion: '0.6.9' }))))
+      .toMatchObject({ ok: true, value: { settings: { bindings: saved.bindings } } })
+  })
+
+  it.each([
+    { client: 'v0.6.8', version: legacy.settings.version, key: legacy.settings.bindings.pictureInPicture.key },
+    { client: 'schema v1', version: 1, key: { ...legacy.settings.bindings.pictureInPicture.key, code: 'KeyW', key: 'W' } },
+  ])('keeps PiP unassigned after $client syncs its historical default', async ({ version, key }) => {
+    const current: ShortcutSettings = structuredClone(DEFAULT_SETTINGS)
+    current.bindings.pictureInPicture.key = null
+    await saveSettings(current)
+
+    const oldWrite = { ...structuredClone(legacy.settings), version, theme: 'dark' }
+    oldWrite.bindings.pictureInPicture.key = { ...key }
+    await setSync({ [SETTINGS_STORAGE_KEY]: oldWrite })
+    expect(await getSettings()).toMatchObject({
+      theme: 'dark',
+      bindings: {
+        pictureInPicture: { enabled: true, key: null },
+        previousEpisode: current.bindings.previousEpisode,
+      },
+    })
+
+    oldWrite.bindings.pictureInPicture.key = { ...DEFAULT_SETTINGS.bindings.pictureInPicture.key }
+    await setSync({ [SETTINGS_STORAGE_KEY]: oldWrite })
+    expect((await getSettings()).bindings.pictureInPicture).toEqual(oldWrite.bindings.pictureInPicture)
+  })
+
+  it('keeps cleared episode shortcuts unassigned after schema v26 syncs its historical defaults', async () => {
+    const current: ShortcutSettings = structuredClone(DEFAULT_SETTINGS)
+    current.bindings.previousEpisode.key = null
+    current.bindings.nextEpisode.key = null
+    await saveSettings(current)
+
+    const oldWrite = { ...structuredClone(DEFAULT_SETTINGS), version: 26 }
+    oldWrite.bindings.previousEpisode.key = { code: 'KeyP', key: 'p', ctrl: true, alt: false, shift: false, meta: false }
+    oldWrite.bindings.nextEpisode.key = { code: 'KeyN', key: 'n', ctrl: true, alt: false, shift: false, meta: false }
+    await setSync({ [SETTINGS_STORAGE_KEY]: oldWrite })
+
+    const { bindings } = await getSettings()
+    expect(bindings.previousEpisode).toEqual(current.bindings.previousEpisode)
+    expect(bindings.nextEpisode).toEqual(current.bindings.nextEpisode)
+  })
+
   it('recovers additional shortcuts after beta.2 writes both of its sync records', async () => {
     const current = structuredClone(DEFAULT_SETTINGS)
     const mediaKey = { code: 'MediaTrackNext', key: 'MediaTrackNext', ctrl: false, alt: false, shift: false, meta: false }
@@ -301,6 +401,7 @@ describe('settings shared with older clients', () => {
       bindings: {
         ...oldWrite.bindings,
         ...Object.fromEntries(addedActions.map(action => [action, settings.bindings[action]])),
+        previousEpisode: { ...settings.bindings.previousEpisode, enabled: false },
         playPause: { ...oldWrite.bindings.playPause, key: null },
         'seek:kept': settings.bindings['seek:kept'],
         'subtitle-size:kept': settings.bindings['subtitle-size:kept'],

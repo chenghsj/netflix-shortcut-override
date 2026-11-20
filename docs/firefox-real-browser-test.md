@@ -31,7 +31,7 @@ Open a Netflix watch page and check the ordinary shortcuts; enabling Subtitle na
 - Run the [Restore defaults checklist](chrome-real-browser-test.md#restore-all-defaults) and [paused subtitle selection/display checks](chrome-real-browser-test.md#paused-subtitle-selection-and-display) without PiP. Export and restore the original settings and playback state. These checklists add no claim of a completed Firefox run.
 - The Picture-in-Picture row is visible but disabled and marked unsupported.
 - Run the [disabled-key reuse and conflict popover checklist](chrome-real-browser-test.md#disabled-key-reuse-and-conflict-popover) in both shortcut tables. Unsupported Picture-in-Picture must not block key reuse. Verify cancellation, focus return, editing, transfer, and single-row reset before restoring original settings.
-- Press `Shift+P`; Firefox receives the shortcut without an extension hint or intercepted action.
+- Press `P`; Firefox receives the shortcut without an extension hint or intercepted action.
 
 ### Local frame idle-overlay check, 2026-11-15
 

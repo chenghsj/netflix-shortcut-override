@@ -48,7 +48,59 @@ describe('shortcut bindings', () => {
 
   it('preserves actual physical codes, including media keys sharing function keys', () => {
     expect(keyBindingFromEvent(new KeyboardEvent('keydown', { code: 'F8', key: 'MediaPlayPause' })).code).toBe('F8')
-    expect(keyBindingFromEvent(new KeyboardEvent('keydown', { code: 'KeyQ', key: 'a' })).code).toBe('KeyQ')
+    const azerty = keyBindingFromEvent(new KeyboardEvent('keydown', { code: 'KeyQ', key: 'a' }))
+    expect(azerty).toMatchObject({ code: 'KeyQ', key: 'a' })
+    expect(formatKeyBinding(azerty)).toBe('A')
+  })
+
+  it.each([
+    { code: 'KeyP', key: 'ㄣ', shift: false, recorded: 'p', label: 'P' },
+    { code: 'KeyP', key: 'ㄣ', shift: true, recorded: 'P', label: 'Shift + P' },
+    { code: 'KeyP', key: 'Process', shift: true, recorded: 'P', label: 'Shift + P' },
+    { code: 'KeyP', key: 'Unidentified', shift: false, recorded: 'p', label: 'P' },
+    { code: 'Digit1', key: 'ㄅ', shift: false, recorded: '1', label: '1' },
+    { code: 'Digit3', key: 'ˇ', shift: false, recorded: '3', label: '3' },
+    { code: 'KeyA', key: 'ち', shift: false, recorded: 'a', label: 'A' },
+    { code: 'KeyA', key: 'ㅁ', shift: false, recorded: 'a', label: 'A' },
+    { code: 'KeyA', key: 'Ф', shift: true, recorded: 'A', label: 'Shift + A' },
+    { code: 'KeyA', key: 'α', shift: false, recorded: 'a', label: 'A' },
+    { code: 'KeyA', key: 'ש', shift: false, recorded: 'a', label: 'A' },
+    { code: 'KeyB', key: 'لا', shift: false, recorded: 'b', label: 'B' },
+    { code: 'KeyS', key: 'े', shift: false, recorded: 's', label: 'S' },
+    { code: 'Digit2', key: '٢', shift: false, recorded: '2', label: '2' },
+    { code: 'Semicolon', key: 'ㄤ', shift: false, recorded: ';', label: ';' },
+    { code: 'Semicolon', key: 'ㄤ', shift: true, recorded: ':', label: 'Shift + :' },
+    { code: 'Semicolon', key: 'れ', shift: false, recorded: ';', label: ';' },
+    { code: 'Semicolon', key: 'ж', shift: false, recorded: ';', label: ';' },
+    { code: 'Backquote', key: 'Dead', shift: false, recorded: '`', label: '`' },
+    { code: 'Minus', key: 'ㄦ', shift: false, recorded: '-', label: '-' },
+    { code: 'Equal', key: '＋', shift: true, recorded: '+', label: 'Shift + +' },
+    { code: 'BracketLeft', key: '「', shift: false, recorded: '[', label: '[' },
+    { code: 'BracketRight', key: '」', shift: true, recorded: '}', label: 'Shift + }' },
+    { code: 'Backslash', key: '、', shift: false, recorded: '\\', label: '\\' },
+    { code: 'Quote', key: 'け', shift: true, recorded: '"', label: 'Shift + "' },
+    { code: 'Comma', key: 'ㄝ', shift: false, recorded: ',', label: ',' },
+    { code: 'Period', key: '。', shift: false, recorded: '.', label: '.' },
+    { code: 'Slash', key: 'ㄥ', shift: false, recorded: '/', label: '/' },
+  ])('records and displays $key as $label using the physical key', ({ code, key, shift, recorded, label }) => {
+    const binding = keyBindingFromEvent(new KeyboardEvent('keydown', { code, key, shiftKey: shift }))
+    expect(binding).toMatchObject({ code, key: recorded, shift })
+    expect(formatKeyBinding(binding)).toBe(label)
+    expect(formatKeyBinding({ ...binding, key })).toBe(label)
+  })
+
+  it.each([
+    { code: 'Digit2', key: 'é', recorded: 'é', label: 'É' },
+    { code: 'KeyE', key: 'e\u0301', recorded: 'e\u0301', label: 'E\u0301' },
+    { code: 'KeyQ', key: 'ａ', recorded: 'a', label: 'A' },
+    { code: 'Digit2', key: '２', recorded: '2', label: '2' },
+    { code: 'Semicolon', key: 'ö', recorded: 'ö', label: 'Ö' },
+    { code: 'Backslash', key: '#', recorded: '#', label: '#' },
+    { code: 'Lang1', key: 'HangulMode', recorded: 'HangulMode', label: 'HANGULMODE' },
+  ])('keeps the layout value for $code producing $key', ({ code, key, recorded, label }) => {
+    const binding = keyBindingFromEvent(new KeyboardEvent('keydown', { code, key }))
+    expect(binding).toMatchObject({ code, key: recorded })
+    expect(formatKeyBinding({ ...binding, key })).toBe(label)
   })
 
   it.each(['MediaPlay', 'MediaPause', 'MediaFastForward', 'MediaRewind', 'MediaRecord'])(
@@ -61,7 +113,7 @@ describe('shortcut bindings', () => {
   )
 
   it('matches already-saved unidentified media bindings without treating all unidentified keys as equal', () => {
-    const saved = { ...DEFAULT_SETTINGS.bindings.nextEpisode.key, code: 'Unidentified', key: 'MediaTrackNext', ctrl: false }
+    const saved = { code: 'Unidentified', key: 'MediaTrackNext', ctrl: false, alt: false, shift: false, meta: false }
     const event = keyBindingFromEvent(new KeyboardEvent('keydown', { key: 'MediaTrackNext' }))
     expect(keyBindingsEqual(saved, event)).toBe(true)
     expect(keyBindingsEqual(saved, { ...saved, key: 'MediaTrackPrevious' })).toBe(false)
@@ -69,7 +121,7 @@ describe('shortcut bindings', () => {
     expect(keyBindingsEqual({ ...saved, key: 'Unidentified' }, unidentifiedEvent)).toBe(false)
   })
 
-  it.each(['a', 'Dead', 'Process', 'Unidentified', 'MadeUpKey', 'Power', 'Sleep', 'LaunchMediaPlayer', 'constructor', '__proto__'])('does not invent a physical code for %s', key => {
+  it.each(['a', 'ㄣ', 'ㄤ', 'ち', 'ф', 'Dead', 'Process', 'Unidentified', 'MadeUpKey', 'Power', 'Sleep', 'LaunchMediaPlayer', 'constructor', '__proto__'])('does not invent a physical code for %s', key => {
     expect(isKeyBinding(keyBindingFromEvent(new KeyboardEvent('keydown', { code: '', key })))).toBe(false)
     expect(isKeyBinding(keyBindingFromEvent(new KeyboardEvent('keydown', { code: 'Unidentified', key })))).toBe(false)
   })

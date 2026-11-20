@@ -1,8 +1,16 @@
-import { DEFAULT_SETTINGS, normalizeSettings, parseSettingsForBackup } from './shortcut-settings'
-import { DEFAULT_KEY_BINDINGS, getBindingKeys, keyBindingsEqual } from './shortcut-bindings'
+import { getBrowserCapabilities, isShortcutSupported } from './browser-capabilities'
+import { DEFAULT_SETTINGS, LEGACY_PICTURE_IN_PICTURE_BINDING, normalizeSettings, parseSettingsForBackup } from './shortcut-settings'
+import { DEFAULT_KEY_BINDINGS, getBindingKeys, isKeyBinding, keyBindingsEqual } from './shortcut-bindings'
 import { createShortcutCatalog } from './shortcut-catalog'
 import { DEFAULT_SUBTITLE_NAVIGATION_BINDINGS } from './subtitle-navigation'
-import { SUBTITLE_NAVIGATION_ACTIONS, type ShortcutAction, type ShortcutSettings } from './shortcut-types'
+import { SUBTITLE_NAVIGATION_ACTIONS, type BuiltinShortcutAction, type KeyBinding, type ShortcutAction, type ShortcutSettings } from './shortcut-types'
+
+// Pre-v27 defaults that differ from the current defaults.
+const PRE_V27_KEY_DEFAULTS: Partial<Record<BuiltinShortcutAction, KeyBinding>> = {
+  pictureInPicture: { code: 'KeyP', key: 'P', ctrl: false, alt: false, shift: true, meta: false },
+  previousEpisode: { code: 'KeyP', key: 'p', ctrl: true, alt: false, shift: false, meta: false },
+  nextEpisode: { code: 'KeyN', key: 'n', ctrl: true, alt: false, shift: false, meta: false },
+}
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value)
@@ -44,10 +52,21 @@ export const recoverCompatibleSettings = (raw: unknown, saved: unknown): Shortcu
       restored.pip.subtitleSize = retained.pip.subtitleSize
     }
   }
+  const rawBindings = isRecord(raw.bindings) ? raw.bindings : {}
   if (version < 27) {
     for (const [action, binding] of Object.entries(restored.bindings)) {
-      const fallback = DEFAULT_KEY_BINDINGS[action as keyof typeof DEFAULT_KEY_BINDINGS]
-      if (retained.bindings[action as ShortcutAction]?.key === null && keyBindingsEqual(binding.key, fallback)) binding.key = null
+      if (retained.bindings[action as ShortcutAction]?.key !== null) continue
+      const builtin = action as BuiltinShortcutAction
+      const defaultKey = DEFAULT_KEY_BINDINGS[builtin]
+      const legacyDefault = version < 2 && action === 'pictureInPicture'
+        ? LEGACY_PICTURE_IN_PICTURE_BINDING
+        : PRE_V27_KEY_DEFAULTS[builtin] ?? defaultKey
+      const rawBinding = rawBindings[action]
+      const rawKey = isRecord(rawBinding) ? rawBinding.key : undefined
+      const usedFallback = isKeyBinding(rawKey)
+        ? keyBindingsEqual(rawKey, legacyDefault)
+        : keyBindingsEqual(binding.key, defaultKey)
+      if (usedFallback) binding.key = null
     }
     for (const action of SUBTITLE_NAVIGATION_ACTIONS) {
       const fallback = action === 'replay' ? DEFAULT_KEY_BINDINGS.skipIntro : DEFAULT_SUBTITLE_NAVIGATION_BINDINGS[action].key
@@ -57,7 +76,6 @@ export const recoverCompatibleSettings = (raw: unknown, saved: unknown): Shortcu
       }
     }
   }
-  const rawBindings = isRecord(raw.bindings) ? raw.bindings : {}
   const rawSubtitles = isRecord(canonicalRaw.subtitleNavigation) && isRecord(canonicalRaw.subtitleNavigation.bindings)
     ? canonicalRaw.subtitleNavigation.bindings : {}
   const bindings = [
@@ -68,7 +86,10 @@ export const recoverCompatibleSettings = (raw: unknown, saved: unknown): Shortcu
       generalAction: undefined, binding: restored.subtitleNavigation.bindings[action], rawBinding: rawSubtitles[action],
     })),
   ]
-  const keySources = bindings.filter(({ binding }) => binding?.enabled).map(({ generalAction, binding, rawBinding }) => {
+  const { supportsSubtitlePreservingPip } = getBrowserCapabilities()
+  const keySources = bindings.filter(({ generalAction, binding }) =>
+    binding?.enabled && (!generalAction || isShortcutSupported(generalAction, supportsSubtitlePreservingPip)),
+  ).map(({ generalAction, binding, rawBinding }) => {
     const legacy = isRecord(rawBinding) ? rawBinding : {}
     const hasLegacyPrimary = legacy.key !== undefined
     const hasLegacyAdditional = legacy.additionalKeys !== undefined

@@ -977,7 +977,7 @@ describe('configured Media Session controls', () => {
       return Promise.resolve(response) as never
     })
     try {
-      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyP', key: 'P', shiftKey: true, cancelable: true }))
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyP', key: 'p', cancelable: true }))
       await vi.waitFor(() => expect(pipWindow.document.querySelector('[data-pip-control="timeline"]')).not.toBeNull())
       vi.useFakeTimers()
       f.play.mockClear()
@@ -1011,7 +1011,7 @@ describe('configured Media Session controls', () => {
       configurable: true, value: { requestWindow: vi.fn().mockResolvedValue(pipWindow) },
     })
     try {
-      f.keyboard('P', false, { code: 'KeyP', shiftKey: true })
+      f.keyboard('p', false, { code: 'KeyP' })
       await vi.waitFor(() => expect(pipWindow.document.querySelector('video')).toBe(f.video))
       document.querySelector('input')!.focus()
       expect(document.hasFocus()).toBe(true)

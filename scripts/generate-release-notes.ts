@@ -39,7 +39,17 @@ function getTag() {
 }
 
 function getPreviousTag(tag: string) {
-  return git(['describe', '--tags', '--abbrev=0', '--match', 'v[0-9]*', `${tag}^`], '')
+  const excludePrereleases = tag.includes('-') ? [] : ['--exclude', 'v*-*']
+  return git(['describe', '--tags', '--abbrev=0', '--match', 'v[0-9]*', ...excludePrereleases, `${tag}^`])
+}
+
+function getChangelogEntry(tag: string) {
+  const changelog = git(['show', `${tag}:CHANGELOG.md`])
+  for (const section of changelog.split(/^## /m).slice(1)) {
+    const [heading, ...lines] = section.split('\n')
+    if (heading.trim() === tag) return lines.join('\n').trim()
+  }
+  return ''
 }
 
 function parseCommit(line: string) {
@@ -122,6 +132,11 @@ if (compareUrl) {
   sections.push(`[Compare changes](${compareUrl})`, '')
 }
 
+const changelogEntry = getChangelogEntry(tag)
+if (changelogEntry) {
+  sections.push(changelogEntry, '', '## Commits', '')
+}
+
 if (commits.length === 0) {
   sections.push('- No commit changes found for this release.', '')
 } else {
@@ -144,7 +159,7 @@ if (commits.length === 0) {
       continue
     }
 
-    sections.push(`## ${category}`)
+    sections.push(`${changelogEntry ? '###' : '##'} ${category}`)
     sections.push(...entries.map(formatCommit))
     sections.push('')
   }

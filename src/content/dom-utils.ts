@@ -94,7 +94,7 @@ const skipButtonText = new RegExp(
 )
 const buttonSelector = 'button, [role="button"]'
 
-const isVisibleElement = (element: HTMLElement): boolean => {
+export const isVisibleElement = (element: HTMLElement): boolean => {
   const rect = element.getBoundingClientRect()
   const style = element.ownerDocument.defaultView?.getComputedStyle(element)
 

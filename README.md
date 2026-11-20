@@ -66,10 +66,10 @@ The 23 built-in actions below follow the current Options categories. All playbac
 | Action | Default key | Behavior |
 | --- | --- | --- |
 | Play / Pause | `Space` | Tap to play/pause; hold for temporary speed. |
-| Previous episode | `Ctrl + P` | Use Netflix's episode picker to play the preceding available episode. |
-| Next episode | `Ctrl + N` | Use Netflix's next-episode control or episode picker. |
+| Previous episode | `Shift + P` | Use Netflix's episode picker to play the preceding available episode. |
+| Next episode | `Shift + N` | Use Netflix's next-episode control or episode picker. |
 | Fullscreen | `F` | Toggle fullscreen on the Netflix page; unavailable inside PiP. |
-| Picture-in-Picture | `Shift + P` | Open/close subtitle-preserving PiP on Chrome/Edge 116+. |
+| Picture-in-Picture | `P` | Open/close subtitle-preserving PiP on Chrome/Edge 116+. |
 
 ### Seeking and navigation
 
@@ -111,7 +111,7 @@ The 23 built-in actions below follow the current Options categories. All playbac
 
 Hold Play / Pause for about 250 ms to use the hold speed (default `2x`); release to restore the previous speed and playing/paused state. This follows your remapped Play / Pause key. Holding a seek or frame-step key repeats that action; exact frame accuracy depends on Netflix. Track switching, subtitle-size cycling, preferred-speed, percentage, and episode shortcuts act once per press.
 
-`Ctrl + P` / `Ctrl + N` mean Control on macOS too and may be reserved by the browser; remap them if needed. Bindings use physical key positions plus modifiers. `Quote` means the quote key (`'` / `"` on a US keyboard); the popup may display it as `Shift + "`. See [Subtitle navigation](#subtitle-navigation) for the four separately enabled sentence actions and [Settings](#settings-and-customization) for custom shortcuts.
+Bindings use physical key positions plus modifiers. `Quote` means the quote key (`'` / `"` on a US keyboard); the popup may display it as `Shift + "`. See [Subtitle navigation](#subtitle-navigation) for the four separately enabled sentence actions and [Settings](#settings-and-customization) for custom shortcuts.
 
 ### Settings Interface Shortcuts
 
@@ -147,7 +147,7 @@ Select a row's pencil, record your key combination, and select **Save**. Choose 
 
 If another enabled action owns a key, choose a different combination or explicitly transfer it; transferring disables the previous action and both directions if it belongs to a seek pair. All keys for an action share its enabled state. Disabled rows retain their complete key lists and release them for reuse; Options, popup reference, search and backups include every assigned key.
 
-For episode controls, add `MediaTrackNext` alongside `Ctrl+N` or `MediaTrackPrevious` alongside `Ctrl+P` if the browser delivers that key to the recorder. During playback, assigned track keys also route through browser Media Session controls. Keys consumed by the operating system or browser may not reach the recorder.
+For episode controls, add `MediaTrackNext` alongside `Shift+N` or `MediaTrackPrevious` alongside `Shift+P` if the browser delivers that key to the recorder. During playback, assigned track keys also route through browser Media Session controls. Keys consumed by the operating system or browser may not reach the recorder.
 
 Assigned play/pause, stop, fast-forward and rewind keys also accept browser Media Session controls. When assigned to Play / Pause, Play resumes and Pause or Stop pauses, without hold speed. Unassigned controls keep Netflix's behavior. Volume keys still require keyboard events.
 
@@ -196,7 +196,7 @@ Timings load on demand for the selected video and subtitle track. The first jump
 
 ## Picture-in-Picture
 
-On Chrome or Edge 116+, press `Shift + P` while a Netflix video is open to enter the extension's subtitle-preserving PiP window. Press it again or close the window to return the video to Netflix. Keep the source tab open.
+On Chrome or Edge 116+, press `P` while a Netflix video is open to enter the extension's subtitle-preserving PiP window. Press it again or close the window to return the video to Netflix. Keep the source tab open.
 
 - Resize the floating window; the video keeps its aspect ratio.
 - Click the video to play/pause. Use the controls to seek, mute, adjust volume, or click/drag the timeline. Controls hide after three seconds of pointer inactivity.

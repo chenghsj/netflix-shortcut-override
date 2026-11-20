@@ -109,6 +109,26 @@ describe('OptionsApp', () => {
   })
 
   it.each([
+    { code: 'KeyG', key: 'ㄕ', label: 'G', recorded: 'g' },
+    { code: 'KeyG', key: 'き', label: 'G', recorded: 'g' },
+    { code: 'KeyG', key: 'ㅎ', label: 'G', recorded: 'g' },
+    { code: 'Semicolon', key: 'ㄤ', label: ';', recorded: ';' },
+  ])('displays $label and saves it when recording $key', async ({ code, key, label, recorded }) => {
+    render(<OptionsApp />)
+    await selectShortcutCategory('Playback')
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Next episode' }))
+    const dialog = screen.getByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add shortcut' }))
+    const area = within(dialog).getAllByRole('group', { name: 'Record shortcut' })[1]
+    fireEvent.keyDown(area, { code, key })
+
+    expect(within(area).getByTitle(label)).toBeVisible()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect((await getSettings()).bindings.nextEpisode.additionalKeys?.[0]).toMatchObject({ code, key: recorded })
+  })
+
+  it.each([
     { action: 'nextEpisode', label: 'Next episode', mediaKey: 'MediaTrackNext' },
     { action: 'previousEpisode', label: 'Previous episode', mediaKey: 'MediaTrackPrevious' },
   ] as const)('records $mediaKey as an additional $label shortcut', async ({ action, label, mediaKey }) => {
@@ -162,7 +182,7 @@ describe('OptionsApp', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Undo edits' }))
     expect(within(dialog).getAllByRole('group', { name: 'Record shortcut' })).toHaveLength(2)
     const extra = within(dialog).getAllByRole('group', { name: 'Record shortcut' })[1]
-    fireEvent.keyDown(extra, { code: 'KeyN', key: 'n', ctrlKey: true })
+    fireEvent.keyDown(extra, { code: 'KeyN', key: 'N', shiftKey: true })
     expect(extra).toHaveAccessibleDescription('This key is already recorded here.')
     expect(within(dialog).getByRole('button', { name: 'Save' })).toBeDisabled()
     fireEvent.keyDown(extra, { code: 'KeyM', key: 'm' })
@@ -754,7 +774,7 @@ describe('OptionsApp', () => {
     expect(within(screen.getByRole('navigation', { name: 'Settings' })).getByRole('link', { name: 'Search results' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('button', { name: 'Edit Toggle subtitles' })).toBeVisible()
     expect(screen.queryByRole('switch', { name: 'Volume up Enabled' })).not.toBeInTheDocument()
-    fireEvent.change(search, { target: { value: 'ctrl+KeyP' } })
+    fireEvent.change(search, { target: { value: 'shift+KeyP' } })
     expect(screen.getByRole('button', { name: 'Edit Previous episode' })).toBeVisible()
     expect(screen.queryByRole('button', { name: 'Edit Next episode' })).not.toBeInTheDocument()
     fireEvent.change(search, { target: { value: 'Space' } })
@@ -2050,8 +2070,7 @@ describe('OptionsApp', () => {
     const dialog = screen.getByRole('dialog')
     fireEvent.keyDown(dialog, {
       code: 'KeyP',
-      key: 'P',
-      shiftKey: true,
+      key: 'p',
     })
 
     expect(within(dialog).queryByText('No conflict detected.')).not.toBeInTheDocument()
@@ -2646,7 +2665,7 @@ describe('OptionsApp', () => {
         ...DEFAULT_SETTINGS.bindings,
         playPause: {
           enabled: true,
-          key: { code: 'KeyP', key: 'p', ctrl: false, alt: false, shift: false, meta: false },
+          key: { code: 'KeyJ', key: 'j', ctrl: false, alt: false, shift: false, meta: false },
         },
       },
     })
@@ -2654,12 +2673,12 @@ describe('OptionsApp', () => {
     render(<OptionsApp />)
 
     const edit = await screen.findByRole('button', { name: 'Edit Play / Pause' })
-    expect(within(edit.closest('tr')!).getByTitle('P')).toBeInTheDocument()
+    expect(within(edit.closest('tr')!).getByTitle('J')).toBeInTheDocument()
 
     fireEvent.click(edit)
 
     const dialog = screen.getByRole('dialog')
-    expect(within(dialog).getByTitle('P')).toBeInTheDocument()
+    expect(within(dialog).getByTitle('J')).toBeInTheDocument()
 
     fireEvent.keyDown(dialog, { code: 'KeyQ', key: 'q' })
 
@@ -2671,13 +2690,13 @@ describe('OptionsApp', () => {
       })
     )
 
-    expect(within(dialog).getByTitle('P')).toBeInTheDocument()
+    expect(within(dialog).getByTitle('J')).toBeInTheDocument()
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
 
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-      expect(within(edit.closest('tr')!).getByTitle('P')).toBeInTheDocument()
+      expect(within(edit.closest('tr')!).getByTitle('J')).toBeInTheDocument()
     })
   })
 })

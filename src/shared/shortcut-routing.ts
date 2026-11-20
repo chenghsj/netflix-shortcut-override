@@ -1,3 +1,4 @@
+import { isShortcutSupported } from './browser-capabilities'
 import { bindingMatchesKey, findActionForKey, getBindingKeys, getShortcutActions, keyBindingFromEvent } from './shortcut-bindings'
 import {
   SUBTITLE_NAVIGATION_ACTIONS,
@@ -24,10 +25,7 @@ export const getShortcutAvailability = (
   _settings: ShortcutSettings,
   action: ShortcutAction,
   supportsSubtitlePreservingPip: boolean,
-) => {
-  const supported = action !== 'pictureInPicture' || supportsSubtitlePreservingPip
-  return { supported }
-}
+) => ({ supported: isShortcutSupported(action, supportsSubtitlePreservingPip) })
 
 // Support is reported separately from matching so an unsupported binding is
 // released without falling through to suppression of a remapped native key.

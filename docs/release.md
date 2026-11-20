@@ -73,7 +73,7 @@ not submit or update any browser store listing.
 
 ## Changelog
 
-Release notes are generated from commits since the previous `v*` tag.
+Stable release notes include commits since the previous stable tag. Prerelease notes include commits since the previous version tag. Add a `## v0.7.0` heading to `CHANGELOG.md` for that tag's user-facing notes. The workflow includes the section from the tagged commit above the commit list.
 
 Preview release notes locally:
 

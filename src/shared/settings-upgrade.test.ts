@@ -25,7 +25,7 @@ describe('v0.6.4 upgrade compatibility', () => {
         cycleSubtitleTrack: DEFAULT_SETTINGS.bindings.cycleSubtitleTrack,
         previousSubtitleTrack: DEFAULT_SETTINGS.bindings.previousSubtitleTrack,
         cycleSubtitleSize: DEFAULT_SETTINGS.bindings.cycleSubtitleSize,
-        previousEpisode: DEFAULT_SETTINGS.bindings.previousEpisode,
+        previousEpisode: { ...DEFAULT_SETTINGS.bindings.previousEpisode, enabled: false },
         nextEpisode: DEFAULT_SETTINGS.bindings.nextEpisode,
         previousFrame: DEFAULT_SETTINGS.bindings.previousFrame,
         nextFrame: DEFAULT_SETTINGS.bindings.nextFrame,

@@ -31,7 +31,7 @@
 
       // Start on the tested category even when the sidebar is hidden on a
       // narrow viewport, including the Codex in-app browser.
-      window.history.replaceState(null, '', `${location.pathname}${location.search}#seeking`)
+      window.history.replaceState(null, '', `${location.pathname}${location.search}#playback`)
       const root = createRoot(document.getElementById('root'))
       let renderId = 0
       const renderOptions = () => root.render(React.createElement(OptionsApp, { key: ++renderId }))
@@ -68,7 +68,7 @@
         try {
           await saveSettings({ ...DEFAULT_SETTINGS, locale: 'en' })
           // Plain development pages have no chrome.storage change events.
-          window.history.replaceState(null, '', `${location.pathname}${location.search}#seeking`)
+          window.history.replaceState(null, '', `${location.pathname}${location.search}#playback`)
           renderOptions()
           const names = [...SPECIAL_SHORTCUT_KEYS, ...Object.keys(LEGACY_SPECIAL_KEY_ALIASES)]
           for (const key of names) {
@@ -118,7 +118,7 @@
           for (const locale of ['en', 'zh-TW', 'zh-CN', 'ja', 'ko']) {
             const copy = getCopy(locale)
             await saveSettings({ ...DEFAULT_SETTINGS, locale })
-            window.history.replaceState(null, '', `${location.pathname}#seeking`)
+            window.history.replaceState(null, '', `${location.pathname}#playback`)
             renderOptions()
             ;(await until(() => button(document, `${copy.edit} ${copy.actions.nextEpisode}`))).click()
             const dialog = await until(() => document.querySelector('[role="dialog"]'))
@@ -133,7 +133,7 @@
             await until(() => !document.querySelector('[role="dialog"]'))
             const saved = await getSettings()
             const mediaAction = resolvePlaybackShortcut(saved, new KeyboardEvent('keydown', { key: 'MediaTrackNext' }), true)?.action
-            const originalAction = resolvePlaybackShortcut(saved, new KeyboardEvent('keydown', { key: 'n', code: 'KeyN', ctrlKey: true }), true)?.action
+            const originalAction = resolvePlaybackShortcut(saved, new KeyboardEvent('keydown', { key: 'N', code: 'KeyN', shiftKey: true }), true)?.action
             const pass = saved.bindings.nextEpisode.key.code === 'KeyN' && saved.bindings.nextEpisode.additionalKeys?.[0].code === 'MediaTrackNext' && mediaAction === 'nextEpisode' && originalAction === 'nextEpisode'
             cases.push({ locale, pass, mediaAction, originalAction })
             if (!pass) throw new Error(`Multiple shortcuts failed for ${locale}`)

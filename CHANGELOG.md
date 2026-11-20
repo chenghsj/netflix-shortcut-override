@@ -1,39 +1,29 @@
 # Changelog
 
-## Unreleased
+## v0.7.0
 
-- Preserve additional shortcuts when an older beta updates synchronized settings.
-- Leave media keys with Netflix while the source page has text focus and Picture-in-Picture is open. Make Previous subtitle use the visible cue near the next cue's start.
-- Let regional subtitle and audio favorites use same-language tracks without a region tag. General audio and Audio Description match within their own track types.
-- Move episode shortcuts to Playback and the pause overlay switch to Playback preferences.
+### Shortcuts
 
-- Focus search when the toolbar popup opens, allowing immediate typing. Keep Options page/section focus and preserve the selected control during popup updates.
+- Assign up to three keys per action. Options checks each key for conflicts. The popup, search, sync and backups include every saved key.
+- Assign media track keys alongside regular episode shortcuts. Record supported media, volume, browser navigation and Caps Lock keys when the browser delivers them. Browser Media Session controls support configured play, pause, stop, seek and track actions. A physical press that arrives through both paths runs once.
+- Step frames, change episodes, cycle subtitle sizes or languages, and switch audio tracks. Add custom forward and rewind pairs, percentage jumps and preferred-speed shortcuts. The episode picker waits briefly for Netflix to make its controls available.
+- Set built-in and custom seek intervals from 1 to 300 seconds. Playback speed limits, preferred speeds, speed adjustments and hold speed can reach `5x`.
 
-- Add up to three shortcut keys per action, with individual removal, conflict checks, complete lists in Options/popup/search, and storage/backup migration to settings v33. Existing keys remain assigned.
-- Support configured browser Media Session play, pause, stop, forward/rewind and track controls. Match keyboard/media notifications once in either order, preserving the actual key and Ctrl/Alt/Shift/Meta combination. Unmatched configured controls allow a 120ms pairing window; standalone controls use plain assignments or Netflix's latest handler with the original browser details.
-- Preserve explicit Play/Pause/Stop direction and physical-key tap/hold behavior. Resolve overlapping controls using confirmed actions, so custom combinations remain usable and older playback cannot override newer playback or seeking, including custom forward/rewind intervals, manual Skip Intro, subtitle jumps and PiP timeline seeks. Retain original order through key release, hold activation and delayed captions.
-- Allow assigned media keys to open or close supported PiP once across document/focus changes. Discard stale deferred playback after lifecycle changes.
-- Correctly label existing/imported Markdown settings while keeping Markdown hidden after switching to another style.
-- Keep subtitle end times so Previous subtitle returns to the immediately preceding sentence when playback is paused between subtitles, including after the last sentence. Refresh Netflix's stale native subtitle cache after paused seeks so the selected text is visible without starting playback.
-- Add confirmed Restore defaults in Backup and restore, with retryable save errors and success feedback beside the button. Add Report an issue links in Options and the popup.
+### Playback and settings
 
-- Split the full in-app guide into short paragraphs, numbered setup steps and separate option lists in all five languages. Shorten the Traditional Chinese instructions while retaining settings ranges, permissions and reset consequences.
+- Cycle through your favorite subtitle languages and audio tracks. Regional favorites can match a track with the same language and no region tag. Standard audio and Audio Description have separate favorites.
+- Jump to the adjacent subtitle while paused. Previous-subtitle navigation handles gaps between cues and refreshes Netflix's subtitle display after seeking. On Chrome and Edge, Picture-in-Picture keeps separate lines of subtitles readable above its controls.
+- Choose whether to skip intros or recaps, advance automatically to the next episode, or hide Netflix's pause overlay. Find these controls in Playback preferences.
+- Browse the searchable Options guide in all five interface languages, including a list of supported special keys. The toolbar popup opens with search focused. Options and the popup include a Report an issue link. Backup and restore has a confirmed Restore defaults action.
 
-- Restore CapsLock recording in primary and additional shortcut fields. Recognize legacy next/previous-track and volume key names, and allow delivered BrowserBack/BrowserForward keys to be recorded without a physical key code. Add searchable lists of supported special key names in the in-app guide in all five languages, grouped into media, volume and browser navigation, with collapsible legacy names.
+### Upgrading from v0.6.8
 
-- Fix recording and playback matching for media and volume keys whose keyboard events omit a physical key code, including next/previous track, play/pause, stop and volume controls. Keep distinct media keys separate during conflict checks and Play / Pause release handling.
-
-- Add a searchable, categorized user guide inside Options, with 11 concise topics, collapsible sections and links to settings in all five interface languages. Add entry points in the Options sidebar and popup footer.
-
-- Allow 1–300 seconds for every built-in and custom forward/rewind interval. Existing custom intervals above 300 seconds migrate to 300 while retaining their keys and enabled states.
-- Raise the configurable highest speed, preferred speeds, speed adjustment amount and hold speed to `5x`. Valid `5x` entries survive settings saves and backup export/import.
-- Shorten the Traditional Chinese editor action to **還原**.
-- Use a compact preferred-speed field labeled **倍速**, with its range beneath the label and input on the right. Simplify modal instructions in all five languages.
-
-The default seek interval remains 10 seconds, the default highest speed is `3x`, and the default preferred speed is `1.5x`. The default speed adjustment remains `0.25x` and hold speed remains `2x`.
+- The new defaults are `Shift+P` for Previous episode, `Shift+N` for Next episode and `P` for Picture-in-Picture. Upgrades preserve saved keys. If an enabled Picture-in-Picture shortcut already uses `Shift+P`, choose a different key for Previous episode or reassign the key in Options.
+- Older saved seek intervals above 300 seconds become 300 seconds. They keep their assigned keys and enabled state. Settings schema v33 adds multiple keys per action and can recover additional keys when an older beta syncs settings.
+- This release requires Chrome 111+, Edge 111+ or Firefox Desktop 128+. Picture-in-Picture with subtitles requires Chrome or Edge 116+.
 
 ## Release notes
 
-Release changelogs are generated by `.github/workflows/release.yml` from commits since the previous `v*` tag and published in each GitHub Release.
+The release workflow publishes these notes with commits since the previous stable release. Prereleases use the previous version tag.
 
 Use `npm run changelog -- --tag v0.1.0 --output release-notes.md` to preview release notes locally after the repository has tags.

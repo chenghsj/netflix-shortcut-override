@@ -103,7 +103,7 @@ describe('shortcut settings', () => {
     )
   })
 
-  it('migrates the earlier Shift+W PiP default to Shift+P once', () => {
+  it('migrates the earlier Shift+W PiP default to the current default once', () => {
     const normalized = normalizeSettings({
       bindings: {
         pictureInPicture: {

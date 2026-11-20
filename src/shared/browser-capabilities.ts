@@ -1,3 +1,5 @@
+import type { ShortcutAction } from './shortcut-types'
+
 export type BrowserCapabilities = {
   supportsSubtitlePreservingPip: boolean
   requiresNetflixPageBridge: boolean
@@ -18,3 +20,6 @@ export const getBrowserCapabilities = (
     closesPopupAfterOpeningOptions: isFirefox,
   }
 }
+
+export const isShortcutSupported = (action: ShortcutAction, supportsSubtitlePreservingPip: boolean): boolean =>
+  action !== 'pictureInPicture' || supportsSubtitlePreservingPip

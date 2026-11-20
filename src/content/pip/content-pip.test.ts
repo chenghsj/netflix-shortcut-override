@@ -43,7 +43,7 @@ describe('content PiP shortcuts', () => {
       await saveSettings({ ...DEFAULT_SETTINGS, subtitleSize: 175, subtitleSizeCycle: [150, 100, 200] })
       document.body.append(document.createElement('video'))
       window.dispatchEvent(new KeyboardEvent('keydown', {
-        code: 'KeyP', key: 'P', shiftKey: true, bubbles: true, cancelable: true,
+        code: 'KeyP', key: 'p', bubbles: true, cancelable: true,
       }))
       await vi.waitFor(() => expect(pipWindow.document.querySelector('[data-pip-control="subtitles-button"]')).not.toBeNull())
       for (const size of [200, 150, 'medium', 200] as const) {
@@ -62,7 +62,7 @@ describe('content PiP shortcuts', () => {
       await saveSettings({ ...DEFAULT_SETTINGS, subtitleSize: 'small' })
       document.body.append(document.createElement('video'))
       window.dispatchEvent(new KeyboardEvent('keydown', {
-        code: 'KeyP', key: 'P', shiftKey: true, bubbles: true, cancelable: true,
+        code: 'KeyP', key: 'p', bubbles: true, cancelable: true,
       }))
       await vi.waitFor(() => expect(pipWindow.document.querySelector('[data-pip-control="subtitles-button"]')).not.toBeNull())
       for (const size of ['large', 'small', 'medium'] as const) {
@@ -87,7 +87,7 @@ describe('content PiP shortcuts', () => {
       settings.bindings['subtitle-size:fixed'] = { enabled: true, key: { code: 'KeyB', key: 'b', ctrl: false, alt: false, shift: false, meta: false } }
       await saveSettings(settings)
       document.body.append(document.createElement('video'))
-      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyP', key: 'P', shiftKey: true, bubbles: true, cancelable: true }))
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyP', key: 'p', bubbles: true, cancelable: true }))
       await vi.waitFor(() => expect(pipWindow.document.querySelector('[data-pip-control="subtitles-button"]')).not.toBeNull())
       pipWindow.document.body.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyB', key: 'b', bubbles: true, cancelable: true }))
       await vi.waitFor(async () => expect((await getSettings()).pip.subtitleSize).toBe(175))
@@ -118,8 +118,7 @@ describe('content PiP shortcuts', () => {
       window.dispatchEvent(
         new KeyboardEvent('keydown', {
           code: 'KeyP',
-          key: 'P',
-          shiftKey: true,
+          key: 'p',
           bubbles: true,
           cancelable: true,
         })
@@ -207,8 +206,7 @@ describe('content PiP shortcuts', () => {
 
       const event = new KeyboardEvent('keydown', {
         code: 'KeyP',
-        key: 'P',
-        shiftKey: true,
+        key: 'p',
         bubbles: true,
         cancelable: true,
       })
@@ -235,8 +233,7 @@ describe('content PiP shortcuts', () => {
 
     const event = new KeyboardEvent('keydown', {
       code: 'KeyP',
-      key: 'P',
-      shiftKey: true,
+      key: 'p',
       bubbles: true,
       cancelable: true,
     })
@@ -250,8 +247,7 @@ describe('content PiP shortcuts', () => {
   it('does not intercept the PiP shortcut when PiP cannot start', () => {
     const event = new KeyboardEvent('keydown', {
       code: 'KeyP',
-      key: 'P',
-      shiftKey: true,
+      key: 'p',
       bubbles: true,
       cancelable: true,
     })
@@ -260,7 +256,7 @@ describe('content PiP shortcuts', () => {
     expect(event.defaultPrevented).toBe(false)
   })
 
-  it('uses Shift+P as a toggle shortcut for entering and exiting PiP', async () => {
+  it('uses P as a toggle shortcut for entering and exiting PiP', async () => {
     const { pipWindow, cleanup } = createDocumentPipFixture()
 
     try {
@@ -269,8 +265,7 @@ describe('content PiP shortcuts', () => {
 
       const enterEvent = new KeyboardEvent('keydown', {
         code: 'KeyP',
-        key: 'P',
-        shiftKey: true,
+        key: 'p',
         bubbles: true,
         cancelable: true,
       })
@@ -284,8 +279,7 @@ describe('content PiP shortcuts', () => {
 
       const exitEvent = new KeyboardEvent('keydown', {
         code: 'KeyP',
-        key: 'P',
-        shiftKey: true,
+        key: 'p',
         bubbles: true,
         cancelable: true,
       })
@@ -317,8 +311,7 @@ describe('content PiP shortcuts', () => {
       window.dispatchEvent(
         new KeyboardEvent('keydown', {
           code: 'KeyP',
-          key: 'P',
-          shiftKey: true,
+          key: 'p',
           bubbles: true,
           cancelable: true,
         })
@@ -379,8 +372,7 @@ describe('content PiP shortcuts', () => {
       window.dispatchEvent(
         new KeyboardEvent('keydown', {
           code: 'KeyP',
-          key: 'P',
-          shiftKey: true,
+          key: 'p',
           bubbles: true,
           cancelable: true,
         })
@@ -462,7 +454,7 @@ describe('content PiP shortcuts', () => {
         pause: { configurable: true, value: pause },
       })
       document.body.append(video)
-      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyP', key: 'P', shiftKey: true, bubbles: true, cancelable: true }))
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyP', key: 'p', bubbles: true, cancelable: true }))
       await vi.waitFor(() => expect(pipWindow.document.querySelector('video')).toBe(video))
       pipWindow.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyS', key: 's', bubbles: true, cancelable: true }))
       await vi.waitFor(() => expect(finish).toBeTypeOf('function'))
@@ -504,8 +496,7 @@ describe('content PiP shortcuts', () => {
       window.dispatchEvent(
         new KeyboardEvent('keydown', {
           code: 'KeyP',
-          key: 'P',
-          shiftKey: true,
+          key: 'p',
           bubbles: true,
           cancelable: true,
         })
@@ -581,8 +572,7 @@ describe('content PiP shortcuts', () => {
       window.dispatchEvent(
         new KeyboardEvent('keydown', {
           code: 'KeyP',
-          key: 'P',
-          shiftKey: true,
+          key: 'p',
           bubbles: true,
           cancelable: true,
         })
@@ -649,8 +639,7 @@ describe('content PiP shortcuts', () => {
       window.dispatchEvent(
         new KeyboardEvent('keydown', {
           code: 'KeyP',
-          key: 'P',
-          shiftKey: true,
+          key: 'p',
           bubbles: true,
           cancelable: true,
         })
@@ -774,7 +763,7 @@ describe('content PiP shortcuts', () => {
       await saveSettings({ ...DEFAULT_SETTINGS, uiStyle: 'markdown' })
       document.body.appendChild(document.createElement('video'))
       window.dispatchEvent(new KeyboardEvent('keydown', {
-        code: 'KeyP', key: 'P', shiftKey: true, bubbles: true, cancelable: true,
+        code: 'KeyP', key: 'p', bubbles: true, cancelable: true,
       }))
       await vi.waitFor(() => {
         expect(pipWindow.document.querySelector('[data-pip-control="subtitles-button"]')).not.toBeNull()
@@ -829,7 +818,7 @@ describe('content PiP shortcuts', () => {
     try {
       document.body.appendChild(document.createElement('video'))
       window.dispatchEvent(new KeyboardEvent('keydown', {
-        code: 'KeyP', key: 'P', shiftKey: true, bubbles: true, cancelable: true,
+        code: 'KeyP', key: 'p', bubbles: true, cancelable: true,
       }))
       await vi.waitFor(() => {
         expect(pipWindow.document.querySelector('[data-pip-control="subtitles-button"]')).not.toBeNull()
@@ -884,8 +873,7 @@ describe('content PiP shortcuts', () => {
       window.dispatchEvent(
         new KeyboardEvent('keydown', {
           code: 'KeyP',
-          key: 'P',
-          shiftKey: true,
+          key: 'p',
           bubbles: true,
           cancelable: true,
         })
@@ -906,8 +894,7 @@ describe('content PiP shortcuts', () => {
       pipWindow.dispatchEvent(
         new KeyboardEvent('keydown', {
           code: 'KeyP',
-          key: 'P',
-          shiftKey: true,
+          key: 'p',
           bubbles: true,
           cancelable: true,
         })

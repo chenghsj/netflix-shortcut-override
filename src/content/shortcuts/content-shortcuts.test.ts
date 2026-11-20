@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
 import { keyBindingFromEvent } from '@/shared/shortcut-bindings'
@@ -20,8 +20,17 @@ const episodeMediaSettings = (): ShortcutSettings => {
 
 describe('content media shortcuts', () => {
   setupContentIndexTests()
+  const elementRect = HTMLElement.prototype.getBoundingClientRect
+  beforeEach(() => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      return this.matches('[data-uia="control-next"], [data-uia="control-episodes"], [data-uia="episode-pane-item"], button.play-button')
+        ? new DOMRect(0, 0, 100, 24)
+        : elementRect.call(this)
+    })
+  })
+  afterEach(() => { vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockRestore() })
 
-  it('keeps Ctrl+P/Ctrl+N working alongside saved additional media keys', async () => {
+  it('keeps Shift+P/Shift+N working alongside saved additional media keys', async () => {
     await saveSettings(episodeMediaSettings())
     document.body.innerHTML = '<video></video><button data-uia="control-next">Next</button><div><button data-uia="episode-pane-item">Previous</button><button data-uia="episode-pane-item" aria-selected="true">Current</button></div>'
     const next = vi.fn()
@@ -29,9 +38,9 @@ describe('content media shortcuts', () => {
     document.querySelector('[data-uia="control-next"]')!.addEventListener('click', next)
     document.querySelector('[data-uia="episode-pane-item"]')!.addEventListener('click', previous)
     for (const init of [
-      { key: 'n', code: 'KeyN', ctrlKey: true },
+      { key: 'N', code: 'KeyN', shiftKey: true },
       { key: 'MediaTrackNext' },
-      { key: 'p', code: 'KeyP', ctrlKey: true },
+      { key: 'P', code: 'KeyP', shiftKey: true },
       { key: 'MediaTrackPrevious', code: 'Unidentified' },
     ]) {
       const event = new KeyboardEvent('keydown', { ...init, bubbles: true, cancelable: true })
@@ -98,7 +107,7 @@ describe('content media shortcuts', () => {
       vi.advanceTimersByTime(120)
       expect(next).toHaveBeenCalledOnce()
       expect(siteNext).toHaveBeenCalledTimes(2)
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', code: 'KeyN', ctrlKey: true, cancelable: true }))
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'N', code: 'KeyN', shiftKey: true, cancelable: true }))
       expect(next).toHaveBeenCalledTimes(2)
       await saveSettings({ ...DEFAULT_SETTINGS, enabled: false })
       expect(registered.get('nexttrack')).toBe(siteNext)
@@ -313,14 +322,14 @@ describe('content media shortcuts', () => {
       window.dispatchEvent(event)
       return event
     }
-    expect(press({ code: 'KeyP', key: 'p', ctrlKey: true }).defaultPrevented).toBe(true)
+    expect(press({ code: 'KeyP', key: 'P', shiftKey: true }).defaultPrevented).toBe(true)
     if (action === 'subtitle') {
       expect(press({ code: 'KeyD', key: 'd' }).defaultPrevented).toBe(true)
     } else if (action === 'PiP') {
       const supported = vi.spyOn(PipManager, 'isSupported').mockReturnValue(true)
       const toggle = vi.spyOn(PipManager.prototype, 'toggle').mockResolvedValue(true)
       try {
-        expect(press({ code: 'KeyP', key: 'P', shiftKey: true }).defaultPrevented).toBe(true)
+        expect(press({ code: 'KeyP', key: 'p' }).defaultPrevented).toBe(true)
         expect(toggle).toHaveBeenCalledOnce()
       } finally {
         supported.mockRestore()
@@ -369,13 +378,13 @@ describe('content media shortcuts', () => {
     const click = vi.fn()
     next.addEventListener('click', click)
     document.body.append(next)
-    expect(press({ code: 'KeyN', key: 'n', ctrlKey: true }).defaultPrevented).toBe(true)
+    expect(press({ code: 'KeyN', key: 'N', shiftKey: true }).defaultPrevented).toBe(true)
     expect(click).toHaveBeenCalledOnce()
-    expect(press({ code: 'KeyN', key: 'n', ctrlKey: true, repeat: true }).defaultPrevented).toBe(true)
+    expect(press({ code: 'KeyN', key: 'N', shiftKey: true, repeat: true }).defaultPrevented).toBe(true)
     expect(click).toHaveBeenCalledOnce()
   })
 
-  it('handles Ctrl+P by expanding and playing the previous Netflix episode once', async () => {
+  it('handles Shift+P by expanding and playing the previous Netflix episode once', async () => {
     document.body.innerHTML = '<video></video><button data-uia="control-episodes">Episodes</button>'
     const play = vi.fn()
     document.querySelector('button')!.addEventListener('click', () => {
@@ -395,7 +404,7 @@ describe('content media shortcuts', () => {
     })
     const press = (repeat = false) => {
       const event = new KeyboardEvent('keydown', {
-        code: 'KeyP', key: 'p', ctrlKey: true, repeat, bubbles: true, cancelable: true,
+        code: 'KeyP', key: 'P', shiftKey: true, repeat, bubbles: true, cancelable: true,
       })
       window.dispatchEvent(event)
       return event
