@@ -12,6 +12,7 @@
   <body data-app-ui>
     <button id="run" type="button">Run simulated media key checks</button>
     <button id="run-multiple" type="button">Run multiple shortcut checks</button>
+    <button id="run-layouts" type="button">Run AZERTY and QWERTZ checks</button>
     <output id="result" aria-live="polite">Not run</output>
     <details><summary>Detailed simulated results</summary><pre id="cases"></pre></details>
     <details open><summary>Recent keyboard events (press a physical media key in the recorder)</summary><pre id="events">No events</pre></details>
@@ -27,6 +28,7 @@
       import { resolvePlaybackShortcut } from '/src/shared/shortcut-routing.ts'
       import { SPECIAL_SHORTCUT_KEYS, LEGACY_SPECIAL_KEY_ALIASES } from '/src/shared/special-shortcut-keys.ts'
       import { getCopy } from '/src/shared/i18n.ts'
+      import { LOCALES } from '/src/shared/shortcut-types.ts'
       import { MULTI_SHORTCUT_COPY } from '/src/components/shortcut-keys-editor.tsx'
 
       // Start on the tested category even when the sidebar is hidden on a
@@ -115,7 +117,7 @@
         run.disabled = true
         output.dataset.state = 'running'
         try {
-          for (const locale of ['en', 'zh-TW', 'zh-CN', 'ja', 'ko']) {
+          for (const locale of LOCALES) {
             const copy = getCopy(locale)
             await saveSettings({ ...DEFAULT_SETTINGS, locale })
             window.history.replaceState(null, '', `${location.pathname}#playback`)
@@ -147,6 +149,57 @@
           output.dataset.state = 'passed'
         } catch (error) {
           output.textContent = JSON.stringify({ pass: false, error: String(error) }, null, 2)
+          output.dataset.state = 'failed'
+        } finally {
+          document.getElementById('cases').textContent = JSON.stringify(cases, null, 2)
+          await saveSettings(original)
+          renderOptions()
+          run.disabled = false
+        }
+      }
+      document.getElementById('run-layouts').onclick = async event => {
+        const run = event.currentTarget
+        const output = document.getElementById('result')
+        const original = await getSettings()
+        const cases = []
+        run.disabled = true
+        output.dataset.state = 'running'
+        try {
+          for (const [locale, code, key, label] of [
+            ['fr', 'KeyQ', 'a', 'A'], ['fr', 'Digit2', 'é', 'É'], ['fr', 'Comma', ';', ';'],
+            ['de', 'KeyY', 'z', 'Z'], ['de', 'KeyZ', 'y', 'Y'], ['de', 'Minus', 'ß', 'ß'],
+          ]) {
+            const copy = getCopy(locale)
+            const edit = () => button(document, `${copy.edit} ${copy.actions.nextEpisode}`)
+            const previousEdit = edit()
+            await saveSettings({ ...DEFAULT_SETTINGS, locale })
+            renderOptions()
+            ;(await until(() => {
+              const currentEdit = edit()
+              return currentEdit !== previousEdit && currentEdit
+            })).click()
+            const area = await until(() => document.querySelector('[role="dialog"] [data-slot="shortcut-recording"]'))
+            area.focus()
+            const stroke = { key, code, ctrlKey: true }
+            area.dispatchEvent(new KeyboardEvent('keydown', { ...stroke, bubbles: true, cancelable: true }))
+            await until(() => area.querySelector('[data-slot="kbd-group"]')?.getAttribute('aria-label') === `Ctrl + ${label}`)
+            ;(await until(() => {
+              const save = button(document.querySelector('[role="dialog"]'), copy.save)
+              return save && !save.disabled && save
+            })).click()
+            await until(() => !document.querySelector('[role="dialog"]'))
+            const settings = await getSettings()
+            const saved = settings.bindings.nextEpisode.key
+            const displayed = edit().closest('tr').querySelector('[data-slot="kbd-group"]')?.getAttribute('aria-label')
+            const action = resolvePlaybackShortcut(settings, new KeyboardEvent('keydown', stroke), true)?.action
+            const pass = saved?.code === code && saved.key === key && displayed === `Ctrl + ${label}` && action === 'nextEpisode'
+            cases.push({ locale, key, code, displayed, action, pass })
+            if (!pass) throw new Error(`Layout check failed for ${locale} ${code}`)
+          }
+          output.textContent = JSON.stringify({ pass: true, count: cases.length, simulated: true }, null, 2)
+          output.dataset.state = 'passed'
+        } catch (error) {
+          output.textContent = JSON.stringify({ pass: false, error: String(error), count: cases.length }, null, 2)
           output.dataset.state = 'failed'
         } finally {
           document.getElementById('cases').textContent = JSON.stringify(cases, null, 2)

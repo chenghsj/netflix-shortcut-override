@@ -16,7 +16,7 @@ describe('reset confirmation', () => {
     fireEvent.click(trigger)
 
     const dialog = await screen.findByRole('dialog', { name: copy.resetAll })
-    expect(within(dialog).getByText(RESET_CONFIRMATION_COPY[locale])).toBeVisible()
+    expect(within(dialog).getByText(RESET_CONFIRMATION_COPY[locale], { normalizer: text => text })).toBeVisible()
     expect(within(dialog).queryByText(RESET_SCOPE_COPY[locale].generalShortcuts)).not.toBeInTheDocument()
     expect(dialog).not.toHaveAttribute('aria-modal', 'true')
     expect(document.querySelector('[data-slot="dialog-overlay"]')).not.toBeInTheDocument()

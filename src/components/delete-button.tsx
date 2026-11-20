@@ -11,6 +11,11 @@ const DELETE_COPY = {
   'zh-CN': { confirmation: '确定删除？', action: '删除' },
   ja: { confirmation: '削除しますか？', action: '削除' },
   ko: { confirmation: '삭제할까요?', action: '삭제' },
+  es: { confirmation: '¿Eliminar?', action: 'Eliminar' },
+  'pt-BR': { confirmation: 'Excluir?', action: 'Excluir' },
+  fr: { confirmation: 'Supprimer ?', action: 'Supprimer' },
+  de: { confirmation: 'Löschen?', action: 'Löschen' },
+  id: { confirmation: 'Hapus?', action: 'Hapus' },
 } satisfies Record<Locale, { confirmation: string; action: string }>
 
 type DeleteButtonProps = Omit<ComponentProps<typeof Button>, 'aria-label' | 'children' | 'onClick' | 'size'> & {

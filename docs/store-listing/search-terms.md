@@ -72,3 +72,63 @@ Netflix 단축키
 인트로 건너뛰기
 키보드 제어
 ```
+
+## Español (`es`)
+
+```text
+atajos de Netflix
+atajos personalizados
+velocidad de reproducción
+imagen en imagen
+navegar por subtítulos
+omitir introducción
+controles de Netflix
+```
+
+## Português (Brasil) (`pt-BR`)
+
+```text
+atalhos da Netflix
+atalhos personalizados
+velocidade de reprodução
+picture in picture
+navegação por legendas
+pular abertura
+controles da Netflix
+```
+
+## Français (`fr`)
+
+```text
+raccourcis Netflix
+raccourcis clavier
+vitesse de lecture
+image dans l’image
+navigation sous-titres
+passer le générique
+commandes Netflix
+```
+
+## Deutsch (`de`)
+
+```text
+Netflix Tastenkürzel
+eigene Tastenkürzel
+Wiedergabegeschwindigkeit
+Bild im Bild
+Untertitel Navigation
+Vorspann überspringen
+Netflix Steuerung
+```
+
+## Bahasa Indonesia (`id`)
+
+```text
+pintasan Netflix
+pintasan keyboard
+kecepatan pemutaran
+gambar dalam gambar
+navigasi subtitel
+lewati intro
+kontrol Netflix
+```

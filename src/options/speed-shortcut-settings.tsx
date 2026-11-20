@@ -42,6 +42,7 @@ export function SpeedRangeSettings({ locale, form, updateSettings }: {
         {(['min', 'max', 'step'] as const).map(field => <NumericSettingField key={field}
           id={`${field}-speed`} label={field === 'min' ? copy.minSpeed : field === 'max' ? copy.maxSpeed : copy.step}
           tooltip={field === 'min' ? copy.minSpeedTooltip : field === 'max' ? copy.maxSpeedTooltip : copy.stepTooltip}
+          infoLabel={copy.infoLabel}
           min={SPEED_LIMITS[field].min} max={SPEED_LIMITS[field].max} step={SPEED_LIMITS.step.inputStep}
           value={form.draft[field]} data-speed-field={field}
           onValueChange={value => form.setField(field, value)} onBlur={() => form.commitField(field)}
@@ -123,6 +124,7 @@ export function HoldSpeedShortcutSettings({ locale, settings, form, updateSettin
       <DialogHeader><DialogTitle>{copy.holdSpeed}</DialogTitle><DialogDescription>{copy.holdSpeedDesc}</DialogDescription></DialogHeader>
       <FieldGroup>
         <NumericSettingField ref={firstInput} id="hold-speed" label={copy.holdSpeedRate} tooltip={copy.holdSpeedTooltip}
+          infoLabel={copy.infoLabel}
           min={HOLD_SPEED_LIMITS.speed.min} max={HOLD_SPEED_LIMITS.speed.max} step={HOLD_SPEED_LIMITS.speed.inputStep}
           value={draft?.speed ?? ''} disabled={form.detailsDisabled} onValueChange={speed => setDraft(current => current && { ...current, speed })}
           onBlur={normalizeDraft} onDragCommit={normalizeDraft} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur() }} />

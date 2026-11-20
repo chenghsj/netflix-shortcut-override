@@ -13,6 +13,7 @@ type SettingLabelWithTooltipProps = {
   htmlFor: string
   label: string
   tooltip: string
+  infoLabel: string
   className?: string
   labelClassName?: string
   labelProps?: Omit<ComponentProps<typeof FieldLabel>, 'children' | 'className' | 'htmlFor'>
@@ -22,6 +23,7 @@ export function SettingLabelWithTooltip({
   htmlFor,
   label,
   tooltip,
+  infoLabel,
   className,
   labelClassName,
   labelProps,
@@ -36,7 +38,7 @@ export function SettingLabelWithTooltip({
           <button
             type="button"
             className="inline-flex size-4 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-            aria-label={`${label} info`}
+            aria-label={infoLabel.replace('{label}', () => label)}
           >
             <CircleHelpIcon className="size-3.5" />
           </button>

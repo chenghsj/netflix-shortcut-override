@@ -6,4 +6,29 @@ export const POPUP_COPY = {
   'zh-CN': { category: '快捷键分类', openSettings: '前往设置', openCategorySettings: '前往设置页编辑快捷键' },
   ja: { category: 'ショートカットの分類', openSettings: '設定を開く', openCategorySettings: '設定ページでショートカットを編集' },
   ko: { category: '단축키 분류', openSettings: '설정 열기', openCategorySettings: '설정 페이지에서 단축키 편집' },
+  es: {
+    category: 'Categoría de atajos',
+    openSettings: 'Abrir configuración',
+    openCategorySettings: 'Editar atajos en la página de configuración',
+  },
+  'pt-BR': {
+    category: 'Categoria de atalhos',
+    openSettings: 'Abrir configurações',
+    openCategorySettings: 'Editar atalhos na página de configurações',
+  },
+  fr: {
+    category: 'Catégorie de raccourcis',
+    openSettings: 'Ouvrir les paramètres',
+    openCategorySettings: 'Modifier les raccourcis dans les paramètres',
+  },
+  de: {
+    category: 'Tastenkürzelkategorie',
+    openSettings: 'Einstellungen öffnen',
+    openCategorySettings: 'Tastenkürzel in den Einstellungen bearbeiten',
+  },
+  id: {
+    category: 'Kategori pintasan',
+    openSettings: 'Buka pengaturan',
+    openCategorySettings: 'Edit pintasan di halaman pengaturan',
+  },
 } satisfies Record<Locale, Record<string, string>>

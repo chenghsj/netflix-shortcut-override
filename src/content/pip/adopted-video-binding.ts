@@ -131,10 +131,12 @@ export class AdoptedVideoBinding {
   }
 
   private getControlsSettings() {
+    const locale = resolveLocalePreference(this.settings.locale)
+    this.pipWindow.document.documentElement.lang = locale
     return {
       seekSeconds: this.settings.seek.seconds,
       pip: this.settings.pip,
-      copy: getCopy(resolveLocalePreference(this.settings.locale)).pipControls,
+      copy: getCopy(locale).pipControls,
     }
   }
 

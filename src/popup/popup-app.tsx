@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AlertCircleIcon, BookOpenIcon, CircleDotIcon, Settings2Icon, StarIcon } from 'lucide-react'
 import { HELP_UI_COPY } from '@/help/help-copy'
 import { GitHubIcon } from '@/components/github-icon'
@@ -50,6 +50,7 @@ export function PopupApp() {
   } = useCompatibilitySession()
   const { suppressFocusRestoration } = usePopupFocusRestoration(resolvePlaybackFocusTarget)
   const locale = resolveLocalePreference(settings.locale)
+  useEffect(() => { document.documentElement.lang = locale }, [locale])
   const copy = getCopy(locale)
   const browserCapabilities = getBrowserCapabilities()
   useTheme(settings.theme, loaded)
@@ -67,7 +68,7 @@ export function PopupApp() {
     }
   }
 
-  if (!loaded) return <main className="h-40 w-full bg-background" aria-label="Loading" />
+  if (!loaded) return <main className="h-40 w-full bg-background" aria-label={copy.loading} />
 
   return <TooltipProvider>
     <main className="popup-shell flex w-full flex-col bg-background text-sm text-foreground">

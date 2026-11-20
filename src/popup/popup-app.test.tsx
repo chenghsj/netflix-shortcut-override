@@ -369,7 +369,7 @@ describe('PopupApp', () => {
     render(<PopupApp />)
     await getPopupShortcuts()
     const search = screen.getByRole('searchbox')
-    for (const query of ['字幕', '자막']) {
+    for (const query of ['字幕', '자막', 'subtitulos', 'legendas', 'sous-titres', 'untertitel', 'subtitel']) {
       fireEvent.change(search, { target: { value: query } })
       expect(screen.getByText('Toggle subtitles')).toBeVisible()
       expect(screen.getByText('Previous subtitle')).toBeVisible()

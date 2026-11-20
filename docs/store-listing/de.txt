@@ -1,0 +1,27 @@
+Passen Sie Netflix mit bis zu drei Tastenkürzeln pro Aktion an.
+
+Tastenkürzel und Wiedergabe
+
+- Behalten Sie Ihre Tastenkürzel für Folgen und ergänzen Sie die Medientasten „Vorheriger Titel“ und „Nächster Titel“, wenn Ihr Browser sie unterstützt.
+- Starten oder pausieren Sie die Wiedergabe, wechseln Sie einzelne Bilder oder Folgen, ändern Sie Lautstärke und Tempo und schalten Sie zwischen Untertitelgrößen, Untertitelsprachen oder Tonspuren um.
+- Erstellen Sie Tastenkürzel für Vor- oder Rücksprünge von 1 bis 300 Sekunden, für eine Position in Prozent oder für eine bevorzugte Wiedergabegeschwindigkeit bis 5×. Halten Sie Wiedergabe / Pause gedrückt, um vorübergehend das gewählte Tempo zu verwenden.
+
+Untertitel und Bild-im-Bild
+
+- Aktivieren Sie die Untertitelnavigation, um zwischen Untertiteln zu springen, den aktuellen zu wiederholen oder ein separates Tastenkürzel für Wiedergabe / Pause zu nutzen. Wählen Sie eine Netflix-Untertitelspur und erlauben Sie den Zugriff auf die Untertitel-Website.
+- Sehen Sie Netflix im Bild-im-Bild-Fenster mit Untertiteln und Wiedergabesteuerung in Chrome und Edge ab Version 116.
+
+Wiedergabeeinstellungen und Sicherungen
+
+- Überspringen Sie auf Wunsch Vorspann oder Rückblick, spielen Sie automatisch die nächste Folge ab oder blenden Sie die Netflix-Informationen bei einer Pause aus.
+- Synchronisieren Sie Einstellungen, exportieren oder importieren Sie Sicherungen und lesen Sie das Handbuch auf Deutsch, Französisch, Indonesisch, Englisch, traditionellem oder vereinfachtem Chinesisch, Japanisch, Koreanisch, Spanisch oder brasilianischem Portugiesisch.
+
+Tastenkürzel funktionieren auf Netflix-Wiedergabeseiten und werden bei der Texteingabe ausgesetzt. Einige Funktionen hängen vom Netflix-Player ab und können nach Änderungen am Player ein Update erfordern.
+
+Datenschutz
+
+Die Erweiterung verwendet keine Analyse- oder Tracking-Dienste und keine Verarbeitung durch Dritte. Die Einstellungen verwenden den synchronisierten Browserspeicher.
+
+Die optionale Untertitelnavigation ruft Untertitel von Netflix-Servern ab, verarbeitet sie auf dem Gerät und behält die Zeitdaten vorübergehend im Arbeitsspeicher.
+
+Unabhängig entwickelte Erweiterung ohne Verbindung zu Netflix. Netflix unterstützt oder sponsert die Erweiterung nicht.

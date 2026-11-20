@@ -30,4 +30,29 @@ export const SUBTITLE_NAVIGATION_POPUP_COPY: Record<Locale, {
     overridden: '일반 단축키 우선',
     overriddenBy: '이 키는 {action}에서 사용합니다. 자막 탐색에는 다른 키를 설정하세요.',
   },
+  es: {
+    requiresEnabled: 'Selecciona «Activar extensión» arriba para navegar por subtítulos.',
+    overridden: 'Prioridad de atajos',
+    overriddenBy: '{action} ya usa esta tecla. Elige otra para la navegación por subtítulos.',
+  },
+  'pt-BR': {
+    requiresEnabled: 'Ative a opção “Ativar extensão” acima para navegar pelas legendas.',
+    overridden: 'Prioridade de atalhos',
+    overriddenBy: '{action} já usa esta tecla. Escolha outra para navegar pelas legendas.',
+  },
+  fr: {
+    requiresEnabled: 'Activez « Activer l’extension » ci-dessus pour utiliser la navigation par sous-titres.',
+    overridden: 'Priorité des raccourcis',
+    overriddenBy: 'Cette touche est utilisée par {action}. Choisissez-en une autre pour la navigation par sous-titres.',
+  },
+  de: {
+    requiresEnabled: 'Schalten Sie oben „Erweiterung aktivieren“ ein, um die Untertitelnavigation zu verwenden.',
+    overridden: 'Priorität der Tastenkürzel',
+    overriddenBy: 'Diese Taste ist bereits {action} zugewiesen. Wählen Sie eine andere Taste für die Untertitelnavigation.',
+  },
+  id: {
+    requiresEnabled: 'Nyalakan “Aktifkan ekstensi” di atas untuk menggunakan navigasi subtitel.',
+    overridden: 'Prioritas pintasan',
+    overriddenBy: 'Tombol ini digunakan oleh {action}. Pilih tombol lain untuk navigasi subtitel.',
+  },
 }

@@ -245,6 +245,7 @@ export function OptionsApp() {
     subtitleSection.current?.scrollIntoView({ block: 'start' })
   }, [loaded, subtitleNavigationRequest])
   const resolvedLocale = resolveLocalePreference(settings.locale)
+  useEffect(() => { document.documentElement.lang = resolvedLocale }, [resolvedLocale])
   const browserCapabilities = getBrowserCapabilities()
   const updateSettings = management.updateSettings
   const setManaging = (id: string, open: boolean) => {
@@ -602,7 +603,7 @@ export function OptionsApp() {
                                           <button
                                             type="button"
                                             className="inline-flex size-4 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                                            aria-label={`${copy.actions[action]} info`}
+                                            aria-label={copy.infoLabel.replace('{label}', copy.actions[action])}
                                           >
                                             <CircleHelpIcon className="size-3.5" />
                                           </button>
@@ -827,7 +828,7 @@ export function OptionsApp() {
                     <h3 id="pause-screen-heading" className="text-base font-semibold">{sectionCopy.pauseScreen}</h3>
                     <Field orientation="horizontal" className="items-center justify-between">
                       <SettingLabelWithTooltip htmlFor={pauseOverlaySettingsId}
-                        label={copy.hidePauseOverlay} tooltip={copy.hidePauseOverlayDescription} />
+                        label={copy.hidePauseOverlay} tooltip={copy.hidePauseOverlayDescription} infoLabel={copy.infoLabel} />
                       <Switch id={pauseOverlaySettingsId}
                         checked={settings.hidePauseOverlay} disabled={!settings.enabled}
                         onCheckedChange={hidePauseOverlay => updateSettings(current => ({ ...current, hidePauseOverlay }))} />
@@ -856,6 +857,7 @@ export function OptionsApp() {
                       htmlFor="enable-shortcut-override"
                       label={copy.enabled}
                       tooltip={copy.enabledDesc}
+                      infoLabel={copy.infoLabel}
                     />
                     <Switch
                       ref={globalEnableSwitch}

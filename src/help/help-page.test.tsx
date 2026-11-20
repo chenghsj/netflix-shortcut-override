@@ -39,7 +39,7 @@ describe('Guide coverage and search', () => {
     const copy = SPECIAL_KEY_GUIDE_COPY[locale]
     expect(within(instructions).getByRole('heading', { name: copy.reservedTitle })).toBeVisible()
     expect(within(instructions).getByText(/Win.*Command/)).toBeVisible()
-    expect(within(instructions).getByText(/^Fn[:：]/)).toBeVisible()
+    expect(within(instructions).getByText(/^Fn\s*[:：]/)).toBeVisible()
     expect(within(instructions).queryByText(copy.aliasesTitle)).not.toBeInTheDocument()
     expect(instructions.querySelector('code')).toBeNull()
     expect(within(instructions).getByRole('link')).toHaveAttribute('href', '#playback')
@@ -57,7 +57,7 @@ describe('Guide coverage and search', () => {
     expect(document.querySelector('#help-volume')).toBeNull()
     expect(document.querySelector('#help-general')).toBeNull()
     expect(screen.queryByRole('button', { name: /^Feature behavior and limitations/ })).not.toBeInTheDocument()
-    view.rerender(<HelpPage {...props} query="Fn" />)
+    view.rerender(<HelpPage {...props} query="MediaNextTrack" />)
     expect(screen.getByRole('status')).toHaveTextContent('1 matching topics')
     expect(screen.getByRole('heading', { name: HELP_TOPIC_COPY.en.supportedKeys[0] })).toBeVisible()
     view.rerender(<HelpPage {...props} query="" />)

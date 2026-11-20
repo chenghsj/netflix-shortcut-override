@@ -1,0 +1,27 @@
+Sesuaikan cara Anda menonton Netflix dengan hingga tiga pintasan keyboard per tindakan.
+
+Pintasan dan pemutaran
+
+- Pertahankan pintasan episode dan tambahkan tombol Trek Sebelumnya dan Trek Berikutnya jika browser mendukungnya.
+- Putar atau jeda, berpindah bingkai atau episode, atur volume dan kecepatan, serta ganti ukuran atau bahasa subtitel dan trek audio.
+- Buat pintasan untuk maju atau mundur 1 hingga 300 detik, lompat ke persentase tertentu dalam video, atau gunakan kecepatan pilihan hingga 5×. Tahan Putar / Jeda untuk memakai kecepatan yang Anda pilih sementara.
+
+Subtitel dan gambar dalam gambar
+
+- Aktifkan navigasi subtitel untuk melompat antar-subtitel, mengulang subtitel saat ini, atau memakai pintasan Putar / Jeda yang terpisah. Pilih trek subtitel Netflix dan izinkan akses ke situs subtitel.
+- Tonton Netflix dalam mode gambar dalam gambar dengan subtitel dan kontrol pemutaran di Chrome dan Edge versi 116 atau yang lebih baru.
+
+Preferensi pemutaran dan cadangan
+
+- Pilih untuk melewati intro atau rekap, memutar episode berikutnya secara otomatis, atau menyembunyikan informasi Netflix saat video dijeda.
+- Sinkronkan pengaturan, ekspor dan impor cadangan, serta baca panduan dalam bahasa Indonesia, Inggris, Tionghoa Tradisional, Tionghoa Sederhana, Jepang, Korea, Spanyol, Portugis Brasil, Prancis, atau Jerman.
+
+Pintasan berfungsi di halaman pemutaran Netflix dan dijeda saat Anda mengetik di kolom yang dapat diedit. Sebagian fitur bergantung pada pemutar Netflix dan mungkin perlu diperbarui jika pemutar berubah.
+
+Privasi
+
+Ekstensi ini berfungsi tanpa analitik, pelacakan, atau layanan pemrosesan pihak ketiga. Pengaturan menggunakan penyimpanan sinkron browser.
+
+Navigasi subtitel bersifat opsional. Fitur ini mengambil subtitel dari server Netflix, memprosesnya di perangkat, dan menyimpan data waktu sementara di memori.
+
+Ekstensi ini dikembangkan secara independen, tanpa afiliasi, dukungan, atau sponsor dari Netflix.

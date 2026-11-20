@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.7.1
+
+- Added Spanish, Brazilian Portuguese, French, German and Indonesian. The extension now has ten interface languages across Settings, the toolbar popup, the user guide and playback controls. Use automatic browser language detection or choose a language in Settings.
+- Find settings, shortcuts and help in all ten languages. Search also matches words typed without Latin accents.
+- Fixed shortcut labels for characters recorded on other keyboard layouts, including `;` on French AZERTY and `ß` on German QWERTZ. Shortcuts continue to use the recorded physical key position.
+
 ## v0.7.0
 
 ### Shortcuts

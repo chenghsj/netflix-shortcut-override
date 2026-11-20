@@ -24,7 +24,9 @@ BrowserBack/BrowserForward recording, routing, cancellation and repeat/disabled/
 
 ## Multiple keys per action
 
-On `/tests/browser/media-keys.html`, choose **Run multiple shortcut checks**. `#result[data-state="passed"]` must report `pass: true`, `count: 5`. It uses the production modal to add MediaTrackNext beside Shift+N, save, reopen and route both keys in English, Traditional Chinese, Simplified Chinese, Japanese and Korean. It restores the prior development-page settings. These events are simulated and do not prove physical media-key delivery. The fixture imports the production stylesheet for layout inspection.
+On `/tests/browser/media-keys.html`, choose **Run multiple shortcut checks**. The count must match the number of supported interface languages. The check uses the production modal to add MediaTrackNext beside Shift+N, save, reopen and route both keys. It restores the prior development-page settings. The fixture imports the production stylesheet for layout inspection and uses simulated keyboard events.
+
+Choose **Run AZERTY and QWERTZ checks** to record, display, save, and route six combinations from the French and German layouts. The cases cover moved letters, `é`, `;`, and `ß`. These use simulated `key` and `code` pairs based on the [W3C keyboard event model](https://www.w3.org/TR/uievents-code/).
 
 ## Browser media-control routing
 

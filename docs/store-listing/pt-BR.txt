@@ -1,0 +1,27 @@
+Personalize como você assiste à Netflix com até três atalhos de teclado por ação.
+
+Atalhos e reprodução
+
+- Mantenha seus atalhos de episódio e adicione as teclas Faixa anterior e Próxima faixa se o navegador oferecer suporte.
+- Reproduza ou pause, navegue quadro a quadro, troque de episódio, ajuste o volume e a velocidade e alterne entre tamanhos ou idiomas de legendas e faixas de áudio.
+- Crie atalhos para avançar ou voltar de 1 a 300 segundos, saltar para uma porcentagem do vídeo ou aplicar uma velocidade preferida de até 5×. Mantenha Reproduzir / Pausar pressionado para usar temporariamente a velocidade que você escolher.
+
+Legendas e Picture-in-Picture
+
+- Ative a navegação por legendas para saltar entre elas, repetir a atual ou usar um atalho separado para reproduzir e pausar. Escolha uma faixa de legendas da Netflix e permita o acesso ao site de legendas.
+- Assista em Picture-in-Picture com legendas e controles de reprodução da Netflix no Chrome e no Edge 116 ou mais recentes.
+
+Preferências de reprodução e backups
+
+- Escolha se deseja pular aberturas ou resumos, reproduzir o próximo episódio automaticamente ou ocultar as informações da Netflix ao pausar.
+- Sincronize as configurações, exporte e importe backups e consulte o guia em português do Brasil, inglês, chinês tradicional, chinês simplificado, japonês, coreano, espanhol, francês, alemão ou indonésio.
+
+Os atalhos funcionam nas páginas de reprodução da Netflix e ficam suspensos enquanto você digita em campos editáveis. Alguns recursos dependem do player da Netflix e podem exigir atualizações quando ele mudar.
+
+Privacidade
+
+A extensão funciona sem análise de dados, rastreamento ou serviços de processamento de terceiros. As configurações usam o armazenamento sincronizado do navegador.
+
+A navegação por legendas é opcional. Ela baixa as legendas dos servidores da Netflix, processa os dados no dispositivo e mantém os tempos temporariamente na memória.
+
+Extensão desenvolvida de forma independente, sem vínculo, aprovação ou patrocínio da Netflix.

@@ -3,6 +3,8 @@ import { matchesSearchText } from '@/shared/search'
 import { RESET_SCOPE_COPY } from '@/shared/reset-scopes'
 import { LOCALES, type Locale } from '@/shared/shortcut-types'
 import { EN_HELP_TOPICS, HELP_UI_COPY, type HelpTopicId, type HelpTopicText } from './help-copy'
+import { ES_HELP_TOPICS, PT_BR_HELP_TOPICS } from './help-copy-es-pt'
+import { DE_HELP_TOPICS, FR_HELP_TOPICS, ID_HELP_TOPICS } from './help-copy-fr-de-id'
 import { JA_HELP_TOPICS, KO_HELP_TOPICS } from './help-copy-ja-ko'
 import { SPECIAL_SHORTCUT_KEYS, LEGACY_SPECIAL_KEY_ALIASES } from '@/shared/special-shortcut-keys'
 import { SPECIAL_KEY_GUIDE_COPY, SPECIAL_KEY_LABELS } from './special-key-copy'
@@ -12,6 +14,8 @@ export const HELP_CATEGORY_IDS = ['start', 'editing', 'backup', 'troubleshooting
 export type HelpCategory = typeof HELP_CATEGORY_IDS[number]
 export const HELP_TOPIC_COPY: Record<Locale, HelpTopicText> = {
   en: EN_HELP_TOPICS, 'zh-TW': ZH_TW_HELP_TOPICS, 'zh-CN': ZH_CN_HELP_TOPICS, ja: JA_HELP_TOPICS, ko: KO_HELP_TOPICS,
+  es: ES_HELP_TOPICS, 'pt-BR': PT_BR_HELP_TOPICS,
+  fr: FR_HELP_TOPICS, de: DE_HELP_TOPICS, id: ID_HELP_TOPICS,
 }
 
 type TopicDefinition = {

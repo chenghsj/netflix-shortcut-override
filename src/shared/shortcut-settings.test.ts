@@ -174,7 +174,7 @@ describe('shortcut settings', () => {
 
   it('defaults unknown or missing locale values to automatic mode', () => {
     expect(normalizeSettings({}).locale).toBe('auto')
-    expect(normalizeSettings({ locale: 'fr' }).locale).toBe('auto')
+    expect(normalizeSettings({ locale: 'it' }).locale).toBe('auto')
     expect(normalizeSettings({ locale: 'zh-TW' }).locale).toBe('zh-TW')
   })
 

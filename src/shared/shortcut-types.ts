@@ -55,7 +55,7 @@ export type SeekShortcut = {
   value: number
 }
 
-export const LOCALES = ['en', 'zh-TW', 'zh-CN', 'ja', 'ko'] as const
+export const LOCALES = ['en', 'zh-TW', 'zh-CN', 'ja', 'ko', 'es', 'pt-BR', 'fr', 'de', 'id'] as const
 export type Locale = (typeof LOCALES)[number]
 
 export const LOCALE_PREFERENCES = ['auto', ...LOCALES] as const

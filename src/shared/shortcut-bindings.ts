@@ -277,6 +277,18 @@ const getRuntimePlatform = (): string => {
   return userAgentDataPlatform ?? navigator.platform
 }
 
+const getDisplayKey = (binding: KeyBinding): string => {
+  const key = normalizeShortcutKey(binding.code, binding.key, binding.shift)
+  const label = CODE_LABELS[binding.code]
+  const punctuation = US_PUNCTUATION_KEYS.get(binding.code)
+  // Keep the familiar base label for US punctuation, and show the recorded
+  // character when this physical position produces a different symbol.
+  if (label && (!punctuation || key === punctuation[binding.shift ? 1 : 0])) return label
+
+  const uppercase = key.toUpperCase()
+  return key.length === 1 && uppercase.length > 1 ? key : uppercase
+}
+
 export const getKeyBindingLabels = (
   binding: KeyBinding | null,
   options: KeyBindingLabelOptions = {}
@@ -287,7 +299,7 @@ export const getKeyBindingLabels = (
     binding.alt ? 'Alt' : null,
     binding.shift ? 'Shift' : null,
     binding.meta ? getMetaKeyLabel(options.platform) : null,
-    CODE_LABELS[binding.code] ?? normalizeShortcutKey(binding.code, binding.key, binding.shift).toUpperCase(),
+    getDisplayKey(binding),
   ]
 
   return labels.filter((label): label is string => Boolean(label))

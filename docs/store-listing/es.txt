@@ -1,0 +1,27 @@
+Personaliza cómo ves Netflix con hasta tres atajos de teclado por acción.
+
+Atajos y reproducción
+
+- Conserva tus atajos de episodio y agrega las teclas Pista anterior y Pista siguiente si tu navegador las admite.
+- Reproduce o pausa, avanza fotograma a fotograma, cambia de episodio, ajusta el volumen y la velocidad, y alterna entre tamaños o idiomas de subtítulos y pistas de audio.
+- Crea atajos para avanzar o retroceder de 1 a 300 segundos, ir a un porcentaje del video o aplicar una velocidad preferida de hasta 5×. Mantén pulsado Reproducir / Pausar para usar temporalmente la velocidad que elijas.
+
+Subtítulos e imagen en imagen
+
+- Activa la navegación por subtítulos para saltar entre ellos, repetir el actual o usar un atajo independiente para reproducir y pausar. Elige una pista de subtítulos de Netflix y concede acceso al sitio de subtítulos.
+- Mira Netflix en imagen en imagen con subtítulos y controles de reproducción en Chrome y Edge 116 o posteriores.
+
+Preferencias de reproducción y copias de seguridad
+
+- Elige si quieres omitir introducciones o resúmenes, reproducir automáticamente el siguiente episodio u ocultar la información de Netflix al pausar.
+- Sincroniza la configuración, exporta e importa copias de seguridad y consulta la guía en español, inglés, chino tradicional, chino simplificado, japonés, coreano, portugués de Brasil, francés, alemán o indonesio.
+
+Los atajos funcionan en las páginas de reproducción de Netflix y se suspenden mientras escribes en campos editables. Algunas funciones dependen del reproductor de Netflix y pueden requerir actualizaciones cuando cambie.
+
+Privacidad
+
+La extensión funciona sin análisis, seguimiento ni servicios de procesamiento de terceros. La configuración se guarda en el almacenamiento sincronizado del navegador.
+
+La navegación por subtítulos es opcional. Obtiene los subtítulos de los servidores de Netflix, los procesa en el dispositivo y conserva los tiempos temporalmente en memoria.
+
+Extensión de desarrollo independiente, sin afiliación, respaldo ni patrocinio de Netflix.

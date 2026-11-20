@@ -105,9 +105,9 @@ validation. The release workflow also creates the Firefox, source, and checksum 
 
 ## Store Languages
 
-The package includes English, Traditional Chinese, Simplified Chinese, Japanese,
-and Korean metadata under `_locales`. The extension name stays the same in every
-language; the summary is translated. After uploading the package, fill in each
-language's detailed description separately in the store dashboard using the
+The package includes localized summaries for all supported interface languages
+under `_locales`. The extension name stays the same in every language. After
+uploading the package, fill in each language's detailed description in the store
+dashboard using the
 [store listing translations](store-listing/README.md). These descriptions are
 documentation and are not published by the build or release workflow.

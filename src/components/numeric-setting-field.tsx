@@ -13,6 +13,7 @@ type NumericSettingFieldProps = Omit<
   id: string
   label: string
   tooltip: string
+  infoLabel?: string
   value: string
   onValueChange: (value: string) => void
   orientation?: ComponentProps<typeof Field>['orientation']
@@ -28,6 +29,7 @@ export function NumericSettingField({
   id,
   label,
   tooltip,
+  infoLabel = '{label} info',
   value,
   onValueChange,
   orientation,
@@ -78,6 +80,7 @@ export function NumericSettingField({
         htmlFor={id}
         label={label}
         tooltip={tooltip}
+        infoLabel={infoLabel}
         labelClassName={numericLabelClassName}
         labelProps={numericLabelProps}
       />}

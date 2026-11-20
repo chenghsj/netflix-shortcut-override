@@ -23,6 +23,14 @@ const EDITOR_COPY: Record<Locale, { description: string; changed: string }> = {
   'zh-CN': { description: '设置跳转值，快捷键可留空。', changed: '设置已更改，请重新打开窗口。' },
   ja: { description: '移動する値を設定します。キーは任意です。', changed: '設定が変わりました。編集画面を開き直してください。' },
   ko: { description: '이동할 값을 설정하세요. 단축키는 선택 사항입니다.', changed: '설정이 변경되었습니다. 편집 창을 다시 여세요.' },
+  es: { description: 'Define el salto. El atajo es opcional.', changed: 'La configuración cambió. Vuelve a abrir este editor.' },
+  'pt-BR': { description: 'Defina o salto. O atalho é opcional.', changed: 'As configurações mudaram. Abra este editor novamente.' },
+  fr: { description: 'Définissez le saut. Le raccourci est facultatif.', changed: 'Les paramètres ont changé. Rouvrez cet éditeur.' },
+  de: {
+    description: 'Legen Sie den Sprung fest. Das Tastenkürzel ist optional.',
+    changed: 'Einstellungen wurden geändert. Öffnen Sie den Editor erneut.',
+  },
+  id: { description: 'Atur lompatan. Pintasan bersifat opsional.', changed: 'Pengaturan berubah. Buka kembali editor ini.' },
 }
 
 export function SeekShortcutDialog({ editor, settings, locale }: {

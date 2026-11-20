@@ -54,6 +54,27 @@ describe('shortcut bindings', () => {
   })
 
   it.each([
+    { layout: 'AZERTY', code: 'KeyQ', key: 'a', label: 'A' },
+    { layout: 'AZERTY', code: 'Digit2', key: 'é', label: 'É' },
+    { layout: 'AZERTY', code: 'Comma', key: ';', label: ';' },
+    { layout: 'QWERTZ', code: 'KeyY', key: 'z', label: 'Z' },
+    { layout: 'QWERTZ', code: 'KeyZ', key: 'y', label: 'Y' },
+    { layout: 'QWERTZ', code: 'Minus', key: 'ß', label: 'ß' },
+  ])('records and displays $label on $layout while matching by physical position', ({ code, key, label }) => {
+    const event = new KeyboardEvent('keydown', { code, key, ctrlKey: true })
+    const binding = keyBindingFromEvent(event)
+    expect(binding).toMatchObject({ code, key, ctrl: true })
+    expect(formatKeyBinding(binding)).toBe('Ctrl + ' + label)
+    const settings = structuredClone(DEFAULT_SETTINGS)
+    settings.bindings.nextEpisode.key = binding
+    expect(findActionForKey(settings, event)).toBe('nextEpisode')
+    expect(findActionForKey(settings, new KeyboardEvent('keydown', { code, key: 'Unidentified', ctrlKey: true })))
+      .toBe('nextEpisode')
+    expect(findActionForKey(settings, new KeyboardEvent('keydown', { code: 'KeyU', key, ctrlKey: true })))
+      .toBeNull()
+  })
+
+  it.each([
     { code: 'KeyP', key: 'ㄣ', shift: false, recorded: 'p', label: 'P' },
     { code: 'KeyP', key: 'ㄣ', shift: true, recorded: 'P', label: 'Shift + P' },
     { code: 'KeyP', key: 'Process', shift: true, recorded: 'P', label: 'Shift + P' },

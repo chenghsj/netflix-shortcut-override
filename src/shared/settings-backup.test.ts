@@ -337,6 +337,14 @@ describe('settings backup', () => {
     })
   })
 
+  it.each(['es', 'pt-BR', 'fr', 'de', 'id'] as const)('preserves the %s locale when importing a backup', locale => {
+    const backup = createSettingsBackup({ ...DEFAULT_SETTINGS, locale }, { extensionVersion: '0.7.0', exportedAt })
+    expect(parseSettingsBackup(serializeSettingsBackup(backup))).toMatchObject({
+      ok: true,
+      value: { settings: { locale } },
+    })
+  })
+
   it('migrates older settings and normalizes values before preview', () => {
     const legacySettings = createVersion9Settings()
     const result = parseSettingsBackup(

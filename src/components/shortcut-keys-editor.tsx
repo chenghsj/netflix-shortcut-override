@@ -13,6 +13,11 @@ export const MULTI_SHORTCUT_COPY = {
   'zh-CN': { add: '添加快捷键', remove: '移除第 {number} 组快捷键' },
   ja: { add: 'ショートカットを追加', remove: 'ショートカット {number} を削除' },
   ko: { add: '단축키 추가', remove: '단축키 {number} 삭제' },
+  es: { add: 'Agregar atajo', remove: 'Quitar atajo {number}' },
+  'pt-BR': { add: 'Adicionar atalho', remove: 'Remover atalho {number}' },
+  fr: { add: 'Ajouter un raccourci', remove: 'Retirer le raccourci {number}' },
+  de: { add: 'Tastenkürzel hinzufügen', remove: 'Tastenkürzel {number} entfernen' },
+  id: { add: 'Tambah pintasan', remove: 'Hapus pintasan {number}' },
 } satisfies Record<Locale, { add: string; remove: string }>
 
 const KEY_ERROR_COPY = {
@@ -21,6 +26,11 @@ const KEY_ERROR_COPY = {
   'zh-CN': { duplicate: '此按键已在此操作中设置。', invalid: '无法录制此按键。' },
   ja: { duplicate: 'このキーはこの操作に登録済みです。', invalid: 'このキーは記録できません。' },
   ko: { duplicate: '이 키는 이 동작에 이미 등록되어 있습니다.', invalid: '이 키를 기록할 수 없습니다.' },
+  es: { duplicate: 'Esta tecla ya está asignada a la acción.', invalid: 'No se pudo registrar esta tecla.' },
+  'pt-BR': { duplicate: 'Esta tecla já está atribuída à ação.', invalid: 'Não foi possível registrar esta tecla.' },
+  fr: { duplicate: 'Cette touche est déjà attribuée à cette action.', invalid: 'Impossible d’enregistrer cette touche.' },
+  de: { duplicate: 'Diese Taste ist dieser Aktion bereits zugewiesen.', invalid: 'Diese Taste konnte nicht erfasst werden.' },
+  id: { duplicate: 'Tombol ini sudah ditetapkan untuk tindakan ini.', invalid: 'Tombol ini tidak dapat direkam.' },
 } satisfies Record<Locale, { duplicate: string; invalid: string }>
 
 type Props = Omit<ComponentProps<typeof ShortcutRecordingArea>, 'binding' | 'onClear' | 'onKeyDown' | 'onChange' | 'ref' | 'placeholder' | 'idlePlaceholder'> & {

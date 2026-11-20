@@ -1216,7 +1216,7 @@ describe('OptionsApp', () => {
     const toggle = within(pauseScreen).getByRole('switch', { name: copy.hidePauseOverlay })
     expect(toggle).not.toBeChecked()
     expect(screen.queryByText(copy.hidePauseOverlayDescription)).not.toBeInTheDocument()
-    const help = screen.getByRole('button', { name: `${copy.hidePauseOverlay} info` })
+    const help = screen.getByRole('button', { name: copy.infoLabel.replace('{label}', copy.hidePauseOverlay) })
     focusAsKeyboard(help)
     expect(await screen.findByRole('tooltip')).toHaveTextContent(copy.hidePauseOverlayDescription)
     act(() => help.blur())
@@ -2325,12 +2325,40 @@ describe('OptionsApp', () => {
     expect(document.documentElement).not.toHaveClass('dark')
   })
 
-  it('uses the detected browser language when no settings exist yet', async () => {
-    vi.mocked(chrome.i18n.getUILanguage).mockReturnValue('zh-TW')
+  it.each([
+    ['zh-TW', 'zh-TW', '一般設定', '語言', '自動'],
+    ['es-MX', 'es', 'Configuración general', 'Idioma', 'Automático'],
+    ['pt-BR', 'pt-BR', 'Configurações gerais', 'Idioma', 'Automático'],
+    ['fr-CA', 'fr', 'Paramètres généraux', 'Langue', 'Automatique'],
+    ['de-CH', 'de', 'Allgemeine Einstellungen', 'Sprache', 'Automatisch'],
+    ['id-ID', 'id', 'Pengaturan umum', 'Bahasa', 'Otomatis'],
+  ])('uses the detected %s browser language when no settings exist yet', async (browserLanguage, locale, general, language, automatic) => {
+    vi.mocked(chrome.i18n.getUILanguage).mockReturnValue(browserLanguage)
     render(<OptionsApp />)
-    await selectShortcutCategory('一般設定')
+    await selectShortcutCategory(general)
 
-    expect(await screen.findByRole('combobox', { name: '語言' })).toHaveTextContent('自動')
+    expect(await screen.findByRole('combobox', { name: language })).toHaveTextContent(automatic)
+    expect(document.documentElement).toHaveAttribute('lang', locale)
+  })
+
+  it('persists a manually chosen locale and searches settings in both new languages', async () => {
+    render(<OptionsApp />)
+    await selectShortcutCategory('General settings')
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Language' }))
+    fireEvent.click(await screen.findByRole('option', { name: 'Português (BR)' }))
+    await waitFor(async () => {
+      expect((await getSettings()).locale).toBe('pt-BR')
+      expect(document.documentElement).toHaveAttribute('lang', 'pt-BR')
+    })
+
+    const search = screen.getByRole('searchbox')
+    for (const query of [
+      'configuracion general', 'configuracoes gerais', 'parametres generaux',
+      'allgemeine einstellungen', 'pengaturan umum',
+    ]) {
+      fireEvent.change(search, { target: { value: query } })
+      expect(screen.getByRole('switch', { name: 'Ativar extensão' })).toBeVisible()
+    }
   })
 
   it('syncs external settings changes while open', async () => {

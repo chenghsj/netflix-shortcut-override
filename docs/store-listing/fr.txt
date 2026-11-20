@@ -1,0 +1,27 @@
+Personnalisez votre expérience Netflix avec jusqu’à trois raccourcis clavier par action.
+
+Raccourcis et lecture
+
+- Conservez vos raccourcis d’épisode et ajoutez les touches Piste précédente et Piste suivante si votre navigateur les prend en charge.
+- Lancez ou mettez en pause la lecture, avancez image par image, changez d’épisode, réglez le volume et la vitesse, et passez d’une taille ou langue de sous-titres ou d’une piste audio à l’autre.
+- Créez des raccourcis pour avancer ou reculer de 1 à 300 secondes, rejoindre un pourcentage de la vidéo ou appliquer une vitesse préférée jusqu’à 5×. Maintenez Lecture / Pause pour utiliser temporairement la vitesse de votre choix.
+
+Sous-titres et image dans l’image
+
+- Activez la navigation par sous-titres pour passer d’un sous-titre à l’autre, relire le sous-titre actuel ou utiliser un raccourci Lecture / Pause distinct. Sélectionnez une piste de sous-titres Netflix et autorisez l’accès au site de sous-titres.
+- Regardez Netflix en mode image dans l’image avec les sous-titres et les commandes de lecture dans Chrome et Edge à partir de la version 116.
+
+Préférences de lecture et sauvegardes
+
+- Choisissez de passer automatiquement les génériques ou récapitulatifs, de lire l’épisode suivant ou de masquer les informations Netflix pendant la pause.
+- Synchronisez vos paramètres, exportez et importez des sauvegardes, et consultez le guide en français, allemand, indonésien, anglais, chinois traditionnel, chinois simplifié, japonais, coréen, espagnol ou portugais du Brésil.
+
+Les raccourcis fonctionnent sur les pages de lecture de Netflix et sont suspendus lors de la saisie de texte. Certaines fonctions dépendent du lecteur Netflix et peuvent nécessiter une mise à jour s’il change.
+
+Confidentialité
+
+L’extension fonctionne sans analyse, suivi ni service tiers de traitement. Les paramètres utilisent le stockage synchronisé du navigateur.
+
+La navigation par sous-titres est facultative. Elle récupère les sous-titres sur les serveurs de Netflix, les traite sur l’appareil et conserve leurs repères de temps en mémoire de façon temporaire.
+
+Extension développée de manière indépendante, sans affiliation, approbation ni parrainage de Netflix.

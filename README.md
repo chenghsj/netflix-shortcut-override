@@ -55,7 +55,7 @@ Ordinary shortcuts and `2x` hold speed are enabled by default. Subtitle navigati
 - Hold the Play / Pause key for temporary speed adjustment, then release to restore the original speed.
 - Automatically skip intros and recaps or advance to the next episode; optionally hide Netflix's pause overlay.
 - Check compatibility and copy local diagnostics from the toolbar popup.
-- Sync settings through browser storage, export/import backups, and choose from five interface languages and three interface styles.
+- Sync settings through browser storage, export/import backups, and choose from ten interface languages and three interface styles.
 
 ## Default Shortcuts
 
@@ -126,9 +126,9 @@ In Options, 1–9 select Playback, Seeking and navigation, Subtitles, Volume and
 
 ## Settings and Customization
 
-Open **User guide** below Backup and restore in the Options sidebar or from the popup footer for searchable, collapsible instructions in all five interface languages. Its 11 concise topics cover four categories: Quick start, Shortcut settings, Backup and recovery, and Permissions and privacy, with links to relevant settings. Feature-specific tips appear beside their controls; see the [detailed user guide](docs/user-guide.md) for the full reference.
+Open **User guide** below Backup and restore in the Options sidebar or from the popup footer for searchable, collapsible instructions in all ten interface languages. Its 11 concise topics cover four categories: Quick start, Shortcut settings, Backup and recovery, and Permissions and privacy, with links to relevant settings. Feature-specific tips appear beside their controls; see the [detailed user guide](docs/user-guide.md) for the full reference.
 
-Use the Options sidebar to choose a shortcut category, General settings, Playback preferences, or Backup and restore. Search settings, action names, language names, or keys across all five interface languages. The toolbar popup provides searchable shortcut reference and compatibility status; **Open settings** opens the corresponding Options page for editing.
+Use the Options sidebar to choose a shortcut category, General settings, Playback preferences, or Backup and restore. Search settings, action names, language names, or keys across all ten interface languages. The toolbar popup provides searchable shortcut reference and compatibility status; **Open settings** opens the corresponding Options page for editing.
 
 - **Seeking:** set the built-in or any custom rewind/forward pair to 1–300 seconds, with separate keys for each direction, or add a jump to 0–100% of the video. Older custom intervals above 300 seconds become 300 seconds on upgrade while retaining their keys.
 - **Subtitle size:** edit the default 80% → 100% → 125% cycle with 2–6 different whole percentages from 50–300%, and drag to set their order. 100% restores the original size; this scales captions locally without changing Netflix account preferences. Regular playback and PiP keep their current sizes separately. Previously saved longer cycles are preserved, and fixed-size or extra cycle shortcuts remain editable and removable.
@@ -223,7 +223,7 @@ Reset controls have different scopes:
 
 ## Supported Languages
 
-The interface follows supported browser UI languages automatically, or you can choose English, Traditional Chinese, Simplified Chinese, Japanese, or Korean in Options.
+The interface follows supported browser UI languages automatically, or you can choose English, Traditional Chinese, Simplified Chinese, Japanese, Korean, Spanish, Brazilian Portuguese, French, German, or Indonesian in Options.
 
 ## Browser Support and Limitations
 

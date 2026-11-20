@@ -44,7 +44,7 @@ Theme tokens live in `src/styles/themes/*.css`. `src/index.css` maps them to Tai
 
 To add a style:
 
-1. Add an entry to `UI_STYLE_DEFINITIONS` in `src/shared/ui-styles.ts`, including its ID and names in all five languages. The `UiStyle` type, setting validator, and both selectors derive from this registry.
+1. Add an entry to `UI_STYLE_DEFINITIONS` in `src/shared/ui-styles.ts`, including its ID and names in all supported languages. The `UiStyle` type, setting validator, and both selectors derive from this registry.
 2. Add `src/styles/themes/<id>.css`, scoped to `:root[data-ui-style='<id>']` and its `.dark` variant. Copy an existing theme's complete token contract, then change its values.
 3. Run the theme contract tests and check light/dark Options, popup, menus, dialogs, switches, and keyboard focus. The contract tests reject duplicate IDs, missing or unregistered stylesheets, and incomplete light/dark tokens.
 
@@ -120,4 +120,4 @@ The Traditional Chinese undo-edit action is labeled **還原**. Its tooltip expl
 
 Preferred-speed editors use the seek editor's horizontal field layout: the draggable **Speed / 倍速** label with the visible `0.25–5 ×` range beneath it on the left, and a compact numeric input plus `×` unit on the right. The range describes the input for assistive technology. The field has no help-icon tooltip; autofocus, numeric stepping, label dragging and Save/Cancel behavior are retained for built-in and added preferred speeds.
 
-Modal descriptions use short, complete instructions in all five interface languages. Preferred speed says **設定倍速，快捷鍵可留空。**; seeking says **設定跳轉值，快捷鍵可留空。**; subtitle-size editors describe the size/order and optional key. Hold speed identifies the Play / Pause hold action. Import explicitly warns that all current settings will be replaced. Compatibility's screen-reader description identifies the results rather than announcing a permanent loading state. Range, validation and conflict messages stay next to their controls.
+Modal descriptions use short, complete instructions in all supported interface languages. Preferred speed says **設定倍速，快捷鍵可留空。**; seeking says **設定跳轉值，快捷鍵可留空。**; subtitle-size editors describe the size/order and optional key. Hold speed identifies the Play / Pause hold action. Import explicitly warns that all current settings will be replaced. Compatibility's screen-reader description identifies the results rather than announcing a permanent loading state. Range, validation and conflict messages stay next to their controls.

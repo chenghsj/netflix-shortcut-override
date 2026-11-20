@@ -20,6 +20,11 @@ field. They are not part of the extension package and are not uploaded by the bu
 | `zh_CN` | Simplified Chinese | [zh-CN.txt](zh-CN.txt) |
 | `ja` | Japanese | [ja.txt](ja.txt) |
 | `ko` | Korean | [ko.txt](ko.txt) |
+| `es` | Spanish | [es.txt](es.txt) |
+| `pt_BR` | Brazilian Portuguese | [pt-BR.txt](pt-BR.txt) |
+| `fr` | French | [fr.txt](fr.txt) |
+| `de` | German | [de.txt](de.txt) |
+| `id` | Indonesian | [id.txt](id.txt) |
 
 Upload the updated extension package, then select each language in the Chrome
 Web Store Developer Dashboard's **Store listing** page and paste its description.
@@ -32,7 +37,7 @@ Picture-in-Picture feature explicitly.
 ## Search terms
 
 The [Microsoft Edge Add-ons search terms](search-terms.md) contain seven suggested
-terms for each of the five languages, plus the dashboard's character and word
+terms for each supported language, plus the dashboard's character and word
 limits. Enter these separately in Partner Center's **Search terms** field.
 
 Reference: [Chrome Web Store listing localization](https://developer.chrome.com/docs/webstore/cws-dashboard-listing#localize_your_listing).
