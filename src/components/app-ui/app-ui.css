@@ -125,10 +125,16 @@ body.popup-page[data-app-ui] main h2 > button {
   font-weight: var(--ui-card-title-weight);
 }
 
-/* Popup reference: section titles, primary labels, nested labels, and values use 400.
+/* Popup reference and settings use regular weight for section titles, labels, and values.
    Keycaps and status badges retain their theme-defined weights. */
-body[data-app-ui] .app-popup-shortcuts :is(.app-popup-section-title, .app-popup-primary-label) {
+body[data-app-ui] .app-popup-shortcuts :is(.app-popup-section-title, .app-popup-primary-label),
+body[data-app-ui] .app-popup-settings [data-slot='field-label'] {
   font-weight: 400;
+}
+
+body[data-app-ui] .app-popup-settings [data-slot='field-label'] {
+  @apply leading-relaxed;
+  font-family: inherit;
 }
 
 body[data-app-ui] [data-slot='card-title'] > svg,

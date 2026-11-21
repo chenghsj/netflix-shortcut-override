@@ -25,8 +25,6 @@ export const RESET_SCOPE_COPY = {
     holdSpeed: 'Restore the hold speed, its enabled state and speed hint. The Play / Pause shortcut stays unchanged.',
     speedRange: 'Restore only the lowest speed, highest speed and adjustment amount. Preferred speeds and shortcuts stay unchanged.',
     restoreDraft: "Restore this editor's starting values. Save to apply.",
-    sizeDefaultsLabel: 'Use defaults',
-    sizeDefaults: 'Load the default subtitle sizes, cycle order and key into this editor. Save to apply.',
   },
   'zh-TW': {
     generalShortcuts: '還原所有一般快捷鍵的預設按鍵與啟用狀態，移除自訂跳轉、常用倍速及字幕大小快捷鍵，並還原字幕大小循環；逐句快捷鍵及其他設定維持原值。',
@@ -39,8 +37,6 @@ export const RESET_SCOPE_COPY = {
     holdSpeed: '還原長按倍速、啟用狀態與速度提示；播放／暫停快捷鍵維持原值。',
     speedRange: '只還原最低倍速、最高倍速與每次調整幅度；常用倍速與快捷鍵維持原值。',
     restoreDraft: '還原開啟視窗時的編輯內容，按儲存後套用。',
-    sizeDefaultsLabel: '套用預設值',
-    sizeDefaults: '載入預設的字幕大小、循環順序與按鍵，按儲存後套用。',
   },
   'zh-CN': {
     generalShortcuts: '恢复所有一般快捷键的默认按键与启用状态，移除自定义跳转、常用倍速及字幕大小快捷键，并恢复字幕大小循环；逐句快捷键及其他设置保持原值。',
@@ -53,8 +49,6 @@ export const RESET_SCOPE_COPY = {
     holdSpeed: '恢复长按倍速、启用状态与速度提示；播放／暂停快捷键保持原值。',
     speedRange: '仅恢复最低倍速、最高倍速与每次调整幅度；常用倍速与快捷键保持原值。',
     restoreDraft: '恢复打开窗口时的编辑内容，点击保存后应用。',
-    sizeDefaultsLabel: '使用默认值',
-    sizeDefaults: '载入默认字幕大小、循环顺序与按键，点击保存后应用。',
   },
   ja: {
     generalShortcuts: '一般ショートカットのキーと有効状態を既定値に戻します。追加したシーク・よく使う速度・字幕サイズのショートカットを削除し、字幕サイズの切替順を戻します。字幕の移動・リピートとその他の設定は保持します。',
@@ -67,8 +61,6 @@ export const RESET_SCOPE_COPY = {
     holdSpeed: '長押し速度・有効状態・速度ヒントを戻します。再生／一時停止のショートカットは保持します。',
     speedRange: '最低速度・最高速度・変更幅だけを戻します。よく使う速度とショートカットは保持します。',
     restoreDraft: '編集画面を開いたときの値に戻します。保存すると適用されます。',
-    sizeDefaultsLabel: '既定値を使う',
-    sizeDefaults: '字幕サイズ・切替順・キーの既定値を編集画面に読み込みます。保存すると適用されます。',
   },
   ko: {
     generalShortcuts: '모든 일반 단축키의 키와 활성화 상태를 기본값으로 되돌립니다. 추가한 탐색, 자주 쓰는 배속, 자막 크기 단축키를 삭제하고 자막 크기 순환을 초기화합니다. 문장 단축키와 다른 설정은 유지합니다.',
@@ -81,8 +73,6 @@ export const RESET_SCOPE_COPY = {
     holdSpeed: '길게 누르기 배속, 활성화 상태와 배속 힌트를 초기화합니다. 재생 / 일시 정지 단축키는 유지합니다.',
     speedRange: '최저 배속, 최고 배속과 조정 폭만 초기화합니다. 자주 쓰는 배속과 단축키는 유지합니다.',
     restoreDraft: '편집 창을 열었을 때의 값으로 되돌립니다. 저장하면 적용됩니다.',
-    sizeDefaultsLabel: '기본값 사용',
-    sizeDefaults: '기본 자막 크기, 순환 순서와 키를 편집 창에 불러옵니다. 저장하면 적용됩니다.',
   },
   es: {
     generalShortcuts: 'Restaura las teclas y el estado de los atajos generales. Elimina los atajos personalizados de salto, velocidad y tamaño de subtítulos, y restablece el ciclo de tamaños. Se conservan los atajos de navegación por subtítulos y el resto de la configuración.',
@@ -95,8 +85,6 @@ export const RESET_SCOPE_COPY = {
     holdSpeed: 'Restaura la velocidad temporal, su estado y el indicador. Se conserva el atajo Reproducir / Pausar.',
     speedRange: 'Restaura solo la velocidad mínima, la máxima y el ajuste. Se conservan las velocidades preferidas y sus atajos.',
     restoreDraft: 'Recupera los valores con los que se abrió el editor. Guarda para aplicar.',
-    sizeDefaultsLabel: 'Usar valores predeterminados',
-    sizeDefaults: 'Carga los tamaños, el orden y la tecla predeterminados en el editor. Guarda para aplicar.',
   },
   'pt-BR': {
     generalShortcuts: 'Restaura as teclas e o estado dos atalhos gerais. Remove os atalhos personalizados de salto, velocidade e tamanho de legendas e redefine o ciclo de tamanhos. Os atalhos de navegação por legendas e demais configurações são preservados.',
@@ -109,8 +97,6 @@ export const RESET_SCOPE_COPY = {
     holdSpeed: 'Restaura a velocidade temporária, seu estado e o indicador. O atalho Reproduzir / Pausar é preservado.',
     speedRange: 'Restaura apenas a velocidade mínima, a máxima e o ajuste. As velocidades preferidas e seus atalhos são preservados.',
     restoreDraft: 'Recupera os valores de quando o editor foi aberto. Salve para aplicar.',
-    sizeDefaultsLabel: 'Usar padrões',
-    sizeDefaults: 'Carrega os tamanhos, a ordem e a tecla padrão no editor. Salve para aplicar.',
   },
   fr: {
     generalShortcuts: 'Rétablit les touches et l’état des raccourcis généraux. Supprime les raccourcis personnalisés de saut, de vitesse préférée et de taille des sous-titres, et rétablit le cycle des tailles. Les raccourcis de navigation par sous-titres et les autres paramètres sont conservés.',
@@ -123,8 +109,6 @@ export const RESET_SCOPE_COPY = {
     holdSpeed: 'Rétablit la vitesse temporaire, son état et l’indicateur de vitesse. Le raccourci Lecture / Pause est conservé.',
     speedRange: 'Rétablit uniquement les vitesses minimale et maximale et le pas de réglage. Les vitesses préférées et leurs raccourcis sont conservés.',
     restoreDraft: 'Rétablit les valeurs à l’ouverture de l’éditeur. Enregistrez pour les appliquer.',
-    sizeDefaultsLabel: 'Utiliser les valeurs par défaut',
-    sizeDefaults: 'Charge les tailles, l’ordre et la touche par défaut dans l’éditeur. Enregistrez pour les appliquer.',
   },
   de: {
     generalShortcuts: 'Stellt Tasten und Status der allgemeinen Tastenkürzel wieder her. Entfernt benutzerdefinierte Sprung-, Geschwindigkeits- und Untertitelgrößenkürzel und stellt die Größenfolge wieder her. Untertitelnavigation und andere Einstellungen bleiben erhalten.',
@@ -137,8 +121,6 @@ export const RESET_SCOPE_COPY = {
     holdSpeed: 'Stellt die vorübergehende Geschwindigkeit, ihren Status und die Geschwindigkeitsanzeige wieder her. Das Kürzel Wiedergabe / Pause bleibt erhalten.',
     speedRange: 'Stellt nur Mindestgeschwindigkeit, Höchstgeschwindigkeit und Schrittweite wieder her. Bevorzugte Geschwindigkeiten und ihre Tastenkürzel bleiben erhalten.',
     restoreDraft: 'Stellt die Werte beim Öffnen des Editors wieder her. Speichern Sie, um sie zu übernehmen.',
-    sizeDefaultsLabel: 'Standardwerte verwenden',
-    sizeDefaults: 'Lädt die Standardgrößen, Reihenfolge und Taste in den Editor. Speichern Sie, um sie zu übernehmen.',
   },
   id: {
     generalShortcuts: 'Pulihkan tombol dan status pintasan umum. Hapus pintasan lompat, kecepatan pilihan, dan ukuran subtitel khusus, lalu pulihkan urutan ukuran subtitel. Pintasan navigasi subtitel dan pengaturan lain tetap sama.',
@@ -151,7 +133,5 @@ export const RESET_SCOPE_COPY = {
     holdSpeed: 'Pulihkan kecepatan sementara, statusnya, dan indikator kecepatan. Pintasan Putar / Jeda tetap sama.',
     speedRange: 'Pulihkan hanya kecepatan minimum, maksimum, dan langkah penyesuaian. Kecepatan pilihan dan pintasannya tetap sama.',
     restoreDraft: 'Pulihkan nilai saat editor dibuka. Simpan untuk menerapkannya.',
-    sizeDefaultsLabel: 'Gunakan pengaturan bawaan',
-    sizeDefaults: 'Muat ukuran, urutan, dan tombol bawaan ke editor. Simpan untuk menerapkannya.',
   },
 } satisfies Record<Locale, Record<string, string>>

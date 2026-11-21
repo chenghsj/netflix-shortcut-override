@@ -5,52 +5,17 @@ import { useRef, useState } from 'react'
 import { NumericSettingField } from '@/components/numeric-setting-field'
 import { Button } from '@/components/app-ui/button'
 import { Alert, AlertTitle } from '@/components/app-ui/alert'
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/app-ui/card'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/app-ui/dialog'
 import { FieldGroup } from '@/components/app-ui/field'
 import { Switch } from '@/components/app-ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/app-ui/table'
 import { getCopy } from '@/shared/i18n'
-import { DEFAULT_SETTINGS, HOLD_SPEED_LIMITS, normalizeHoldSpeedSettings, SPEED_LIMITS } from '@/shared/shortcut-settings'
+import { HOLD_SPEED_LIMITS, normalizeHoldSpeedSettings } from '@/shared/shortcut-settings'
 import type { Locale, ShortcutSettings } from '@/shared/shortcut-types'
 import type { useShortcutSettingsForm } from '@/shared/use-shortcut-settings-form'
-import { SPEED_SHORTCUT_COPY } from './speed-shortcut-copy'
+import { SPEED_SHORTCUT_COPY } from '@/shared/speed-shortcut-copy'
 
 type SettingsForm = ReturnType<typeof useShortcutSettingsForm>
-
-export function SpeedRangeSettings({ locale, form, updateSettings }: {
-  locale: Locale
-  form: SettingsForm['speed']
-  updateSettings: SettingsForm['updateSettings']
-}) {
-  const copy = getCopy(locale)
-  const speedCopy = SPEED_SHORTCUT_COPY[locale]
-  const reset = () => {
-    for (const field of ['min', 'max', 'step'] as const) form.setField(field, String(DEFAULT_SETTINGS.speed[field]))
-    updateSettings(current => ({ ...current, speed: { ...DEFAULT_SETTINGS.speed, preferred: current.speed.preferred } }))
-  }
-  return <Card role="group" aria-labelledby="speed-range-heading" aria-describedby="speed-range-description" size="sm" className="min-w-0">
-    <CardHeader>
-      <CardTitle id="speed-range-heading">{speedCopy.range}</CardTitle>
-      <CardDescription id="speed-range-description">{speedCopy.rangeDescription}</CardDescription>
-      <CardAction>
-        <ResetButton locale={locale} onClick={reset} label={copy.resetSpeedSettings} description={RESET_SCOPE_COPY[locale].speedRange}>{copy.reset}</ResetButton>
-      </CardAction>
-    </CardHeader>
-    <CardContent>
-      <FieldGroup className="grid gap-4 sm:grid-cols-3">
-        {(['min', 'max', 'step'] as const).map(field => <NumericSettingField key={field}
-          id={`${field}-speed`} label={field === 'min' ? copy.minSpeed : field === 'max' ? copy.maxSpeed : copy.step}
-          tooltip={field === 'min' ? copy.minSpeedTooltip : field === 'max' ? copy.maxSpeedTooltip : copy.stepTooltip}
-          infoLabel={copy.infoLabel}
-          min={SPEED_LIMITS[field].min} max={SPEED_LIMITS[field].max} step={SPEED_LIMITS.step.inputStep}
-          value={form.draft[field]} data-speed-field={field}
-          onValueChange={value => form.setField(field, value)} onBlur={() => form.commitField(field)}
-          onDragCommit={() => form.commitField(field)} onKeyDown={form.handleKeyDown} />)}
-      </FieldGroup>
-    </CardContent>
-  </Card>
-}
 
 export function HoldSpeedShortcutSettings({ locale, settings, form, updateSettings, id, open }: {
   locale: Locale

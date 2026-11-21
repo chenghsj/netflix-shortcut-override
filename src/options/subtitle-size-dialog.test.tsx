@@ -291,24 +291,52 @@ describe('subtitle size editor', () => {
     }))
   })
 
-  it('loads default sizes and key into the editor without applying them until saved', async () => {
+  it('undoes edits to the built-in cycle, restoring the saved order and shortcuts', async () => {
     const settings = structuredClone(DEFAULT_SETTINGS)
     settings.subtitleSizeCycle = [175, 100]
-    settings.bindings.cycleSubtitleSize = { enabled: false, key: { ...settings.bindings.mute.key, code: 'KeyZ', key: 'z' } }
+    settings.bindings.cycleSubtitleSize = {
+      enabled: false,
+      key: { ...settings.bindings.mute.key, code: 'KeyZ', key: 'z' },
+      additionalKeys: [{ ...settings.bindings.mute.key, code: 'KeyY', key: 'y' }],
+    }
     const saved = await saveSettings(settings)
     render(<OptionsApp />)
     fireEvent.click(await screen.findByRole('button', { name: 'Subtitles' }))
     const dialog = await editDialog()
-    expect(within(dialog).queryByRole('button', { name: 'Undo edits' })).not.toBeInTheDocument()
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Use defaults' }))
-    expect(within(dialog).getAllByRole('spinbutton').map(input => (input as HTMLInputElement).value)).toEqual(['80', '100', '125'])
+    const editor = within(dialog)
+    const restore = editor.getByRole('button', { name: 'Undo edits' })
+    expect(restore).toBeDisabled()
+    fireEvent.keyDown(editor.getByRole('button', { name: 'Reorder size 1' }), { key: 'ArrowDown' })
+    expect(restore).toBeEnabled()
+    fireEvent.keyDown(editor.getByRole('button', { name: 'Reorder size 2' }), { key: 'ArrowUp' })
+    expect(restore).toBeDisabled()
+    fireEvent.click(editor.getByRole('button', { name: 'Add shortcut' }))
+    expect(restore).toBeEnabled()
+    fireEvent.click(restore)
+    expect(restore).toBeDisabled()
+    expect(editor.getAllByRole('group', { name: 'Key' })).toHaveLength(2)
+    fireEvent.change(editor.getByLabelText('Size 1'), { target: { value: '' } })
+    expect(restore).toBeEnabled()
+    fireEvent.change(editor.getByLabelText('Size 1'), { target: { value: '175' } })
+    expect(restore).toBeDisabled()
+    fireEvent.change(editor.getByLabelText('Size 1'), { target: { value: '190' } })
+    fireEvent.keyDown(editor.getByRole('button', { name: 'Reorder size 1' }), { key: 'ArrowDown' })
+    fireEvent.keyDown(editor.getAllByRole('group', { name: 'Key' })[0], { code: 'KeyB', key: 'b' })
+    fireEvent.click(editor.getByRole('button', { name: 'Remove shortcut 2' }))
+    expect(editor.getByLabelText('Size 1')).toHaveValue(100)
+    expect(editor.getByRole('group', { name: 'Key' })).toHaveTextContent('B')
+
+    fireEvent.click(restore)
+    expect(restore).toBeDisabled()
+    expect(editor.getAllByRole('spinbutton').map(input => (input as HTMLInputElement).value)).toEqual(['175', '100'])
+    const restoredKeys = editor.getAllByRole('group', { name: 'Key' })
+    expect(restoredKeys).toHaveLength(2)
+    expect(restoredKeys[0]).toHaveTextContent('Z')
+    expect(restoredKeys[1]).toHaveTextContent('Y')
     expect(await getSettings()).toEqual(saved)
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
-    await waitFor(async () => expect(await getSettings()).toEqual({
-      ...saved,
-      subtitleSizeCycle: DEFAULT_SETTINGS.subtitleSizeCycle,
-      bindings: { ...saved.bindings, cycleSubtitleSize: { ...saved.bindings.cycleSubtitleSize, key: DEFAULT_SETTINGS.bindings.cycleSubtitleSize.key } },
-    }))
+    fireEvent.click(editor.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(await getSettings()).toEqual(saved)
   })
 
   it('edits a saved custom cycle inline with other subtitles and deletes both the entry and its binding', async () => {
@@ -319,7 +347,10 @@ describe('subtitle size editor', () => {
     render(<OptionsApp />)
     fireEvent.click(await screen.findByRole('button', { name: 'Subtitles' }))
     const dialog = await editDialog('Cycle sizes · 80% → 100% → 125%')
+    const restore = within(dialog).getByRole('button', { name: 'Undo edits' })
+    expect(restore).toBeDisabled()
     fireEvent.change(within(dialog).getByLabelText('Size 1'), { target: { value: '200' } })
+    expect(restore).toBeEnabled()
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add size' }))
     expect(within(dialog).getByLabelText('Size 4')).toHaveValue(150)
     fireEvent.click(within(dialog).getByRole('button', { name: 'Remove size 3' }))
@@ -348,7 +379,10 @@ describe('subtitle size editor', () => {
     const dialog = await editDialog('Set size · 125%')
     expect(dialog).toHaveAttribute('data-size', 'wide')
     expect(within(dialog).queryByText('Key', { selector: 'label' })).not.toBeInTheDocument()
+    const restore = within(dialog).getByRole('button', { name: 'Undo edits' })
+    expect(restore).toBeDisabled()
     fireEvent.change(within(dialog).getByLabelText('Size'), { target: { value: '175' } })
+    expect(restore).toBeEnabled()
     expect(within(dialog).queryByRole('button', { name: 'Add size' })).not.toBeInTheDocument()
     record(dialog, 'Space', ' ')
     expect(within(dialog).getByRole('alert')).toHaveTextContent('Play / Pause')

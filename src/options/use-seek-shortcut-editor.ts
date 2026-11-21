@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { DEFAULT_SETTINGS, SEEK_LIMITS } from '@/shared/shortcut-settings'
 import { getSeekShortcutActions, SEEK_SHORTCUT_LIMITS } from '@/shared/seek-shortcuts'
 import { applyShortcutAssignment } from '@/shared/shortcut-assignment'
+import { recordedKeysEqual } from '@/shared/shortcut-bindings'
 import { captureShortcutEdit, evaluateShortcutEdit, isShortcutEditCurrent, type ShortcutEditSnapshot } from '@/shared/shortcut-edit'
 import type { useShortcutSettingsForm } from '@/shared/use-shortcut-settings-form'
 import type { KeyBinding, SeekShortcut, ShortcutAction, ShortcutSettings } from '@/shared/shortcut-types'
@@ -25,7 +26,7 @@ export type SeekDialogState = {
   enableOnSave: boolean
 }
 const snapshot = (settings: ShortcutSettings, target: SeekEditorTarget, isNew = false): Snapshot => ({
-  value: valueFor(settings, target),
+  value: isNew && target.kind === 'custom' ? target.shortcut.value : valueFor(settings, target),
   keys: Object.fromEntries(actionsFor(target).map(action => [action, settings.bindings[action]?.key ?? null])),
   additionalKeys: Object.fromEntries(actionsFor(target).map(action => [action, settings.bindings[action]?.additionalKeys ?? []])),
   edit: captureShortcutEdit(settings, { kind: 'seek', shortcut: target.kind === 'custom' ? target.shortcut : null, isNew }),
@@ -46,7 +47,7 @@ export function useSeekShortcutEditor({ settings, updateSettings, supportsSubtit
     const saved = snapshot(settings, target, isNew)
     returnFocus.current = button
     setPending(null)
-    setDialog({ target, isNew, saved, enableOnSave, value: String(isNew && target.kind === 'custom' ? target.shortcut.value : saved.value),
+    setDialog({ target, isNew, saved, enableOnSave, value: String(saved.value),
       keys: saved.keys, additionalKeys: saved.additionalKeys,
     })
   }
@@ -64,9 +65,15 @@ export function useSeekShortcutEditor({ settings, updateSettings, supportsSubtit
   const keyConflicts = evaluation?.analysis.keyConflicts ?? {}
   const storageFull = evaluation?.storageFull ?? false
   const canSave = Boolean(dialog?.value.trim() && evaluation?.canSave)
+  const canRestore = Boolean(dialog && (
+    dialog.value !== String(dialog.saved.value) || actions.some(action => !recordedKeysEqual(
+      [dialog.keys[action] ?? null, ...(dialog.additionalKeys[action] ?? [])],
+      [dialog.saved.keys[action] ?? null, ...(dialog.saved.additionalKeys[action] ?? [])],
+    ))
+  ))
 
   return {
-    dialog, actions, percentage, min, max, stale, keyConflicts, canSave, storageFull,
+    dialog, actions, percentage, min, max, stale, keyConflicts, canSave, canRestore, storageFull,
     open,
     add: (kind: SeekShortcut['kind'], button: HTMLButtonElement) => open({ kind: 'custom', shortcut: { id: `seek:${crypto.randomUUID()}`, kind, value: kind === 'relative' ? 10 : 50 } }, button, true),
     setValue: (value: string) => setDialog(current => current && { ...current, value }),
@@ -74,7 +81,7 @@ export function useSeekShortcutEditor({ settings, updateSettings, supportsSubtit
     captureKeys: (action: ShortcutAction, keys: (KeyBinding | null)[]) => setDialog(current => current && { ...current,
       keys: { ...current.keys, [action]: keys[0] ?? null }, additionalKeys: { ...current.additionalKeys, [action]: keys.slice(1) } }),
     restore: () => setDialog(current => current && { ...current,
-      value: String(current.isNew && current.target.kind === 'custom' ? current.target.shortcut.value : current.saved.value),
+      value: String(current.saved.value),
       keys: current.saved.keys,
       additionalKeys: current.saved.additionalKeys,
     }),

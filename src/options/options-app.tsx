@@ -6,7 +6,7 @@ import { FEATURE_MANAGEMENT_COPY } from '@/shared/feature-management-copy'
 import { useFeatureManagement } from '@/options/use-feature-management'
 import { FeatureCheckbox } from '@/components/feature-checkbox'
 import { formatSubtitleSizes } from '@/shared/subtitle-size-shortcuts'
-import { ResetButton, RestoreButton } from '@/components/reset-button'
+import { ResetButton } from '@/components/reset-button'
 import { DeleteButton } from '@/components/delete-button'
 import { RESET_SCOPE_COPY } from '@/shared/reset-scopes'
 import { SUBTITLE_PERMISSION_COPY, SUBTITLE_NAVIGATION_COPY } from '@/shared/subtitle-navigation'
@@ -23,7 +23,6 @@ import { Fragment, useEffect, useId, useLayoutEffect, useRef, useState, type Com
 import { GitHubIcon } from '@/components/github-icon'
 import { KeyBindingKbd } from '@/components/key-binding-kbd'
 import { ShortcutKeysEditor } from '@/components/shortcut-keys-editor'
-import { LanguageCombobox } from '@/components/language-combobox'
 import { NumericSettingField } from '@/components/numeric-setting-field'
 import { OtherProjectsSelect } from '@/components/other-projects-select'
 import { SettingsTransferCard } from '@/options/settings-transfer-card'
@@ -42,8 +41,9 @@ import { useSubtitleSizeEditor } from '@/options/use-subtitle-size-editor'
 import { SeekShortcutDialog } from '@/options/seek-shortcut-dialog'
 import { useSeekShortcutEditor, type SeekEditorTarget } from '@/options/use-seek-shortcut-editor'
 import { ShortcutGroupToggle, ShortcutRow, shortcutRowId, ShortcutTableGroup } from '@/options/shortcut-table-group'
-import { HoldSpeedShortcutSettings, SpeedRangeSettings } from '@/options/speed-shortcut-settings'
-import { SPEED_SHORTCUT_COPY } from '@/options/speed-shortcut-copy'
+import { HoldSpeedShortcutSettings } from '@/options/speed-shortcut-settings'
+import { SpeedRangeSettings } from '@/components/speed-range-settings'
+import { SPEED_SHORTCUT_COPY } from '@/shared/speed-shortcut-copy'
 import { PreferredSpeedShortcutSettings } from '@/options/preferred-speed-shortcut-rows'
 import { getShortcutLabels, getSeekShortcutLabel, SEEK_PAIR_COPY, SEEK_SECTION_COPY, SEEK_SHORTCUT_COPY } from '@/shared/seek-shortcuts'
 import { createShortcutCatalog, type ShortcutSeekPair } from '@/shared/shortcut-catalog'
@@ -51,7 +51,7 @@ import { SettingLabelWithTooltip } from '@/components/setting-label-with-tooltip
 import { Label } from '@/components/app-ui/label'
 import { Popover, PopoverAnchor, PopoverArrow, PopoverContent } from '@/components/app-ui/popover'
 import { SettingsSaveStatus } from '@/components/settings-save-status'
-import { ChoiceCombobox } from '@/components/choice-combobox'
+import { GeneralSettingsFields, PlaybackPreferenceFields } from '@/components/settings-fields'
 import { Alert, AlertTitle } from '@/components/app-ui/alert'
 import { Badge } from '@/components/app-ui/badge'
 import { Button } from '@/components/app-ui/button'
@@ -72,7 +72,6 @@ import {
 import {
   Field,
   FieldGroup,
-  FieldLabel,
 } from '@/components/app-ui/field'
 import { Switch } from '@/components/app-ui/switch'
 import {
@@ -114,7 +113,6 @@ import { useShortcutSettingsForm } from '@/shared/use-shortcut-settings-form'
 import { EXTERNAL_LINKS, getShortcutOverrideRatingUrl } from '@/shared/external-links'
 import { useTheme } from '@/shared/use-theme'
 import { useUiStyle } from '@/shared/use-ui-style'
-import { getUiStyleOptions } from '@/shared/ui-styles'
 import { SUBTITLE_OPTIONS_HASH } from '@/shared/feature-announcements'
 import { DISPLAY_SHORTCUT_ACTIONS, SEEK_GROUPS, SHORTCUT_GROUPS } from '@/shared/shortcut-groups'
 import { OptionsBreadcrumb, OptionsLayout, OPTIONS_LAYOUT_COPY, type OptionsPage, type OptionsPageDescriptor, type ShortcutCategory } from '@/options/options-layout'
@@ -205,7 +203,6 @@ export function OptionsApp() {
     row?.scrollIntoView({ block: 'center', inline: 'nearest' })
   })
   const holdSpeedSettingsId = useId()
-  const pauseOverlaySettingsId = useId()
   const [expandedShortcutGroups, setExpandedShortcutGroups] = useState(() => new Set<OptionsShortcutGroupId>([...SEEK_GROUPS, 'holdSpeed', 'preferredSpeed']))
   const setShortcutGroupOpen = (group: OptionsShortcutGroupId, open: boolean) => {
     setExpandedShortcutGroups(current => {
@@ -743,45 +740,7 @@ export function OptionsApp() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <FieldGroup>
-                    <Field orientation="horizontal" className="items-center justify-between">
-                      <FieldLabel>{copy.locale}</FieldLabel>
-                      <LanguageCombobox
-                        autoLabel={copy.localeAuto}
-                        className="w-36"
-                        label={copy.locale}
-                        size="default"
-                        value={settings.locale}
-                        onChange={locale => updateSettings(current => ({ ...current, locale }))}
-                      />
-                    </Field>
-                    <Field orientation="horizontal" className="items-center justify-between">
-                      <FieldLabel>{copy.uiStyle}</FieldLabel>
-                      <ChoiceCombobox
-                        className="w-36"
-                        size="default"
-                        label={copy.uiStyle}
-                        value={settings.uiStyle}
-                        options={getUiStyleOptions(resolvedLocale, settings.uiStyle)}
-                        onChange={uiStyle => updateSettings(current => ({ ...current, uiStyle }))}
-                      />
-                    </Field>
-                    <Field orientation="horizontal" className="items-center justify-between">
-                      <FieldLabel>{copy.theme}</FieldLabel>
-                      <ChoiceCombobox
-                        className="w-36"
-                        label={copy.theme}
-                        size="default"
-                        value={settings.theme}
-                        options={[
-                          { value: 'auto', label: copy.themeAuto },
-                          { value: 'light', label: copy.themeLight },
-                          { value: 'dark', label: copy.themeDark },
-                        ]}
-                        onChange={theme => updateSettings(current => ({ ...current, theme }))}
-                      />
-                    </Field>
-                  </FieldGroup>
+                  <GeneralSettingsFields settings={settings} locale={resolvedLocale} updateSettings={updateSettings} />
                 </CardContent>
               </Card> },
     { id: 'automation', label: sectionCopy.playbackPreferences, group: 'settings', matches: matchesAutomation || matchesPauseScreen, content:               <Card>
@@ -790,50 +749,9 @@ export function OptionsApp() {
                     {searchingShortcuts ? sectionCopy.playbackPreferences : <OptionsBreadcrumb locale={resolvedLocale} group="settings" label={sectionCopy.playbackPreferences} />}
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="flex flex-col gap-6">
-                  {matchesAutomation && <FieldGroup role="group" aria-labelledby="automation-heading">
-                    <h3 id="automation-heading" className="text-base font-semibold">{copy.autoSkip}</h3>
-                    {([
-                      ['intro', copy.autoSkipIntro],
-                      ['recap', copy.autoSkipRecap],
-                    ] as const).map(([kind, label]) => (
-                      <div key={kind} className="flex items-center justify-between gap-3">
-                        <FieldLabel htmlFor={`auto-skip-${kind}`} aria-disabled={!settings.enabled}>
-                          {label}
-                        </FieldLabel>
-                        <Switch
-                          id={`auto-skip-${kind}`}
-                          checked={settings.autoSkip[kind]}
-                          disabled={!settings.enabled}
-                          onCheckedChange={checked => updateSettings(current => ({
-                            ...current,
-                            autoSkip: { ...current.autoSkip, [kind]: checked },
-                          }))}
-                        />
-                      </div>
-                    ))}
-                    <div className="flex items-center justify-between gap-3">
-                      <FieldLabel htmlFor="auto-next-episode" aria-disabled={!settings.enabled}>
-                        {copy.autoNextEpisode}
-                      </FieldLabel>
-                      <Switch
-                        id="auto-next-episode"
-                        checked={settings.autoNextEpisode}
-                        disabled={!settings.enabled}
-                        onCheckedChange={autoNextEpisode => updateSettings(current => ({ ...current, autoNextEpisode }))}
-                      />
-                    </div>
-                  </FieldGroup>}
-                  {matchesPauseScreen && <FieldGroup role="group" aria-labelledby="pause-screen-heading">
-                    <h3 id="pause-screen-heading" className="text-base font-semibold">{sectionCopy.pauseScreen}</h3>
-                    <Field orientation="horizontal" className="items-center justify-between">
-                      <SettingLabelWithTooltip htmlFor={pauseOverlaySettingsId}
-                        label={copy.hidePauseOverlay} tooltip={copy.hidePauseOverlayDescription} infoLabel={copy.infoLabel} />
-                      <Switch id={pauseOverlaySettingsId}
-                        checked={settings.hidePauseOverlay} disabled={!settings.enabled}
-                        onCheckedChange={hidePauseOverlay => updateSettings(current => ({ ...current, hidePauseOverlay }))} />
-                    </Field>
-                  </FieldGroup>}
+                <CardContent>
+                  <PlaybackPreferenceFields settings={settings} locale={resolvedLocale} updateSettings={updateSettings}
+                    showAutomation={matchesAutomation} showPauseScreen={matchesPauseScreen} />
                 </CardContent>
               </Card> },
     { id: 'backup', label: copy.backupRestore, group: 'settings', matches: matchesSettings('backup', shortcutQuery), content:               <SettingsTransferCard
@@ -988,9 +906,9 @@ export function OptionsApp() {
           </div>
 
           <DialogFooter className="sm:justify-between">
-            <RestoreButton onClick={editor.restoreSavedDraft} disabled={!recorder?.canRestoreDraft}
-              label={copy.restore}
-              description={RESET_SCOPE_COPY[resolvedLocale].restoreDraft} />
+            <Button type="button" variant="ghost" onClick={editor.restoreDraft} disabled={!recorder?.canRestoreDraft}>
+              {copy.restore}
+            </Button>
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button variant="outline" onClick={editor.closeRecorder}>
                 {copy.cancel}

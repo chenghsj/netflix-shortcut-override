@@ -1,5 +1,3 @@
-import { RestoreButton } from '@/components/reset-button'
-import { RESET_SCOPE_COPY } from '@/shared/reset-scopes'
 import { PlayIcon } from 'lucide-react'
 import { Fragment, useRef } from 'react'
 import { ShortcutKeysEditor } from '@/components/shortcut-keys-editor'
@@ -96,7 +94,7 @@ export function SeekShortcutDialog({ editor, settings, locale }: {
         {editor.storageFull && <Alert variant="destructive"><PlayIcon /><AlertTitle>{copy.settingsStorageFull}</AlertTitle></Alert>}
       </div>
       <DialogFooter className="sm:justify-between">
-        <RestoreButton onClick={editor.restore} label={copy.restore} description={RESET_SCOPE_COPY[locale].restoreDraft} />
+        <Button type="button" variant="ghost" onClick={editor.restore} disabled={!editor.canRestore}>{copy.restore}</Button>
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button variant="outline" onClick={editor.close}>{copy.cancel}</Button>
           <Button disabled={!editor.canSave} onClick={editor.save}>{copy.save}</Button>

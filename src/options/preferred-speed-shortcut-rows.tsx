@@ -10,7 +10,7 @@ import { getCopy } from '@/shared/i18n'
 import type { ShortcutTarget } from '@/shared/shortcut-routing'
 import type { Locale, PreferredSpeedShortcutAction, ShortcutAction, ShortcutSettings } from '@/shared/shortcut-types'
 import type { useShortcutSettingsForm } from '@/shared/use-shortcut-settings-form'
-import { SPEED_SHORTCUT_COPY } from './speed-shortcut-copy'
+import { SPEED_SHORTCUT_COPY } from '@/shared/speed-shortcut-copy'
 import type { useShortcutEditor } from './use-shortcut-editor'
 import { ShortcutRow, ShortcutTableGroup } from './shortcut-table-group'
 

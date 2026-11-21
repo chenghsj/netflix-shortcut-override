@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.7.2
+
+- Change the interface language, style, theme and playback preferences directly in the toolbar popup. Search for a setting to edit it in the results, or open Backup and restore from the popup menu.
+- The popup navigation menu closes before the selector changes width when switching between shortcuts and settings.
+- View the current playback speed limits and adjustment amount in the popup. Search by name or by the displayed value, such as `0.35×`.
+- Undo edits restores the values a shortcut editor opened with, including subtitle sizes, cycle order and additional keys. It also recognizes a changed character when recording the same physical key on a different keyboard layout.
+
 ## v0.7.1
 
 - Added Spanish, Brazilian Portuguese, French, German and Indonesian. The extension now has ten interface languages across Settings, the toolbar popup, the user guide and playback controls. Use automatic browser language detection or choose a language in Settings.

@@ -45,7 +45,7 @@ export function createHelpTopics(locale: Locale) {
     const resetDetails = (language: Locale) => {
       const copy = RESET_SCOPE_COPY[language]
       return [copy.generalShortcuts, copy.subtitleNavigation, copy.binding, copy.preferredSpeed, copy.seekInterval,
-        copy.subtitleSizeCycle, copy.holdSpeed, copy.speedRange, copy.restoreDraft, copy.sizeDefaults]
+        copy.subtitleSizeCycle, copy.holdSpeed, copy.speedRange, copy.restoreDraft]
     }
     const specialKeyDetails = (language: Locale) => [
       ...SPECIAL_SHORTCUT_KEYS.map(key => `${key}: ${SPECIAL_KEY_LABELS[language][key]}`),

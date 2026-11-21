@@ -7,6 +7,7 @@ import {
   isShortcutAction,
   keyBindingsEqual,
   keyListsEqual,
+  recordedKeysEqual,
 } from '@/shared/shortcut-bindings'
 import { DEFAULT_SETTINGS, normalizeSpeedSettings } from '@/shared/shortcut-settings'
 import { getPreferredSpeed } from '@/shared/preferred-speed-shortcuts'
@@ -30,12 +31,12 @@ type RecordingIntent =
   | { kind: 'enable'; reason: BindingRequest['reason'] }
 type Recorder = ShortcutTarget & {
   draft: KeyBinding | null
-  savedKey: KeyBinding | null
+  initialKey: KeyBinding | null
   additionalKeys: (KeyBinding | null)[]
-  savedAdditionalKeys: KeyBinding[]
+  initialAdditionalKeys: KeyBinding[]
   intent: RecordingIntent
   snapshot: ShortcutEditSnapshot
-  preferredSpeed?: { saved: number; draft: string }
+  preferredSpeed?: { initial: number; draft: string }
   isNewPreferredSpeed?: boolean
 }
 type Editing =
@@ -138,9 +139,8 @@ export function useShortcutEditor({
   const storageFull = validDraft && (evaluation?.storageFull ?? false)
   const canSaveDraft = validDraft && Boolean(evaluation?.canSave)
   const canRestoreDraft = Boolean(recorder && (
-    !keyBindingsEqual(recorder.draft, recorder.savedKey) ||
-    !keyListsEqual(recorder.additionalKeys, recorder.savedAdditionalKeys) ||
-    (recorder.preferredSpeed && recorder.preferredSpeed.draft !== String(recorder.preferredSpeed.saved))
+    !recordedKeysEqual([recorder.draft, ...recorder.additionalKeys], [recorder.initialKey, ...recorder.initialAdditionalKeys]) ||
+    (recorder.preferredSpeed && recorder.preferredSpeed.draft !== String(recorder.preferredSpeed.initial))
   ))
   const replacedNetflixKeys = recorder && [recorder.draft, ...recorder.additionalKeys].some(Boolean) && !activeConflict && recorder.group === 'general'
     ? getReplacedNetflixNativeKeyBindings(recorder.action, { enabled: settings.bindings[recorder.action]?.enabled ?? true,
@@ -167,17 +167,17 @@ export function useShortcutEditor({
       requestEnabled(target, binding.enabled, binding.key, 'reset')
     },
     edit: (target: ShortcutTarget, returnFocus?: HTMLButtonElement) => {
-      const savedKey = bindingFor(target).key
+      const { key, additionalKeys = [] } = bindingFor(target)
       const speed = target.group === 'general' ? getPreferredSpeed(settings, target.action) : undefined
       recorderReturnFocus.current = returnFocus ?? null
       setEditing({
         kind: 'record',
-        recorder: { ...target, savedKey, draft: savedKey, additionalKeys: bindingFor(target).additionalKeys ?? [],
-          savedAdditionalKeys: bindingFor(target).additionalKeys ?? [], intent: { kind: 'preserve-enabled' },
+        recorder: { ...target, initialKey: key, draft: key, additionalKeys,
+          initialAdditionalKeys: additionalKeys, intent: { kind: 'preserve-enabled' },
           snapshot: captureShortcutEdit(settings, speed !== undefined && target.group === 'general'
             ? { kind: 'preferredSpeed', action: target.action as 'setPreferredSpeed' | `preferred-speed:${string}` }
             : { kind: 'binding', target }),
-          ...(speed !== undefined ? { preferredSpeed: { saved: speed, draft: String(speed) } } : {}) },
+          ...(speed !== undefined ? { preferredSpeed: { initial: speed, draft: String(speed) } } : {}) },
       })
     },
     addPreferredSpeed: (returnFocus: HTMLButtonElement) => {
@@ -185,23 +185,23 @@ export function useShortcutEditor({
       const action = `preferred-speed:${crypto.randomUUID()}` as const
       setEditing({ kind: 'record', recorder: { group: 'general', action,
         snapshot: captureShortcutEdit(settings, { kind: 'preferredSpeed', action, isNew: true }),
-        savedKey: null, draft: null, additionalKeys: [], savedAdditionalKeys: [], intent: { kind: 'enable', reason: 'enable' }, isNewPreferredSpeed: true,
-        preferredSpeed: { saved: DEFAULT_SETTINGS.speed.preferred, draft: String(DEFAULT_SETTINGS.speed.preferred) } } })
+        initialKey: null, draft: null, additionalKeys: [], initialAdditionalKeys: [], intent: { kind: 'enable', reason: 'enable' }, isNewPreferredSpeed: true,
+        preferredSpeed: { initial: DEFAULT_SETTINGS.speed.preferred, draft: String(DEFAULT_SETTINGS.speed.preferred) } } })
     },
     dismissConflict: () => setEditing(current => current.kind === 'confirm' ? { kind: 'idle' } : current),
     changeConflictKey: (returnFocus: HTMLButtonElement | null) => {
       if (!validRequest) return
       const { key, reason, ...target } = validRequest
       const speed = target.group === 'general' ? getPreferredSpeed(settings, target.action) : undefined
+      const initialSpeed = speed !== undefined && reason === 'reset' ? DEFAULT_SETTINGS.speed.preferred : speed
       recorderReturnFocus.current = returnFocus
       setEditing({
         kind: 'record',
-        recorder: { ...target, draft: key, intent: { kind: 'enable', reason },
+        recorder: { ...target, initialKey: key, draft: key, initialAdditionalKeys: target.additionalKeys, intent: { kind: 'enable', reason },
           snapshot: captureShortcutEdit(settings, speed !== undefined && target.group === 'general'
             ? { kind: 'preferredSpeed', action: target.action as 'setPreferredSpeed' | `preferred-speed:${string}` }
             : { kind: 'binding', target }),
-          ...(speed !== undefined ? { preferredSpeed: { saved: speed,
-            draft: String(reason === 'reset' ? DEFAULT_SETTINGS.speed.preferred : speed) } } : {}) },
+          ...(initialSpeed !== undefined ? { preferredSpeed: { initial: initialSpeed, draft: String(initialSpeed) } } : {}) },
       })
     },
     confirmTransfer: () => {
@@ -221,16 +221,16 @@ export function useShortcutEditor({
     }),
     normalizePreferredSpeed: () => setEditing(current => {
       if (current.kind !== 'record' || !current.recorder.preferredSpeed) return current
-      const { saved, draft } = current.recorder.preferredSpeed
-      const value = draft.trim() && Number.isFinite(Number(draft)) ? Number(draft) : saved
+      const { initial, draft } = current.recorder.preferredSpeed
+      const value = draft.trim() && Number.isFinite(Number(draft)) ? Number(draft) : initial
       return { ...current, recorder: { ...current.recorder, preferredSpeed: {
         ...current.recorder.preferredSpeed, draft: String(normalizeSpeedSettings({ ...settings.speed, preferred: value }).preferred),
       } } }
     }),
-    restoreSavedDraft: () => setEditing(current => {
-      if (current.kind === 'record') return { ...current, recorder: { ...current.recorder, draft: current.recorder.savedKey,
-        additionalKeys: current.recorder.savedAdditionalKeys,
-        ...(current.recorder.preferredSpeed ? { preferredSpeed: { ...current.recorder.preferredSpeed, draft: String(current.recorder.preferredSpeed.saved) } } : {}) } }
+    restoreDraft: () => setEditing(current => {
+      if (current.kind === 'record') return { ...current, recorder: { ...current.recorder, draft: current.recorder.initialKey,
+        additionalKeys: current.recorder.initialAdditionalKeys,
+        ...(current.recorder.preferredSpeed ? { preferredSpeed: { ...current.recorder.preferredSpeed, draft: String(current.recorder.preferredSpeed.initial) } } : {}) } }
       return current
     }),
     saveDraft: () => {

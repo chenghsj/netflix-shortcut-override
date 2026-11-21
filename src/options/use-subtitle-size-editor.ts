@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
+import { recordedKeysEqual } from '@/shared/shortcut-bindings'
 import { captureShortcutEdit, evaluateShortcutEdit, type ShortcutEditSnapshot } from '@/shared/shortcut-edit'
-import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
-import { DEFAULT_SUBTITLE_SIZE_CYCLE, getSubtitleSizeEditLimit, isSubtitleSizeList, SUBTITLE_SIZE_LIMITS } from '@/shared/subtitle-size-shortcuts'
+import { getSubtitleSizeEditLimit, isSubtitleSizeList, SUBTITLE_SIZE_LIMITS } from '@/shared/subtitle-size-shortcuts'
 import type { KeyBinding, ShortcutSettings, SubtitleSizeShortcut, SubtitleSizeShortcutAction } from '@/shared/shortcut-types'
 import type { useShortcutSettingsForm } from '@/shared/use-shortcut-settings-form'
 
@@ -49,9 +49,14 @@ export function useSubtitleSizeEditor({ settings, updateSettings, supportsSubtit
   const keyConflicts = dialog ? evaluation?.analysis.keyConflicts[dialog.action] : undefined
   const storageFull = validSizes && (evaluation?.storageFull ?? false)
   const canSave = validSizes && (evaluation?.canSave ?? false)
+  const canRestore = Boolean(dialog && (
+    dialog.sizes.length !== dialog.saved.sizes.length ||
+    dialog.sizes.some((size, index) => size.value !== String(dialog.saved.sizes[index])) ||
+    !recordedKeysEqual([dialog.key, ...dialog.additionalKeys], [dialog.saved.key, ...dialog.saved.additionalKeys])
+  ))
 
   return {
-    dialog, validSizes, stale, keyConflicts, storageFull, canSave,
+    dialog, validSizes, stale, keyConflicts, storageFull, canSave, canRestore,
     open,
     setSize: (id: number, value: string) => setDialog(current => current && { ...current,
       sizes: current.sizes.map(size => size.id === id ? { ...size, value } : size) }),
@@ -74,11 +79,8 @@ export function useSubtitleSizeEditor({ settings, updateSettings, supportsSubtit
       ? { ...current, sizes: current.sizes.filter(size => size.id !== id) } : current),
     capture: (key: KeyBinding | null) => setDialog(current => current && { ...current, key }),
     captureKeys: (keys: (KeyBinding | null)[]) => setDialog(current => current && { ...current, key: keys[0] ?? null, additionalKeys: keys.slice(1) }),
-    restore: () => setDialog(current => {
-      if (!current) return null
-      if (current.action === 'cycleSubtitleSize') return { ...current, sizes: sizeDrafts(DEFAULT_SUBTITLE_SIZE_CYCLE),
-        key: DEFAULT_SETTINGS.bindings.cycleSubtitleSize.key, additionalKeys: [] }
-      return { ...current, sizes: sizeDrafts(current.saved.sizes), key: current.saved.key, additionalKeys: current.saved.additionalKeys }
+    restore: () => setDialog(current => current && {
+      ...current, sizes: sizeDrafts(current.saved.sizes), key: current.saved.key, additionalKeys: current.saved.additionalKeys,
     }),
     close: () => setDialog(null),
     restoreFocus: (event: Event) => {

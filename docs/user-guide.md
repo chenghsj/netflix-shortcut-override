@@ -32,7 +32,7 @@ Keys consumed by the operating system or browser may not reach the recorder or N
 
 Use `,` / `.` to move backward / forward by one frame. If playback is running, the extension pauses it first, then moves one frame and stays paused. Netflix's reported frame rate determines the interval; when unavailable, the extension estimates 24 FPS. Holding either key repeats the steps. `Shift + ,` / `Shift + .` still adjust playback speed. Frame stepping uses Netflix's seek API, so exact rendered-frame accuracy depends on its seek precision.
 
-In **Playback preferences → Pause screen → Hide pause overlay**, choose whether to hide Netflix's idle title/synopsis overlay and dark backdrop during pauses from Netflix's controls, keyboard shortcuts and frame stepping. This is off by default, and changes apply immediately. The information icon opens an explanatory tooltip. Subtitles and playback controls remain available. The global extension switch also controls this behavior and retains your saved preference when turned off and on again.
+In **Playback preferences → Hide pause overlay**, choose whether to hide Netflix's idle title/synopsis overlay and dark backdrop during pauses from Netflix's controls, keyboard shortcuts and frame stepping. This is off by default, and changes apply immediately. The information icon opens an explanatory tooltip. Subtitles and playback controls remain available. The global extension switch also controls this behavior and retains your saved preference when turned off and on again.
 
 Use `Shift + A` / `Shift + D` to select the previous / next available audio track, wrapping at the ends. The on-screen hint translates the language into the extension interface language and labels audio-description variants; unknown languages fall back to Netflix's track name. A single selected track stays unchanged. These shortcuts appear under **Volume and audio** in Options and the popup; frame shortcuts appear under **Seeking and navigation**. All four keys can be remapped or disabled in Options.
 
@@ -146,7 +146,7 @@ Playback speed preferences are next to their shortcuts in Options:
 - Expand the **Preferred speed** nested table on the Playback speed page and use **Add preferred speed** for additional groups. Each group has its own speed, optional shortcut, and enable switch. Edit or delete each group independently; resetting all shortcuts removes the additional groups.
 - **Hold** immediately below Play / Pause is a nested table with Speed, Enabled, Hint, and Action columns. The hint switch saves automatically. Edit opens the speed setting; Save applies the speed and Cancel discards its draft. It uses the configured Play / Pause key. Hold settings remain visible when disabled. The hint and speed controls become unavailable while hold speed is off; its enable control also becomes unavailable while Play / Pause is disabled, preserving the saved preference. This section starts expanded.
 
-The popup opens directly on shortcut reference, with search across all categories and a selector for viewing one category at a time. **Open settings**, marked with an external-link icon, opens the corresponding page in Options to edit its shortcuts. All preferences, including playback automation, subtitle navigation, hold speed, and preferred speed, are edited in Options. The global enable switch and top-right **Open options** button stay visible. GitHub, rating, and the other-products Store menu are in the fixed footer.
+The popup opens directly on shortcut reference, with search across all categories and a selector for viewing one category at a time. **Open settings**, marked with an external-link icon, opens the corresponding page in Options to edit its shortcuts. Change General settings and Playback preferences from the selector’s Settings group. Playback speed also shows the current minimum, maximum, and adjustment values under Range and step. The search box finds these values and lets you edit matching General settings and Playback preferences in the results. Use Options to change the speed range and step. Backup and restore opens its Options page. Subtitle navigation, hold speed, and preferred speed are edited in Options. The global enable switch and top-right **Open options** button stay visible. GitHub, rating, and the other-products Store menu are in the fixed footer.
 
 | Setting | Default | Range |
 | --- | ---: | --- |
@@ -192,7 +192,7 @@ For supported Netflix shortcuts such as Play / Pause, retaining the original key
 
 ## Auto Skip
 
-Open **Playback preferences → Playback automation** in Options to turn on **Intro** or **Recap**. Both are off by default and can be enabled independently. While the extension is enabled, it clicks the matching button when Netflix shows it. Rewinding lets the extension skip the segment again when the button reappears.
+Open **Playback preferences** to turn on **Automatically skip intro** or **Automatically skip recap**. Both are off by default and can be enabled independently. While the extension is enabled, it clicks the matching button when Netflix shows it. Rewinding lets the extension skip the segment again when the button reappears.
 
 ## Permissions
 

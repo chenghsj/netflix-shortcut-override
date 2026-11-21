@@ -9,7 +9,7 @@ import { SUBTITLE_NAVIGATION_COPY } from '@/shared/subtitle-navigation'
 import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
 import { LOCALES, type ShortcutSettings } from '@/shared/shortcut-types'
 import { getCopy } from '@/shared/i18n'
-import { SPEED_SHORTCUT_COPY } from '@/options/speed-shortcut-copy'
+import { SPEED_SHORTCUT_COPY } from '@/shared/speed-shortcut-copy'
 import { createSettingsBackup, serializeSettingsBackup } from '@/shared/settings-backup'
 import { fitsSettingsStorageLimit, getSettings, saveSettings } from '@/shared/storage'
 import { subtitleNavigationAnnouncement } from '@/shared/feature-announcements'
@@ -78,6 +78,57 @@ async function openPreferredSpeed() {
 }
 
 describe('OptionsApp', () => {
+  it.each([
+    ['Playback', 'Edit Next episode', 'nextEpisode', 'Record shortcut'],
+    ['Seeking and navigation', 'Edit Forward / Rewind 10 seconds', 'seekBackward', 'Rewind'],
+    ['Subtitles', 'Edit Cycle subtitle size', 'cycleSubtitleSize', 'Key'],
+  ] as const)('undoes keyboard-layout changes in %s', async (section, editButton, action, fieldLabel) => {
+    const settings = structuredClone(DEFAULT_SETTINGS)
+    settings.bindings[action] = {
+      enabled: true,
+      key: { code: 'KeyY', key: 'y', ctrl: false, alt: false, shift: false, meta: false },
+      additionalKeys: [{ code: 'KeyZ', key: 'z', ctrl: false, alt: false, shift: false, meta: false }],
+    }
+    await saveSettings(settings)
+    render(<OptionsApp />)
+    await selectShortcutCategory(section)
+    fireEvent.click(await screen.findByRole('button', { name: editButton }))
+    const dialog = within(await screen.findByRole('dialog'))
+    const [primary, additional] = dialog.getAllByRole('group', { name: fieldLabel })
+    const undo = dialog.getByRole('button', { name: 'Undo edits' })
+    for (const [field, code, recorded, initial] of [[primary, 'KeyY', 'z', 'Y'], [additional, 'KeyZ', 'y', 'Z']] as const) {
+      expect(undo).toBeDisabled()
+      fireEvent.keyDown(field, { code, key: recorded })
+      expect(field).toHaveTextContent(recorded.toUpperCase())
+      expect(undo).toBeEnabled()
+      fireEvent.click(undo)
+      expect(field).toHaveTextContent(initial)
+      expect(undo).toBeDisabled()
+    }
+  })
+
+  it.each([
+    ['播放', '編輯 播放 / 暫停'],
+    ['進度與跳轉', '編輯 前進／後退 10 秒'],
+    ['播放速度', '編輯 套用常用倍速'],
+    ['字幕', '編輯 切換字幕大小'],
+    ['字幕', '編輯 上一句'],
+  ])('shows a disabled 還原 button on opening %s / %s', async (section, editButton) => {
+    await saveSettings({ ...DEFAULT_SETTINGS, locale: 'zh-TW' })
+    render(<OptionsApp />)
+    await selectShortcutCategory(section)
+    fireEvent.click(await screen.findByRole('button', { name: editButton }))
+    const dialog = within(await screen.findByRole('dialog'))
+    const restore = dialog.getByRole('button', { name: '還原' })
+    expect(restore).toBeVisible()
+    expect(restore).toBeDisabled()
+    const recordingArea = dialog.getAllByRole('group').find(group => group.dataset.slot === 'shortcut-recording')!
+    fireEvent.keyDown(recordingArea, { key: 'q', code: 'KeyQ' })
+    expect(restore).toBeEnabled()
+    fireEvent.click(restore)
+    expect(restore).toBeDisabled()
+  })
+
   it('labels an existing Markdown selection correctly and hides it after changing away', async () => {
     await saveSettings({ ...DEFAULT_SETTINGS, uiStyle: 'markdown' })
     render(<OptionsApp />)
@@ -318,7 +369,10 @@ describe('OptionsApp', () => {
     await selectShortcutCategory('Playback speed')
     fireEvent.click(screen.getByRole('button', { name: 'Add preferred speed' }))
     const newDialog = await screen.findByRole('dialog', { name: 'Preferred speed' })
+    const restore = within(newDialog).getByRole('button', { name: 'Undo edits' })
+    expect(restore).toBeDisabled()
     fireEvent.keyDown(within(newDialog).getByRole('group', { name: 'Key' }), { code: 'KeyQ', key: 'q' })
+    expect(restore).toBeEnabled()
     expect(within(newDialog).getByRole('button', { name: 'Save' })).toBeDisabled()
     expect(newDialog).toHaveTextContent('Set preferred speed · 2×')
     fireEvent.click(within(newDialog).getByRole('button', { name: 'Cancel' }))
@@ -326,6 +380,7 @@ describe('OptionsApp', () => {
     expect((await getSettings()).preferredSpeedShortcuts).toHaveLength(1)
     fireEvent.click(screen.getByRole('button', { name: 'Edit Set preferred speed · 2×' }))
     const dialog = await screen.findByRole('dialog', { name: 'Preferred speed' })
+    expect(within(dialog).getByRole('button', { name: 'Undo edits' })).toBeDisabled()
     fireEvent.change(within(dialog).getByLabelText('Speed'), { target: { value: '2.5' } })
     await act(async () => { await saveSettings({ ...settings, preferredSpeedShortcuts: [{ id: 'preferred-speed:custom', speed: 3 }] }) })
     expect(within(dialog).getByRole('button', { name: 'Save' })).toBeDisabled()
@@ -431,8 +486,15 @@ describe('OptionsApp', () => {
     expect(section).toHaveAttribute('aria-expanded', 'true')
     const dialog = await screen.findByRole('dialog', { name: 'Record shortcut' })
     const seconds = within(dialog).getByLabelText('Seconds')
+    const restore = within(dialog).getByRole('button', { name: 'Undo edits' })
     expect(seconds).toHaveFocus()
+    expect(restore).toBeDisabled()
+    fireEvent.keyDown(within(dialog).getByRole('group', { name: 'Rewind' }), { code: 'KeyJ', key: 'j' })
+    expect(restore).toBeEnabled()
+    fireEvent.click(restore)
+    expect(restore).toBeDisabled()
     fireEvent.change(seconds, { target: { value: '17' } })
+    expect(restore).toBeEnabled()
     fireEvent.keyDown(seconds, { code: 'Digit2', key: '2' })
     expect(within(dialog).getByRole('group', { name: 'Rewind' })).toHaveTextContent('Set shortcut')
     fireEvent.keyDown(within(dialog).getByRole('group', { name: 'Rewind' }), { code: 'KeyJ', key: 'j' })
@@ -453,7 +515,10 @@ describe('OptionsApp', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Add percentage shortcut' }))
     let dialog = await screen.findByRole('dialog', { name: 'Record shortcut' })
     const progress = within(dialog).getByLabelText('Video progress (%)')
+    const restore = within(dialog).getByRole('button', { name: 'Undo edits' })
+    expect(restore).toBeDisabled()
     fireEvent.change(progress, { target: { value: '37' } })
+    expect(restore).toBeEnabled()
     expect(within(dialog).queryByText('Key', { selector: 'label' })).not.toBeInTheDocument()
     const keyField = within(dialog).getByRole('group', { name: 'Key' })
     fireEvent.keyDown(keyField, { code: 'ArrowRight', key: 'ArrowRight' })
@@ -473,6 +538,7 @@ describe('OptionsApp', () => {
     expect(screen.queryByRole('spinbutton', { name: '37%' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Edit 37%' }))
     dialog = await screen.findByRole('dialog', { name: 'Record shortcut' })
+    expect(within(dialog).getByRole('button', { name: 'Undo edits' })).toBeDisabled()
     fireEvent.change(within(dialog).getByLabelText('Video progress (%)'), { target: { value: '63' } })
     fireEvent.keyDown(within(dialog).getByRole('group', { name: 'Key' }), { code: 'Digit6', key: '6' })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
@@ -572,11 +638,13 @@ describe('OptionsApp', () => {
     const edit = await screen.findByRole('button', { name: 'Edit Forward / Rewind 10 seconds' })
     fireEvent.click(edit)
     let dialog = await screen.findByRole('dialog')
+    const restore = within(dialog).getByRole('button', { name: 'Undo edits' })
     fireEvent.change(within(dialog).getByLabelText('Seconds'), { target: { value: '20' } })
     fireEvent.keyDown(within(dialog).getByRole('group', { name: 'Rewind' }), { code: 'KeyJ', key: 'j' })
     fireEvent.keyDown(within(dialog).getByRole('group', { name: 'Forward' }), { code: 'KeyL', key: 'l' })
     expect((await getSettings()).seek.seconds).toBe(10)
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Undo edits' }))
+    fireEvent.click(restore)
+    expect(restore).toBeDisabled()
     expect(within(dialog).getByLabelText('Seconds')).toHaveValue(10)
     expect(within(dialog).getByRole('group', { name: 'Rewind' })).toHaveTextContent('←')
     expect(within(dialog).getByRole('group', { name: 'Forward' })).toHaveTextContent('→')
@@ -882,7 +950,7 @@ describe('OptionsApp', () => {
     ['介面風格', 'combobox', 'Interface style'],
     ['主題', 'combobox', 'Theme'],
     ['語言', 'combobox', 'Language'],
-    ['自動播放與略過', 'switch', 'Intro'],
+    ['自動略過片頭', 'switch', 'Automatically skip intro'],
     ['逐句模式', 'button', 'Edit Play / pause'],
     ['匯出設定', 'button', 'Export settings'],
     ['Show speed hint', 'switch', 'Play / Pause hold speed: Show speed hint'],
@@ -899,13 +967,13 @@ describe('OptionsApp', () => {
     await selectShortcutCategory('Volume and audio')
     const search = screen.getByRole('searchbox')
     fireEvent.change(search, { target: { value: '自動播放與略過' } })
-    fireEvent.click(screen.getByRole('switch', { name: 'Intro' }))
+    fireEvent.click(screen.getByRole('switch', { name: 'Automatically skip intro' }))
     await waitFor(async () => expect((await getSettings()).autoSkip.intro).toBe(true))
     expect(screen.queryByRole('button', { name: 'Reset general shortcuts' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Clear search' }))
     expect(search).toHaveFocus()
     expect(screen.getByRole('button', { name: 'Volume and audio' })).toHaveAttribute('aria-current', 'page')
-    expect(screen.queryByRole('switch', { name: 'Intro' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('switch', { name: 'Automatically skip intro' })).not.toBeInTheDocument()
   })
 
   it('finds custom seek and subtitle-size shortcuts and reflects external binding changes', async () => {
@@ -1032,7 +1100,7 @@ describe('OptionsApp', () => {
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
     await selectShortcutCategory('Playback preferences')
     expect(within(screen.getByRole('navigation', { name: 'Settings' })).getByRole('link', { name: 'Playback preferences' })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('switch', { name: 'Intro' })).toBeVisible()
+    expect(screen.getByRole('switch', { name: 'Automatically skip intro' })).toBeVisible()
     expect(screen.queryByRole('combobox', { name: 'Language' })).not.toBeInTheDocument()
     await selectShortcutCategory('Backup and restore')
     expect(within(screen.getByRole('navigation', { name: 'Settings' })).getByRole('link', { name: 'Backup and restore' })).toHaveAttribute('aria-current', 'page')
@@ -1188,13 +1256,16 @@ describe('OptionsApp', () => {
     ])
   })
 
-  it('saves the intro and recap preferences independently', async () => {
+  it('shows the four playback preferences together and saves the automation switches independently', async () => {
     render(<OptionsApp />)
     await selectShortcutCategory('Playback preferences')
-    const group = await screen.findByRole('group', { name: 'Playback automation' })
-    const intro = within(group).getByRole('switch', { name: 'Intro' })
-    const recap = within(group).getByRole('switch', { name: 'Recap' })
-    const nextEpisode = within(group).getByRole('switch', { name: 'Next episode' })
+    const intro = await screen.findByRole('switch', { name: 'Automatically skip intro' })
+    const recap = screen.getByRole('switch', { name: 'Automatically skip recap' })
+    const nextEpisode = screen.getByRole('switch', { name: 'Automatically play next episode' })
+    const overlay = screen.getByRole('switch', { name: 'Hide pause overlay' })
+    const rows = within(intro.closest<HTMLElement>('[data-slot="field-group"]')!)
+    expect(rows.getAllByRole('switch')).toEqual([intro, recap, nextEpisode, overlay])
+    expect(rows.queryByRole('heading')).not.toBeInTheDocument()
     expect(nextEpisode).not.toBeChecked()
     fireEvent.click(nextEpisode)
     await waitFor(async () => expect((await getSettings()).autoNextEpisode).toBe(true))
@@ -1212,8 +1283,7 @@ describe('OptionsApp', () => {
     const copy = getCopy(locale)
     const first = render(<OptionsApp />)
     await selectShortcutCategory(OPTIONS_SECTION_COPY[locale].playbackPreferences)
-    const pauseScreen = screen.getByRole('group', { name: OPTIONS_SECTION_COPY[locale].pauseScreen })
-    const toggle = within(pauseScreen).getByRole('switch', { name: copy.hidePauseOverlay })
+    const toggle = screen.getByRole('switch', { name: copy.hidePauseOverlay })
     expect(toggle).not.toBeChecked()
     expect(screen.queryByText(copy.hidePauseOverlayDescription)).not.toBeInTheDocument()
     const help = screen.getByRole('button', { name: copy.infoLabel.replace('{label}', copy.hidePauseOverlay) })
@@ -1631,6 +1701,36 @@ describe('OptionsApp', () => {
     fireEvent.click(within(popover).getByRole('button', { name: 'Use this key' }))
     await waitFor(async () => expect((await getSettings()).subtitleNavigation.bindings.playback.key?.code).toBe('KeyW'))
     expect((await getSettings()).subtitleNavigation.bindings.next.enabled).toBe(false)
+  })
+
+  it('undoes edits back to the proposed speed and key when opened from a reset conflict', async () => {
+    const settings = structuredClone(DEFAULT_SETTINGS)
+    settings.speed.preferred = 2.5
+    settings.bindings.mute.key = DEFAULT_SETTINGS.bindings.setPreferredSpeed.key
+    settings.bindings.setPreferredSpeed.key = { ...DEFAULT_SETTINGS.bindings.mute.key!, code: 'KeyQ', key: 'q' }
+    const saved = await saveSettings(settings)
+    render(<OptionsApp />)
+    await selectShortcutCategory('Playback speed')
+    fireEvent.click(await screen.findByRole('button', { name: 'Reset Set preferred speed' }))
+    await confirmReset()
+    const conflict = await screen.findByRole('dialog', { name: /is used by Mute/ })
+    fireEvent.click(within(conflict).getByRole('button', { name: 'Change key' }))
+
+    const editor = within(await screen.findByRole('dialog', { name: 'Preferred speed' }))
+    const speed = editor.getByLabelText('Speed')
+    const key = editor.getByRole('group', { name: 'Key' })
+    const openingKey = key.textContent
+    const restore = editor.getByRole('button', { name: 'Undo edits' })
+    expect(speed).toHaveValue(DEFAULT_SETTINGS.speed.preferred)
+    expect(restore).toBeDisabled()
+    fireEvent.change(speed, { target: { value: '3' } })
+    fireEvent.keyDown(key, { code: 'KeyQ', key: 'q' })
+    expect(restore).toBeEnabled()
+    fireEvent.click(restore)
+    expect(speed).toHaveValue(DEFAULT_SETTINGS.speed.preferred)
+    expect(key.textContent).toBe(openingKey)
+    expect(restore).toBeDisabled()
+    expect(await getSettings()).toEqual(saved)
   })
 
   it.each([false, true])('resets replay to unassigned and disabled from enabled=%s without taking over another shortcut', async enabled => {

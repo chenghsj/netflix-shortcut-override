@@ -14,9 +14,9 @@ describe('shared subtitle activation', () => {
     const popup = render(<PopupApp />)
     const name = 'Enable subtitle navigation shortcuts'
     const optionsToggle = await within(options.container).findByRole('switch', { name })
-    fireEvent.click(await within(popup.container).findByRole('combobox', { name: 'Shortcut category' }))
+    fireEvent.click(await within(popup.container).findByRole('combobox', { name: 'Shortcuts and settings' }))
     fireEvent.click(await screen.findByRole('option', { name: 'Subtitles' }))
-    const reference = within(popup.container).getByRole('region', { name: 'Sentence jumps and replay' })
+    const reference = await within(popup.container).findByRole('region', { name: 'Sentence jumps and replay' })
     expect(within(popup.container).queryByRole('switch', { name })).not.toBeInTheDocument()
     expect(within(reference).getAllByText('Disabled')).toHaveLength(2)
     fireEvent.click(optionsToggle)

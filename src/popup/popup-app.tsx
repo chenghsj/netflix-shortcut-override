@@ -14,10 +14,10 @@ import { useCompatibilitySession } from '@/popup/use-compatibility-session'
 import { usePopupFocusRestoration } from '@/popup/use-popup-focus-restoration'
 import { FEATURE_ANNOUNCEMENT_COPY } from '@/popup/feature-announcement-copy'
 import { FeatureAnnouncementCard } from '@/popup/feature-announcement-card'
-import { PopupShortcutsPanel } from '@/popup/popup-shortcuts-panel'
+import { PopupShortcutsPanel, type PopupCategory } from '@/popup/popup-shortcuts-panel'
 import { subtitleNavigationAnnouncement } from '@/shared/feature-announcements'
 import { EXTERNAL_LINKS, getShortcutOverrideRatingUrl } from '@/shared/external-links'
-import { OPTIONS_PAGE_HASHES, type OptionsLink, type ShortcutCategory } from '@/shared/options-navigation'
+import { OPTIONS_PAGE_HASHES, type OptionsLink } from '@/shared/options-navigation'
 import { resolveLocalePreference } from '@/shared/browser-locale'
 import { getBrowserCapabilities } from '@/shared/browser-capabilities'
 import { isCompatibilityCoreReady } from '@/shared/diagnostics'
@@ -41,7 +41,7 @@ const openOptionsPage = (beforeNavigate: () => void, page?: OptionsLink) => {
 }
 
 export function PopupApp() {
-  const [shortcutCategory, setShortcutCategory] = useState<ShortcutCategory>('playback')
+  const [category, setCategory] = useState<PopupCategory>('playback')
   const [shortcutQuery, setShortcutQuery] = useState('')
   const { settings, loaded, saveError, updateSettings } = useShortcutSettingsForm()
   const {
@@ -105,9 +105,9 @@ export function PopupApp() {
         <div className="flex flex-col gap-3">
           <FeatureAnnouncementCard announcement={subtitleNavigationAnnouncement} copy={FEATURE_ANNOUNCEMENT_COPY[locale]}
             onEnable={() => openOptionsPage(suppressFocusRestoration, 'subtitleNavigation')} />
-          <PopupShortcutsPanel settings={settings} locale={locale} supportsSubtitlePreservingPip={browserCapabilities.supportsSubtitlePreservingPip}
-            category={shortcutCategory} onCategoryChange={setShortcutCategory} query={shortcutQuery} onQueryChange={setShortcutQuery}
-            onOpenCategorySettings={category => openOptionsPage(suppressFocusRestoration, category)} />
+          <PopupShortcutsPanel settings={settings} updateSettings={updateSettings} locale={locale} supportsSubtitlePreservingPip={browserCapabilities.supportsSubtitlePreservingPip}
+            category={category} onCategoryChange={setCategory} query={shortcutQuery} onQueryChange={setShortcutQuery}
+            onOpenSettingsPage={page => openOptionsPage(suppressFocusRestoration, page)} />
         </div>
       </div>
       <footer className="flex shrink-0 flex-col gap-2 border-t border-border px-3 py-2">

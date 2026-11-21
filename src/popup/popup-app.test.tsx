@@ -8,7 +8,7 @@ import { OPTIONS_PAGE_HASHES } from '@/shared/options-navigation'
 import { PLAYBACK_FOCUS_RESTORATION_MESSAGE_TYPE } from '@/shared/playback-focus-restoration'
 import { DEFAULT_SETTINGS } from '@/shared/shortcut-settings'
 import { hideFeatures } from '@/shared/feature-management'
-import { getCopy } from '@/shared/i18n'
+import { getCopy, LOCALE_SHORT_LABELS } from '@/shared/i18n'
 import { getAudioFavoritesCopy } from '@/shared/audio-favorites-copy'
 import type { ShortcutSettings } from '@/shared/shortcut-types'
 import { getSettings, saveSettings } from '@/shared/storage'
@@ -25,7 +25,7 @@ const openCompatibilityDiagnostics = async () => {
 const getPopupShortcuts = () => screen.findByRole('region', { name: 'Shortcuts' })
 
 const selectCategory = async (name: string) => {
-  fireEvent.click(await screen.findByRole('combobox', { name: 'Shortcut category' }))
+  fireEvent.click(await screen.findByRole('combobox', { name: 'Shortcuts and settings' }))
   const category = ['Subtitle language and size', 'Sentence jumps and replay'].includes(name) ? 'Subtitles' : name
   fireEvent.click(await screen.findByRole('option', { name: category }))
   return screen.findByRole('region', { name })
@@ -74,10 +74,10 @@ describe('PopupApp', () => {
     expect(await screen.findByText('F20')).toBeVisible()
   })
 
-  it('opens directly on shortcut reference and keeps preferences in Options', async () => {
+  it('opens directly on the Playback shortcut reference', async () => {
     render(<PopupApp />)
     expect(await getPopupShortcuts()).toBeVisible()
-    expect(screen.getByRole('searchbox', { name: 'Search actions or keys…' })).toBeVisible()
+    expect(screen.getByRole('searchbox', { name: 'Search settings, actions or keys…' })).toBeVisible()
     expect(screen.getByRole('searchbox')).toHaveFocus()
     expect(screen.getByText('Play / Pause')).toBeVisible()
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
@@ -352,16 +352,16 @@ describe('PopupApp', () => {
     expect(screen.queryByText('Toggle subtitles')).not.toBeInTheDocument()
     expect(screen.getByRole('searchbox')).toHaveValue('SHIFT + keyd')
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'no-such-action' } })
-    expect(screen.getByText('No shortcuts found. Try another action or key.')).toBeVisible()
+    expect(screen.getByText('No settings or shortcuts found. Try another term or key.')).toBeVisible()
     fireEvent.keyDown(screen.getByRole('searchbox'), { key: 'Escape' })
-    expect(screen.getByRole('combobox', { name: 'Shortcut category' })).toHaveTextContent('Subtitles')
+    expect(screen.getByRole('combobox', { name: 'Shortcuts and settings' })).toHaveTextContent('Subtitles')
     expect(chrome.storage.sync.set).not.toHaveBeenCalled()
     popup.unmount()
     render(<PopupApp />)
     await getPopupShortcuts()
     expect(screen.getByRole('searchbox')).toHaveValue('')
     expect(screen.getByRole('searchbox')).toHaveFocus()
-    expect(screen.getByRole('combobox', { name: 'Shortcut category' })).toHaveTextContent('Playback')
+    expect(screen.getByRole('combobox', { name: 'Shortcuts and settings' })).toHaveTextContent('Playback')
   })
 
   it('finds translated categories and actions while keeping the current interface language', async () => {
@@ -422,6 +422,149 @@ describe('PopupApp', () => {
     expect(chrome.tabs.create).toHaveBeenCalledWith({ url: `chrome-extension://test-extension-id/options.html${OPTIONS_PAGE_HASHES[category]}` })
     act(() => window.dispatchEvent(new Event('pagehide')))
     expect(chrome.runtime.sendMessage).not.toHaveBeenCalled()
+  })
+
+  it('groups localized categories and opens Backup and restore in Options by keyboard', async () => {
+    await saveSettings({ ...DEFAULT_SETTINGS, locale: 'zh-TW' })
+    render(<PopupApp />)
+    const navigation = await screen.findByRole('combobox', { name: '快捷鍵與設定' })
+    fireEvent.click(navigation)
+    const list = await screen.findByRole('listbox', { name: '快捷鍵與設定' })
+    const shortcuts = within(list).getByRole('group', { name: '快捷鍵' })
+    const settings = within(list).getByRole('group', { name: '設定' })
+    expect(within(shortcuts).getAllByRole('option').map(option => option.textContent)).toEqual([
+      '播放', '進度與跳轉', '字幕', '音量與音軌', '播放速度',
+    ])
+    expect(within(settings).getAllByRole('option').map(option => option.textContent)).toEqual([
+      '一般設定', '播放偏好', '備份與還原',
+    ])
+    expect(list.querySelector('[title]')).toBeNull()
+    expect(navigation.querySelector('[title]')).toBeNull()
+    expect(list).toHaveFocus()
+    fireEvent.keyDown(list, { key: 'End' })
+    expect(within(settings).getByRole('option', { name: '備份與還原' })).toHaveAttribute('aria-selected', 'true')
+    fireEvent.keyDown(list, { key: 'Enter' })
+    expect(chrome.tabs.create).toHaveBeenCalledExactlyOnceWith({ url: 'chrome-extension://test-extension-id/options.html#backup' })
+    expect(navigation).toHaveTextContent('播放')
+    act(() => window.dispatchEvent(new Event('pagehide')))
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalled()
+  })
+
+  it('keeps the shortcut selector narrow until its menu closes', async () => {
+    render(<PopupApp />)
+    const selector = await screen.findByRole('combobox', { name: 'Shortcuts and settings' })
+    const settingsLink = screen.getByRole('button', { name: 'Open settings: Playback' })
+    fireEvent.click(selector)
+    fireEvent.click(await screen.findByRole('option', { name: 'General settings' }))
+
+    expect(selector).toHaveAttribute('aria-expanded', 'false')
+    expect(selector).toHaveTextContent('Playback')
+    expect(settingsLink).toBeVisible()
+    await screen.findByRole('region', { name: 'General settings' })
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+    expect(settingsLink).not.toBeInTheDocument()
+    expect(selector).toHaveFocus()
+  })
+
+  it('changes theme, interface style and language in the popup', async () => {
+    await saveSettings({ ...DEFAULT_SETTINGS, locale: 'en', theme: 'light', uiStyle: 'classic' })
+    render(<PopupApp />)
+    const general = within(await selectCategory('General settings'))
+
+    for (const [field, choice] of [['Theme', 'Dark'], ['Interface style', 'Neobrutalism'], ['Language', LOCALE_SHORT_LABELS['zh-TW']]]) {
+      const control = general.getByRole('combobox', { name: field })
+      fireEvent.click(control)
+      fireEvent.click(await screen.findByRole('option', { name: choice }))
+      await waitFor(() => expect(control).toHaveFocus())
+    }
+
+    expect(await screen.findByRole('region', { name: '一般設定' })).toBeVisible()
+    expect(screen.getByRole('combobox', { name: '快捷鍵與設定' })).toHaveTextContent('一般設定')
+    await waitFor(async () => expect(await getSettings()).toMatchObject({ locale: 'zh-TW', theme: 'dark', uiStyle: 'neobrutalism' }))
+    expect(chrome.tabs.create).not.toHaveBeenCalled()
+  })
+
+  it('saves playback preferences in the popup and disables editing while the extension is off', async () => {
+    await saveSettings({ ...DEFAULT_SETTINGS, autoSkip: { intro: false, recap: false }, autoNextEpisode: false, hidePauseOverlay: false })
+    render(<PopupApp />)
+    const preferences = within(await selectCategory('Playback preferences'))
+    const copy = getCopy('en')
+    const switches = [copy.autoSkipIntro, copy.autoSkipRecap, copy.autoNextEpisode, copy.hidePauseOverlay]
+      .map(name => preferences.getByRole('switch', { name }))
+    expect(preferences.getAllByRole('switch')).toEqual(switches)
+    expect(preferences.queryByRole('heading')).not.toBeInTheDocument()
+    switches.forEach(control => fireEvent.click(control))
+    await waitFor(async () => expect(await getSettings()).toMatchObject({
+      autoSkip: { intro: true, recap: true }, autoNextEpisode: true, hidePauseOverlay: true,
+    }))
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Enable extension' }))
+    switches.forEach(control => { expect(control).toBeDisabled(); expect(control).toBeChecked() })
+    expect(chrome.tabs.create).not.toHaveBeenCalled()
+  })
+
+  it('edits matching general settings and playback preferences directly in search results', async () => {
+    await saveSettings({ ...DEFAULT_SETTINGS, locale: 'en', theme: 'light' })
+    render(<PopupApp />)
+    const search = await screen.findByRole('searchbox')
+
+    fireEvent.change(search, { target: { value: '主題' } })
+    const general = within(screen.getByRole('region', { name: 'General settings' }))
+    const theme = general.getByRole('combobox', { name: 'Theme' })
+    expect(general.getAllByRole('combobox')).toEqual([theme])
+    fireEvent.click(theme)
+    fireEvent.click(await screen.findByRole('option', { name: 'Dark' }))
+    await waitFor(async () => expect((await getSettings()).theme).toBe('dark'))
+    expect(search).toHaveValue('主題')
+
+    fireEvent.change(search, { target: { value: '自動播放下一集' } })
+    const playback = within(screen.getByRole('region', { name: 'Playback preferences' }))
+    const nextEpisode = playback.getByRole('switch', { name: 'Automatically play next episode' })
+    expect(playback.getAllByRole('switch')).toEqual([nextEpisode])
+    fireEvent.click(nextEpisode)
+    await waitFor(async () => expect((await getSettings()).autoNextEpisode).toBe(true))
+
+    fireEvent.change(search, { target: { value: 'hide pause overlay' } })
+    const hidePauseOverlay = screen.getByRole('switch', { name: 'Hide pause overlay' })
+    fireEvent.click(hidePauseOverlay)
+    await waitFor(async () => expect((await getSettings()).hidePauseOverlay).toBe(true))
+    expect(chrome.tabs.create).not.toHaveBeenCalled()
+  })
+
+  it('shows current speed limits and step as read-only values in Playback speed and search', async () => {
+    const settings = await saveSettings({ ...DEFAULT_SETTINGS, speed: { min: 0.5, max: 4, step: 0.35, preferred: 2 } })
+    render(<PopupApp />)
+    await selectCategory('Playback speed')
+
+    const range = within(screen.getByRole('group', { name: 'Range and step' }))
+    for (const [name, value] of [['Lowest speed', '0.5×'], ['Highest speed', '4×'], ['Speed adjustment amount', '0.35×']]) {
+      expect(range.getByText(name).parentElement).toHaveTextContent(value)
+    }
+    expect(range.queryByRole('spinbutton')).not.toBeInTheDocument()
+    expect(range.queryByRole('button')).not.toBeInTheDocument()
+    await act(async () => { await saveSettings({ ...settings, speed: { ...settings.speed, max: 5 } }) })
+    expect(range.getByText('Highest speed').parentElement).toHaveTextContent('5×')
+
+    const search = screen.getByRole('searchbox')
+    fireEvent.change(search, { target: { value: '最高倍速' } })
+    const match = within(screen.getByRole('group', { name: 'Range and step' }))
+    expect(match.getByText('Highest speed').parentElement).toHaveTextContent('5×')
+    expect(match.queryByText('Lowest speed')).not.toBeInTheDocument()
+    expect(match.queryByText('Speed adjustment amount')).not.toBeInTheDocument()
+    expect(match.queryByRole('spinbutton')).not.toBeInTheDocument()
+    expect(match.queryByRole('button')).not.toBeInTheDocument()
+
+    for (const [query, label] of [['0.35', 'Speed adjustment amount'], ['0.35×', 'Speed adjustment amount'],
+      ['0.5×', 'Lowest speed'], ['最高倍速 5×', 'Highest speed']]) {
+      fireEvent.change(search, { target: { value: query } })
+      const result = within(screen.getByRole('group', { name: 'Range and step' }))
+      expect(result.getAllByRole('term')).toEqual([result.getByText(label)])
+    }
+    await act(async () => { await saveSettings(settings) })
+    expect(screen.queryByRole('group', { name: 'Range and step' })).not.toBeInTheDocument()
+
+    fireEvent.keyDown(search, { key: 'Escape' })
+    expect(screen.getByRole('group', { name: 'Range and step' })).toHaveTextContent('Speed adjustment amount')
   })
 
   it('reports Firefox Picture-in-Picture support in its category', async () => {
@@ -679,7 +822,7 @@ describe('PopupApp', () => {
     settings.subtitleNavigation.bindings.previous.key = { ...settings.bindings.seekForward.key!, key: 'custom label' }
     await saveSettings(settings)
     render(<PopupApp />)
-    fireEvent.click(await screen.findByRole('combobox', { name: '快捷鍵分類' }))
+    fireEvent.click(await screen.findByRole('combobox', { name: '快捷鍵與設定' }))
     fireEvent.click(screen.getByRole('option', { name: '字幕' }))
     const section = await screen.findByRole('region', { name: '逐句跳轉與重播' })
     expect(within(section).getByText('一般快捷鍵優先')).toHaveAttribute('aria-label', '這個按鍵由「快轉」使用，請為字幕導航設定其他按鍵。')

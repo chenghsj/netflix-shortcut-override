@@ -1,5 +1,5 @@
-import { ChevronsUpDownIcon } from 'lucide-react'
-import { useId, useState, type ReactNode } from 'react'
+import { ChevronsUpDownIcon, ExternalLinkIcon } from 'lucide-react'
+import { useId, useRef, useState, type ReactNode } from 'react'
 
 import { Button } from '@/components/app-ui/button'
 import {
@@ -9,6 +9,8 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
+  CommandSeparator,
+  CommandShortcut,
 } from '@/components/app-ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/app-ui/popover'
 import { cn } from '@/lib/utils'
@@ -24,8 +26,15 @@ export type ChoiceComboboxOption<Value extends string> = {
 type ChoiceComboboxProps<Value extends string> = {
   value: Value
   onChange: (value: Value) => void
+  changeAfterClose?: boolean
   label: string
   options: readonly ChoiceComboboxOption<Value>[]
+  optionsHeading?: string
+  secondaryGroup?: {
+    heading: string
+    options: readonly ChoiceComboboxOption<Value>[]
+    links?: readonly { value: string; label: string; onSelect: () => void }[]
+  }
   size?: 'sm' | 'default'
   className?: string
   triggerIcon?: ReactNode
@@ -38,8 +47,11 @@ type ChoiceComboboxProps<Value extends string> = {
 export function ChoiceCombobox<Value extends string>({
   value,
   onChange,
+  changeAfterClose = false,
   label,
   options,
+  optionsHeading,
+  secondaryGroup,
   size = 'sm',
   className,
   triggerIcon,
@@ -50,14 +62,33 @@ export function ChoiceCombobox<Value extends string>({
 }: ChoiceComboboxProps<Value>) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
+  const list = useRef<HTMLDivElement>(null)
+  const pendingValue = useRef<Value | null>(null)
+  const allOptions = secondaryGroup ? [...options, ...secondaryGroup.options] : options
   const matches = (option: ChoiceComboboxOption<Value>) =>
     [option.value, option.label, option.title ?? '', ...(option.keywords ?? [])].join(' ').toLowerCase().includes(query.toLowerCase())
-  const customOption = query.trim() && !options.some(matches) ? createOption?.(query) : undefined
+  const customOption = query.trim() && !allOptions.some(matches) ? createOption?.(query) : undefined
   const menuOptions = customOption ? [...options, customOption] : options
   const selectedDescriptionId = useId()
-  const selected = options.find(option => option.value === value) ?? (placeholder === undefined ? options[0] : undefined)
+  const selected = allOptions.find(option => option.value === value) ?? (placeholder === undefined ? allOptions[0] : undefined)
   const selectedTitle = selected?.title ?? selected?.label
   const iconOnly = triggerIcon !== undefined
+  const renderOption = (option: ChoiceComboboxOption<Value>) => (
+    <CommandItem key={option.value} value={option.value} disabled={option.disabled}
+      keywords={[option.label, option.title ?? option.label, ...(option.keywords ?? [])]}
+      data-checked={value === option.value}
+      onSelect={() => {
+        if (option.value !== value) {
+          if (changeAfterClose) pendingValue.current = option.value
+          else onChange(option.value)
+        }
+        setOpen(false)
+      }}>
+      <span className="min-w-0 flex-1 whitespace-normal break-words" title={option.title === option.label ? undefined : option.title}>
+        {option.label}
+      </span>
+    </CommandItem>
+  )
   const trigger = (
     <PopoverTrigger asChild>
       <Button
@@ -74,21 +105,35 @@ export function ChoiceCombobox<Value extends string>({
           {triggerIcon}
           <span id={selectedDescriptionId} className="sr-only">{selected?.label}</span>
         </> : <>
-          <span className="min-w-0 flex-1 truncate text-left" title={selectedTitle}>
+          <span className="min-w-0 flex-1 truncate text-left" title={open ? undefined : selectedTitle}>
             {selected?.label ?? (createOption && value ? value : placeholder)}
           </span>
-          <ChevronsUpDownIcon data-icon="inline-end" className="opacity-50" />
+          <ChevronsUpDownIcon aria-hidden="true" data-icon="inline-end" className="opacity-50" />
         </>}
       </Button>
     </PopoverTrigger>
   )
 
   return (
-    <Popover open={open} onOpenChange={nextOpen => { setOpen(nextOpen); setQuery('') }}>
+    <Popover open={open} onOpenChange={nextOpen => {
+      if (nextOpen && pendingValue.current !== null) return
+      setOpen(nextOpen)
+      setQuery('')
+    }}>
       {trigger}
       <PopoverContent
         align="end"
         collisionPadding={8}
+        onCloseAutoFocus={() => {
+          const next = pendingValue.current
+          pendingValue.current = null
+          if (next !== null) onChange(next)
+        }}
+        onOpenAutoFocus={event => {
+          if (search) return
+          event.preventDefault()
+          list.current?.focus()
+        }}
         className="w-max min-w-[max(10rem,var(--radix-popover-trigger-width))] max-w-(--radix-popover-content-available-width) p-0"
       >
         <Command
@@ -99,27 +144,24 @@ export function ChoiceCombobox<Value extends string>({
           }}
         >
           {search && <CommandInput placeholder={search.placeholder} value={query} onValueChange={setQuery} />}
-          <CommandList className="max-h-56">
+          <CommandList ref={list} label={label} className={secondaryGroup ? 'max-h-[min(22rem,calc(var(--radix-popover-content-available-height)-0.75rem))]' : 'max-h-56'}>
             {search && <CommandEmpty>{search.empty}</CommandEmpty>}
-            <CommandGroup>
-              {menuOptions.map(option => (
-                <CommandItem
-                  key={option.value}
-                  value={option.value}
-                  disabled={option.disabled}
-                  keywords={[option.label, option.title ?? option.label, ...(option.keywords ?? [])]}
-                  data-checked={value === option.value}
-                  onSelect={() => {
-                    if (option.value !== value) onChange(option.value)
-                    setOpen(false)
-                  }}
-                >
-                  <span className="min-w-0 flex-1 whitespace-normal break-words" title={option.title ?? option.label}>
-                    {option.label}
-                  </span>
-                </CommandItem>
-              ))}
+            <CommandGroup heading={optionsHeading}>
+              {menuOptions.map(renderOption)}
             </CommandGroup>
+            {secondaryGroup && <>
+              <CommandSeparator />
+              <CommandGroup heading={secondaryGroup.heading}>
+                {secondaryGroup.options.map(renderOption)}
+                {secondaryGroup.links?.map(link => <CommandItem key={link.value} value={link.value} keywords={[link.label]} onSelect={() => {
+                  setOpen(false)
+                  link.onSelect()
+                }}>
+                  <span className="min-w-0 flex-1 whitespace-normal break-words">{link.label}</span>
+                  <CommandShortcut aria-hidden="true"><ExternalLinkIcon /></CommandShortcut>
+                </CommandItem>)}
+              </CommandGroup>
+            </>}
           </CommandList>
         </Command>
       </PopoverContent>

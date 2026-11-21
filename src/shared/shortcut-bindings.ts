@@ -171,6 +171,17 @@ export const keyListsEqual = (
 ): boolean =>
   left.length === right.length && left.every((key, index) => keyBindingsEqual(key, right[index]))
 
+// Undo compares the stored characters as well as their physical shortcuts.
+export const recordedKeysEqual = (
+  left: readonly (KeyBinding | null)[],
+  right: readonly (KeyBinding | null)[],
+): boolean => left.length === right.length && left.every((key, index) => {
+  const other = right[index]
+  if (!key || !other) return key === other
+  return key.code === other.code && key.key === other.key && key.ctrl === other.ctrl &&
+    key.alt === other.alt && key.shift === other.shift && key.meta === other.meta
+})
+
 // Editors may contain empty recording fields. Saving removes those fields and
 // promotes the first remaining key to the backward-compatible primary field.
 export const bindingWithKeys = (enabled: boolean, keys: readonly (KeyBinding | null)[]): ShortcutBinding => {

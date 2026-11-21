@@ -81,33 +81,31 @@ export function ShortcutKeysEditor({ bindings, onChange, locale, conflicts, acti
             new Intl.ListFormat(locale).format(conflict.actions.map(actionLabel))),
         ].filter(Boolean)
         const id = `${feedbackId}-${index}`
-        return <div key={index} className="flex items-start gap-2">
-          <div className="min-w-0 flex-1">
-            <ShortcutRecordingArea
-              {...props}
-              ref={index === 0 ? ref : undefined}
-              binding={key}
-              tabIndex={0}
-              aria-invalid={errors.length > 0 || undefined}
-              aria-describedby={errors.length ? [props['aria-describedby'], id].filter(Boolean).join(' ') : props['aria-describedby']}
-              placeholder={copy.pressKey}
-              idlePlaceholder={copy.shortcutPlaceholder}
-              onClear={() => updateKey(index, null)}
-              clearLabel={props.clearLabel ?? copy.clearShortcut}
-              onClick={event => event.currentTarget.focus()}
-              onKeyDown={event => recordKey(index, event)}
-            />
-            {errors.length > 0 && <p id={id} role="alert" className="mt-2 text-sm text-destructive">
-              {errors.map((error, index) => <span key={index} className="block">{error}</span>)}
-            </p>}
-          </div>
+        return <div key={index} className="grid grid-cols-[minmax(0,1fr)_auto] items-center">
+          <ShortcutRecordingArea
+            {...props}
+            ref={index === 0 ? ref : undefined}
+            binding={key}
+            tabIndex={0}
+            aria-invalid={errors.length > 0 || undefined}
+            aria-describedby={errors.length ? [props['aria-describedby'], id].filter(Boolean).join(' ') : props['aria-describedby']}
+            placeholder={copy.pressKey}
+            idlePlaceholder={copy.shortcutPlaceholder}
+            onClear={() => updateKey(index, null)}
+            clearLabel={props.clearLabel ?? copy.clearShortcut}
+            onClick={event => event.currentTarget.focus()}
+            onKeyDown={event => recordKey(index, event)}
+          />
           {keys.length > 1 && (
             <Button
-              type="button" variant="ghost" size="icon" className="mt-3"
+              type="button" variant="ghost" size="icon" className="ms-2"
               aria-label={multi.remove.replace('{number}', String(index + 1))}
               onClick={() => removeShortcut(index)}
             ><Trash2Icon /></Button>
           )}
+          {errors.length > 0 && <p id={id} role="alert" className="col-start-1 row-start-2 mt-2 text-sm text-destructive">
+            {errors.map((error, index) => <span key={index} className="block">{error}</span>)}
+          </p>}
         </div>
       })}
       <Button

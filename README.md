@@ -139,7 +139,7 @@ Use the Options sidebar to choose a shortcut category, General settings, Playbac
 
 Custom seek pairs, percentage jumps, and additional preferred speeds start empty and have no predefined keys; assign them when adding each entry. Hold speed shares the Play / Pause binding. Automatic skipping and next-episode automation use switches rather than additional shortcut keys.
 
-In **Playback preferences → Playback automation**, enable Intro, Recap, or Next episode independently. Each clicks the matching Netflix button when it becomes visible. Under **Playback preferences → Pause screen**, **Hide pause overlay** hides the paused title, synopsis, and dark backdrop while keeping subtitles and playback controls visible. These options are all off by default.
+In **Playback preferences**, enable **Automatically skip intro**, **Automatically skip recap**, or **Automatically play next episode** independently. Each clicks the matching Netflix button when it becomes visible. **Hide pause overlay** hides the paused title, synopsis, and dark backdrop while keeping subtitles and playback controls visible. These options are all off by default.
 
 ### Editing Keys and Resolving Conflicts
 

@@ -77,6 +77,10 @@ describe('ChoiceCombobox icon trigger', () => {
     await act(async () => { await Promise.resolve() })
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
     expect(trigger).not.toHaveAttribute('aria-describedby')
+    fireEvent.click(trigger)
+    await screen.findByRole('option', { name: 'Auto' })
+    expect(screen.queryByTitle('Auto')).not.toBeInTheDocument()
+    expect(screen.getByTitle('English')).toHaveTextContent('EN')
   })
 })
 
